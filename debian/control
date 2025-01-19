@@ -1,0 +1,23 @@
+# Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LP <adrelanos@kicksecure.com>
+## See the file COPYING for copying conditions.
+
+Source: privleap
+Section: admin
+Priority: optional
+Maintainer: Patrick Schleizer <adrelanos@kicksecure.com>
+Build-Depends: debhelper (>= 13), debhelper-compat (= 13), python3
+Homepage: https://www.kicksecure.com/wiki/Privleap
+Vcs-Browser: https://github.com/Kicksecure/privleap
+Vcs-Git: https://github.com/Kicksecure/privleap.git
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+
+Package: privleap
+Architecture: all
+Depends: python3,
+         ${misc:Depends}
+Description: Limited privilege escalation framework
+ WARNING: Not yet stable.
+ .
+ Provides a privilege escalation framework for running pre-defined command
+ sequences ("actions") as root. Does not require a SUID executable.

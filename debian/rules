@@ -1,0 +1,12 @@
+#!/usr/bin/make -f
+
+## Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
+## See the file COPYING for copying conditions.
+
+#export DH_VERBOSE=1
+
+%:
+	dh $@
+
+override_dh_installchangelogs:
+	dh_installchangelogs changelog.upstream upstream

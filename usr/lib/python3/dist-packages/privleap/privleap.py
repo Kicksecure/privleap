@@ -114,19 +114,30 @@ class PrivleapCommServerResultStderrMessage:
     def serialize(self):
         return "RESULT_STDERR {0} ".format(self.action_name).encode("utf-8") + self.stderr_bytes
 
-class PrivleapCommServerChallengeMessage:
-    challenge_type = None
+class PrivleapCommServerResultExitcodeMessage:
+    action_name = None
+    exit_code = None
 
-    def __init__(self, challenge_type: str):
-        self.challenge_type = challenge_type
+    def __init__(self, action_name: str, exit_code: str):
+        self.action_name = action_name
+        self.exit_code = exit_code
 
     def serialize(self):
-        return "CHALLENGE {0}".format(self.challenge_type).encode("utf-8")
+        return "RESULT_EXITCODE {0} {1}" . format(self.action_name, self.exit_code).encode("utf-8")
 
-class PrivleapCommServerChallengePassMessage:
-    @staticmethod
-    def serialize():
-        return "CHALLENGE_PASS".encode("utf-8")
+#class PrivleapCommServerChallengeMessage:
+#    challenge_type = None
+#
+#    def __init__(self, challenge_type: str):
+#        self.challenge_type = challenge_type
+#
+#    def serialize(self):
+#        return "CHALLENGE {0}".format(self.challenge_type).encode("utf-8")
+#
+#class PrivleapCommServerChallengePassMessage:
+#    @staticmethod
+#    def serialize():
+#        return "CHALLENGE_PASS".encode("utf-8")
 
 class PrivleapCommServerUnauthorizedMessage:
     @staticmethod
@@ -158,7 +169,7 @@ class PrivleapSocket:
             except:
                 raise ValueError("user_name must be the name of a user that exists on the system")
             self.backend_socket = socket.socket(family = socket.AF_UNIX)
-            socket_path = PrivleapCommon.comm_path + user_name
+            socket_path = PrivleapCommon.comm_path + "/" + user_name
             self.backend_socket.bind(socket_path)
             os.chown(socket_path, target_uid, target_gid)
             os.chmod(socket_path, stat.S_IRUSR | stat.S_IWUSR)
@@ -234,8 +245,9 @@ class PrivleapSession:
             recv_buf += tmp_buf
 
         msg_len = int.from_bytes(recv_buf, byteorder='big')
+        recv_buf = b''
 
-        while (len(recv_buf) - header_len) != msg_len:
+        while len(recv_buf) != msg_len:
             try:
                 tmp_buf = self.backend_socket.recv(msg_len - len(recv_buf))
             except socket.timeout:
@@ -270,8 +282,9 @@ class PrivleapSession:
             max_loops -= 1
 
         msg_len = int.from_bytes(recv_buf, byteorder='big')
+        recv_buf = b''
 
-        while (len(recv_buf) - header_len) != msg_len:
+        while len(recv_buf) != msg_len:
             if max_loops == 0:
                 raise ConnectionAbortedError("Connection is too slow")
             try:
@@ -326,18 +339,21 @@ class PrivleapSession:
             # Ignore the message type field, we parsed that out already in
             # __get_message_type_field
             if i == 0:
-                recv_buf_pos = space_idx + 1
+                # If space_idx isn't equal to len(recv_buf), we hit an actual space,
+                # so we want to pick up scanning immediately *after* that space. If
+                # space_idx is equal to len(recv_buf) though, it's already at an
+                # index equal to one past the end of the data buffer, so there's no
+                # need to increment it.
+                if space_idx != len(recv_buf):
+                    recv_buf_pos = space_idx + 1
+                else:
+                    recv_buf_pos = space_idx
                 continue
 
             # Grab the detected string
             found_string = recv_buf[recv_buf_pos:space_idx].decode("utf-8")
             output_list.append(found_string)
 
-            # If space_idx isn't equal to len(recv_buf), we hit an actual space,
-            # so we want to pick up scanning immediately *after* that space. If
-            # space_idx is equal to len(recv_buf) though, it's already at an
-            # index equal to one past the end of the data buffer, so there's no
-            # need to increment it.
             if space_idx != len(recv_buf):
                 recv_buf_pos = space_idx + 1
             else:
@@ -423,12 +439,15 @@ class PrivleapSession:
             elif msg_type_str == "RESULT_STDERR":
                 param_list = self.__parse_message_parameters(recv_buf, str_count = 1, blob_at_end = True)
                 return PrivleapCommServerResultStderrMessage(param_list[0], param_list[1])
-            elif msg_type_str == "CHALLENGE":
-                param_list = self.__parse_message_parameters(recv_buf, str_count = 1, blob_at_end = False)
-                return PrivleapCommServerChallengeMessage(param_list[0])
-            elif msg_type_str == "CHALLENGE_PASS":
-                self.__parse_message_parameters(recv_buf, str_count = 0, blob_at_end = False)
-                return PrivleapCommServerChallengePassMessage()
+            elif msg_type_str == "RESULT_EXITCODE":
+                param_list = self.__parse_message_parameters(recv_buf, str_count = 2, blob_at_end = False)
+                return PrivleapCommServerResultExitcodeMessage(param_list[0], param_list[1])
+            #elif msg_type_str == "CHALLENGE":
+            #    param_list = self.__parse_message_parameters(recv_buf, str_count = 1, blob_at_end = False)
+            #    return PrivleapCommServerChallengeMessage(param_list[0])
+            #elif msg_type_str == "CHALLENGE_PASS":
+            #    self.__parse_message_parameters(recv_buf, str_count = 0, blob_at_end = False)
+            #    return PrivleapCommServerChallengePassMessage()
             elif msg_type_str == "UNAUTHORIZED":
                 self.__parse_message_parameters(recv_buf, str_count = 0, blob_at_end = False)
                 return PrivleapCommServerUnauthorizedMessage()
@@ -466,10 +485,11 @@ class PrivleapSession:
             if msg_obj_type != PrivleapCommServerTriggerMessage \
             and msg_obj_type != PrivleapCommServerResultStdoutMessage \
             and msg_obj_type != PrivleapCommServerResultStderrMessage \
-            and msg_obj_type != PrivleapCommServerChallengeMessage \
-            and msg_obj_type != PrivleapCommServerChallengePassMessage \
+            and msg_obj_type != PrivleapCommServerResultExitcodeMessage \
             and msg_obj_type != PrivleapCommServerUnauthorizedMessage:
-                raise ValueError("Invalid message type for socket.")
+            # and msg_obj_type != PrivleapCommServerChallengeMessage \
+            # and msg_obj_type != PrivleapCommServerChallengePassMessage \
+                        raise ValueError("Invalid message type for socket.")
         else:
             if msg_obj_type != PrivleapCommClientSignalMessage \
             and msg_obj_type != PrivleapCommClientResponseMessage:
@@ -492,9 +512,12 @@ class PrivleapAction:
         self.action_name = action_name
 
         conf_stream = StringIO(conf_data)
-        detect_comment_regex = re.compile(r"\s+#")
+        detect_comment_regex = re.compile(r"\s*#")
         for line in conf_stream:
+            line = line.strip()
             if detect_comment_regex.match(line):
+                continue
+            elif line == "":
                 continue
             line_parts = line.split('=', maxsplit = 1)
             if len(line_parts) != 2:

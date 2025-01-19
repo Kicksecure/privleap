@@ -47,36 +47,25 @@ enough.
 
 ## Usage
 
-privleap consists of three executables, `leap` (the client), `leapctl` (a
+privleap consists of three executables, `leaprun` (the client), `leapctl` (a
 privileged client for interacting with privleap's control mechanism), and
-`privleapd` (the background process). `leap` can be used to run actions (i.e.
-`leap stop-tor`). `privleapd` is executed by `init` as root and runs
-continuously in the background, awaiting *signals* from `leap` or any other
-application that is capable of speaking privleap's protocol. Note, that because
-privleap does not rely on SUID-root, *any* application can send signals to
-`privleapd`, not just `leap`. `leap` is merely a convenience utility to make
-privleap easier to use from within shell scripts and at the command line.
-`leapctl` should usually only be used by other background processes on the
-system, though it can be useful for debugging.
+`privleapd` (the background process). `leaprun` can be used to run actions
+(i.e. `leaprun stop-tor`). `privleapd` is executed by `init` as root and runs
+continuously in the background, awaiting *signals* from `leaprun` or any other
+application that is capable of speaking privleap's protocol. Note, that
+because privleap does not rely on SUID-root, *any* application can send
+signals to `privleapd`, not just `leaprun`. `leaprun` is merely a convenience
+utility to make privleap easier to use from within shell scripts and at the
+command line. `leapctl` should usually only be used by other background
+processes on the system, though it can be useful for debugging.
 
-The full syntax of the `leap` command is:
+The full syntax of the `leaprun` command is:
 
-    leap [<--response-file filename>] [<--non-interactive>] <signal_name>
+    leaprun <signal_name>
 
     signal_name : The name of the signal that leap should send. Sending a
                   signal with a particular name will request privleapd to
                   trigger an action of the same name.
-	--response-file : A file containing information that can be used to pass
-	                  a challenge sent by privleapd. If this argument is not
-	                  provided and privleapd sends a challenge in response to
-	                  leap's signal, leap will query the user for the needed
-	                  identity verification data. Otherwise, leap will use the
-	                  data in this file to pass the challenge automatically.
-	--non-interactive: Specifies that leap must not query the user for
-	                   identity verification data. Note that if signal you are
-	                   sending is expected to result in privleapd sending a
-	                   challenge, you must pass a --response-file argument as
-	                   well or leap will fail the challenge.
 
 The full syntax of the `leapctl` command is:
 
@@ -84,7 +73,7 @@ The full syntax of the `leapctl` command is:
 
     username : The name of the user account to create or destroy a
                communication socket of.
-	--create : Specifies that leapctl should request a communcation socket to
+	--create : Specifies that leapctl should request a communication socket to
 	           be created for the specified user.
 	--destroy : Specifies that leapctl should request a communication socket
 	            to be destroyed for the specified user.
@@ -131,21 +120,8 @@ The configuration file is formatted as follows:
       to trigger the action. If you want all users in a group and specific users
       outside of that group to be allowed to trigger an action, create multiple
       actions, one for the group and one for each user.
-    * `VerifyIdentity=` - Whether privleap needs to verify the identity of the
-      user before executing the action. One of either `true` or `false`,
-      defaults to `false`. If set to `true`, privleap will not immediately run
-      an action even if an authorized user requests it, but will instead
-      challenge the user to prove their identity via some mechanism.
-    * `IdentityMechanism=` - What mechanism to use for verifying the user's
-      identity. Currently the only supported value is `password`.
-        * When set to `password`, privleap will require the user to provide their
-          password before a requested action is run. The password must match the
-          password set in `/etc/shadow`. Note that this does **NOT** go through
-          PAM!
-        * In the future, perhaps other methods of identity verification can be
-          added (perhaps using PAM or GPG).
 
-## Protocol (socket-based option)
+## Protocol
 
 The server should assume that user-level clients are malicious and therefore
 treat any data from them with the utmost caution. Additionally, the server
@@ -164,18 +140,18 @@ trusted if it comes from an untrusted source. Messages are case-sensitive.
 Throughout this spec, placeholders are formatted as `<placeholder>`. These
 placeholders are expected to be substituted wholesale for the actual data that
 belongs there. For instance, `CREATE <username>` contains the placeholder
-`<username>`. If the username `john` is being used, the string would be changed
-to `CREATE john`.
+`<username>`. If the username `john` is being used, the string would be
+changed to `CREATE john`.
 
 When an application connects to any socket `privleapd` has open and is
-listening on, it begins a session with `privleapd`. Sessions are only held open
-for as long as necessary, and are closed as soon as possible.
+listening on, it begins a session with `privleapd`. Sessions are only held
+open for as long as necessary, and are closed as soon as possible.
 
 On startup, `privleapd` creates and listens on a socket at
 `/run/privleapd/control`. This socket is owned by `root:root` and uses
 permissions `0600`. The containing directory `/run/privleapd` is owned by
-`root:root` and uses permissions `0644`. The `control` socket is used to manage
-communication sockets for each individual user account.
+`root:root` and uses permissions `0644`. The `control` socket is used to
+manage communication sockets for each individual user account.
 
 `privleapd` understands the following messages passed via the `control` socket:
 
@@ -200,22 +176,22 @@ clients must be able to understand:
   username specified in the message has no communication socket open.
 
 Regardless of the reply, `privleapd` will close the session immediately after
-sending one of the above messages, and will ignore all but the first message the
-client sends.
+sending one of the above messages, and will ignore all but the first message
+the client sends.
 
 In actual operation, an application involved in user login is expected to send
-`CREATE <username>` when `<username>` logs in, while an application invovled in
-user logout is expected to send `DESTROY <username>` when the user logs out.
-This ensures that only actively logged-in users have open communication
+`CREATE <username>` when `<username>` logs in, while an application involved
+in user logout is expected to send `DESTROY <username>` when the user logs
+out. This ensures that only actively logged-in users have open communication
 sockets. If using shell scripts for this, `leapctl --create <username>` can be
 used to send `CREATE <username>`, while `leapctl --destroy <username>` can be
 used to send `DESTROY <username>`.
 
 Communication sockets are stored under `/run/privleapd/comm`. Each
-communication socket is named after the user it is intended to be used by (i.e.
-`<username>`). It is owned by the user and group corresponding to that user,
-and uses permissions `0600`. This ensures that only the authorized user can
-communicate with `privleapd` over this socket. This allows `privleapd` to
+communication socket is named after the user it is intended to be used by
+(i.e. `<username>`). It is owned by the user and group corresponding to that
+user, and uses permissions `0600`. This ensures that only the authorized user
+can communicate with `privleapd` over this socket. This allows `privleapd` to
 identify which user is sending messages to it.
 
 `privleapd` understands the following messages passed via a communication
@@ -223,9 +199,6 @@ socket:
 
 * `SIGNAL <signal_name>` - Sends a signal to `privleapd`, requesting the
   triggering of the action corresponding to `<signal_name>`.
-* `RESPONSE <response_text>` - Responds to an identity verification challenge.
-  `<response_text>` may contain arbitrary binary data, including space, NUL,
-  and any other "difficult" bytes.
 
 `privleapd` can send the following messages, which clients must be able to
 understand:
@@ -238,16 +211,16 @@ understand:
   otherwise it should wait to disconnect until receiving a `RESULT` message.
 * `RESULT_STDOUT <action_name> <result_stdout_text>` - Indicates that the
   action specified by `<action_name>` has completed execution, and that it
-  output `<result_stdout_text>` on STDOUT.
+  output `<result_stdout_text>` on STDOUT. `<result_stdout_text>` is arbitrary
+  binary data.
 * `RESULT_STDERR <action_name> <result_stderr_text>` - Indicates that the
   action specified by `<action_name>` has completed execution, and that it
-  output `<result_stderr_text>` on STDERR.
-* `CHALLENGE <challenge_type>` - Requests the client to verify the identity of
-  the user, using the method specified in `<challenge_type>`. Valid
-  `<challenge_type>` values directly corresponnd to valid `IdentityMechanism=`
-  values in privleap's configuration.
-* `CHALLENGE_PASS` - Indicates that the client successfully passed the
-  challenge.
+  output `<result_stderr_text>` on STDERR. `<result_stderr_text>` is arbitrary
+  binary data.
+* `RESULT_EXITCODE <action_name> <exit_code>` - Indicates that the action
+  specified by `<action_name>` has completed execution, and that it exited with
+  code `<exit_code>`. `<exit_code>` is a string representing a decimal integer
+  between 0 and 255.
 * `UNAUTHORIZED` - Indicates that the client failed the challenge, that the
   user attempting to trigger the specified action is not authorized to do so,
   or that the signal send by the client has no matching action. This response
@@ -255,29 +228,28 @@ understand:
   perform the action, or whether the action doesn't even exist.
 
 `privleapd` will only send any of the above server-sent messages exactly once
-per session, and will only parse the first one of each of the above client-sent
-messages per session. `privleapd` will terminate the session immediately after
-sending `UNAUTHORIZED`, or immediately after sending both `RESULT_STDOUT` and
-`RESULT_STDERR`. A `CHALLENGE` must be responded to by the client within 30
-seconds, or `privleapd` will send `UNAUTHORIZED` and terminate the session. It
-is an error for the client to send more than one of the above client-sent
-messages per second, and doing so will result in `privleapd` forcibly
-disconnecting the client.
+per session, and will only parse the first one of each of the above
+client-sent messages per session. `privleapd` will terminate the session
+immediately after sending `UNAUTHORIZED`, or immediately after sending both
+`RESULT_STDOUT` and `RESULT_STDERR`. It is an error for the client to send
+more than one of the above client-sent messages per session, and doing so will
+result in `privleapd` forcibly disconnecting the client.
 
-In actual operation, the client (most likely `leap`) is expected to open a
-session with `privleapd` and send a `SIGNAL` message. If the user it authorized
-to trigger the action corresponding to this signal, `privleapd` will respond
-with `TRIGGER` upon triggering the action, then will send `RESULT_STDOUT` and
-`RESULT_STDERR` once the action completes. If the action requires identify
-verification, `privleapd` will instead respond with `CHALLENGE`, and `leap` is
-expected to reply to the challenge with a `RESPONSE`. If the response is valid,
-`privleapd` will send `TRIGGER`, then `RESULT_STDOUT` and `RESULT_STDERR` once
-the action is complete. If a bad `RESPONSE` is sent, if the user isn't
-permitted by the configuration to trigger the action, or if the requested
-action doesn't exist, `privleapd` will send `UNAUTHORIZED`.
+In actual operation, the client (most likely `leaprun`) is expected to open a
+session with `privleapd` and send a `SIGNAL` message. If the user is
+authorized to trigger the action corresponding to this signal, `privleapd`
+will respond with `TRIGGER` upon triggering the action, then will send
+`RESULT_STDOUT` and `RESULT_STDERR` once the action completes.
 
-## TODO:
+## Potential future development:
 
-* Identity verification isn't a thing yet at all.
-* Probably just offload all of the identity junk to PAM, which has this down to
-  a science at this point
+* Right now privleap is designed only to allow running specific actions as
+  root without a password, without the dangers of sudo. It would make it much
+  more useful if it was able to handle identity verification. This could be
+  done with `CHALLENGE` and `CHALLENGE_PASS` messages from the server, and
+  a `RESPONSE` message from the client. This would only allow for simple
+  password-based (or similar) auth though. PAM could potentially also be used,
+  but trying to forward PAM auth requests over a socket could be extremely
+  difficult or impossible, so in practice this would probably end up bypassing
+  PAM, which is potentially livable but not ideal.
+* We don't share the exit code of the action with the client yet.
