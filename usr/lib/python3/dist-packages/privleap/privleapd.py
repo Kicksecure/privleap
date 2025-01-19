@@ -26,202 +26,232 @@ class PrivleapdGlobal:
 def handle_control_session(control_socket: PrivleapSocket):
     try:
         control_session = control_socket.get_session()
-        control_msg = control_session.get_msg()
     except Exception:
         print("handle_control_session: could not start session with client")
         print(traceback.format_exc())
         return
 
-    if type(control_msg) == PrivleapControlClientCreateMsg:
-        for sock in PrivleapdGlobal.socket_list:
-            if sock.user_name == control_msg.user_name:
-                # User already has an open socket
+    # PyCharm apparently can't figure out this try/finally block.
+    # noinspection PyUnreachableCode
+    try:
+        try:
+            control_msg = control_session.get_msg()
+        except Exception:
+            print("handle_control_session: could not get message from client")
+            print(traceback.format_exc())
+            return
+
+        if type(control_msg) == PrivleapControlClientCreateMsg:
+            for sock in PrivleapdGlobal.socket_list:
+                if sock.user_name == control_msg.user_name:
+                    # User already has an open socket
+                    try:
+                        control_session.send_msg(PrivleapControlServerExistsMsg())
+                    except Exception:
+                        print("handle_control_session: handling CREATE, could not send EXISTS")
+                        print(traceback.format_exc())
+                    print("handle_control_session: handled CREATE message for user '" + control_msg.user_name + "', socket already exists")
+                    return
+
+            user_list = [pw[0] for pw in pwd.getpwall()]
+            if not control_msg.user_name in user_list:
                 try:
-                    control_session.send_msg(PrivleapControlServerExistsMsg())
+                    control_session.send_msg(PrivleapControlServerErrorMsg())
                 except Exception:
-                    print("handle_control_session: handling CREATE, could not send EXISTS")
+                    print("handle_control_session: handling CREATE, could not send ERROR")
                     print(traceback.format_exc())
-                print("handle_control_session: handled CREATE message for user '" + control_msg.user_name + "', socket already exists")
+                print("handle_control_session: User '" + control_msg.user_name + "' does not exist")
                 return
 
-        user_list = [pw[0] for pw in pwd.getpwall()]
-        if not control_msg.user_name in user_list:
             try:
-                control_session.send_msg(PrivleapControlServerErrorMsg())
+                comm_socket = PrivleapSocket(PrivleapSocketType.COMMUNICATION, control_msg.user_name)
+                PrivleapdGlobal.socket_list.append(comm_socket)
+                try:
+                    control_session.send_msg(PrivleapControlServerOkMsg())
+                except Exception:
+                    print("handle_control_session: handling CREATE, could not send OK")
+                    print(traceback.format_exc())
+                print("handle_control_session: handled CREATE message for user '" + control_msg.user_name + "', socket created")
+                return
             except Exception:
-                print("handle_control_session: handling CREATE, could not send ERROR")
+                # TODO: This should never happen, should this really be just
+                #  a warning?
+                print("WARNING: Failed to create socket for user '" + control_msg.user_name + "'!", file=sys.stderr)
                 print(traceback.format_exc())
-            print("handle_control_session: User '" + control_msg.user_name + "' does not exist")
+                try:
+                    control_session.send_msg(PrivleapControlServerErrorMsg())
+                except Exception:
+                    print("handle_control_session: handling CREATE, could not send ERROR")
+                    print(traceback.format_exc())
+                return
 
-        try:
-            comm_socket = PrivleapSocket(PrivleapSocketType.COMMUNICATION, control_msg.user_name)
-            PrivleapdGlobal.socket_list.append(comm_socket)
-            try:
-                control_session.send_msg(PrivleapControlServerOkMsg())
-            except Exception:
-                print("handle_control_session: handling CREATE, could not send OK")
-                print(traceback.format_exc())
-            print("handle_control_session: handled CREATE message for user '" + control_msg.user_name + "', socket created")
-        except Exception:
-            # TODO: This should never happen, should this really be just
-            #  a warning?
-            print("WARNING: Failed to create socket for user '" + control_msg.user_name + "'!", file=sys.stderr)
-            print(traceback.format_exc())
-            try:
-                control_session.send_msg(PrivleapControlServerErrorMsg())
-            except Exception:
-                print("handle_control_session: handling CREATE, could not send ERROR")
-                print(traceback.format_exc())
-
-    elif type(control_msg) == PrivleapControlClientDestroyMsg:
-        found_user = False
-        remove_sock_idx = -1
-        for sock_idx, sock in enumerate(PrivleapdGlobal.socket_list):
-            if sock.user_name == control_msg.user_name:
-                socket_path = PrivleapCommon.comm_path + "/" + control_msg.user_name
-                if os.path.exists(socket_path):
-                    try:
-                        os.remove(socket_path)
-                    except Exception:
-                        # Probably just a TOCTOU issue, i.e. someone already
-                        # removed the socket. Most likely caused by the user
-                        # fiddling with things, no big deal.
+        elif type(control_msg) == PrivleapControlClientDestroyMsg:
+            remove_sock_idx = -1
+            for sock_idx, sock in enumerate(PrivleapdGlobal.socket_list):
+                if sock.user_name == control_msg.user_name:
+                    socket_path = PrivleapCommon.comm_path + "/" + control_msg.user_name
+                    if os.path.exists(socket_path):
+                        try:
+                            os.remove(socket_path)
+                        except Exception:
+                            # Probably just a TOCTOU issue, i.e. someone already
+                            # removed the socket. Most likely caused by the user
+                            # fiddling with things, no big deal.
+                            print("handle_control_session: handling DESTROY, failed to delete socket at '" + socket_path + "'")
+                            print(traceback.format_exc())
+                    else:
                         print("handle_control_session: handling DESTROY, no socket to delete at '" + socket_path + "'")
-                        print(traceback.format_exc())
-                remove_sock_idx = sock_idx
-                found_user = True
-                break
+                    remove_sock_idx = sock_idx
+                    break
 
-        if found_user:
-            PrivleapdGlobal.socket_list.pop(remove_sock_idx)
-            try:
-                control_session.send_msg(PrivleapControlServerOkMsg())
-            except Exception:
-                print("handle_control_session: handling DESTROY, could not send OK")
-                print(traceback.format_exc())
-            print("handle_control_session: handled DESTROY message for user '" + control_msg.user_name + "', socket deleted")
+            if remove_sock_idx != -1:
+                PrivleapdGlobal.socket_list.pop(remove_sock_idx)
+                try:
+                    control_session.send_msg(PrivleapControlServerOkMsg())
+                except Exception:
+                    print("handle_control_session: handling DESTROY, could not send OK")
+                    print(traceback.format_exc())
+                print("handle_control_session: handled DESTROY message for user '" + control_msg.user_name + "', socket destroyed")
+                return
+            else:
+                try:
+                    control_session.send_msg(PrivleapControlServerNouserMsg())
+                except Exception:
+                    print("handle_control_session: handling DESTROY, could not send NOUSER")
+                    print(traceback.format_exc())
+                print("handle_control_session: handled DESTROY message for user '" + control_msg.user_name + "', socket did not exist")
+                return
         else:
-            try:
-                control_session.send_msg(PrivleapControlServerNouserMsg())
-            except Exception:
-                print("handle_control_session: handling DESTROY, could not send NOUSER")
-                print(traceback.format_exc())
-            print("handle_control_session: handled DESTROY message for user '" + control_msg.user_name + "', socket did not exist")
-    else:
-        print("CRITICAL ERROR: privleapd mis-parsed a control command from the client!")
-        sys.exit(2)
+            print("CRITICAL ERROR: privleapd mis-parsed a control command from the client!")
+            sys.exit(2)
 
-    control_session.close_session()
+    finally:
+        print("control cleanup")
+        control_session.close_session()
 
 def handle_comm_session(comm_socket):
     try:
         comm_session = comm_socket.get_session()
-        comm_msg = comm_session.get_msg()
     except Exception:
         print("handle_comm_session: could not start session with client")
         print(traceback.format_exc())
         return
 
-    if type(comm_msg) != PrivleapCommClientSignalMsg:
-        # Illegal message, a SIGNAL needs to be the first message.
-        comm_session.close_session()
-        print("handle_comm_session: Did not read SIGNAL as first message, forcibly closed connection.")
-        return
-
-    signal_name = comm_msg.signal_name
-    desired_action = None
-    for action in PrivleapdGlobal.action_list:
-        if action.action_name == signal_name:
-            desired_action = action
-            break
-
-    if desired_action is None:
-        # No such action, send back UNAUTHORIZED since we don't want to leak
-        # the list of available actions to the client.
+    try:
         try:
-            comm_session.send_msg(PrivleapCommServerUnauthorizedMsg())
+            comm_msg = comm_session.get_msg()
         except Exception:
-            print("handle_comm_session: Could not send UNAUTHORIZED")
+            print("handle_comm_session: could not get message from client")
             print(traceback.format_exc())
-
-        comm_session.close_session()
-        print("handle_comm_session: Could not find action '" + signal_name + "'")
-        return
-
-    if desired_action.auth_user is not None:
-        # Action exists but can only be run by certain users.
-        if desired_action.auth_user != comm_session.user_name:
-            # User is not authorized to run this action.
-            try:
-                comm_session.send_msg(PrivleapCommServerUnauthorizedMsg())
-            except Exception:
-                print("handle_comm_session: Could not send UNAUTHORIZED")
-                print(traceback.format_exc())
-
-            comm_session.close_session()
-            print("handle_comm_session: User is not authorized to run action '" + desired_action.action_name + "'")
             return
 
-    if desired_action.auth_group is not None:
-        # Action exists but can only be run by certain groups.
-        # We need to get the list of groups this user is a member of to
-        # determine whether they are authorized or not.
-        user_gid = grp.getgrnam(comm_session.user_name)[2]
-        group_list = [grp.getgrgid(gid)[0] for gid in os.getgrouplist(comm_session.user_name, user_gid)]
-        found_matching_group = False
-        for group in group_list:
-            if group == desired_action.auth_group:
-                found_matching_group = True
+        if type(comm_msg) != PrivleapCommClientSignalMsg:
+            # Illegal message, a SIGNAL needs to be the first message.
+            print("handle_comm_session: Did not read SIGNAL as first message, forcibly closing connection.")
+            return
+
+        signal_name = comm_msg.signal_name
+        desired_action = None
+        for action in PrivleapdGlobal.action_list:
+            if action.action_name == signal_name:
+                desired_action = action
                 break
 
-        if not found_matching_group:
-            # User is not in the group authorized to run this action.
+        if desired_action is None:
+            # No such action, send back UNAUTHORIZED since we don't want to leak
+            # the list of available actions to the client.
             try:
                 comm_session.send_msg(PrivleapCommServerUnauthorizedMsg())
             except Exception:
                 print("handle_comm_session: Could not send UNAUTHORIZED")
                 print(traceback.format_exc())
 
-            comm_session.close_session()
-            print("handle_comm_session: User is not in a group authorized to run action '" + desired_action.action_name + "'")
+            print("handle_comm_session: Could not find action '" + signal_name + "'")
             return
 
-    # TODO: Add identity verification here in the future.
+        if desired_action.auth_user is not None:
+            # Action exists but can only be run by certain users.
+            if desired_action.auth_user != comm_session.user_name:
+                # User is not authorized to run this action.
+                try:
+                    comm_session.send_msg(PrivleapCommServerUnauthorizedMsg())
+                except Exception:
+                    print("handle_comm_session: Could not send UNAUTHORIZED")
+                    print(traceback.format_exc())
 
-    # If we get this far, the user is authorized. Run the action.
-    action_process = subprocess.Popen(['/usr/bin/bash', '-c', desired_action.action_command], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-    print("handle_comm_session: Triggered action '" + desired_action.action_name + "'")
-    try:
-        comm_session.send_msg(PrivleapCommServerTriggerMsg(desired_action.action_name))
-    except Exception:
-        # Client already disconnected. At this point the action is already
-        # running, and there's not any point in waiting for the process's stdout
-        # and stderr, so the thread can end here.
-        print("handle_comm_session: action triggered, but could not send TRIGGER")
-        print(traceback.format_exc())
-        return
+                print("handle_comm_session: User is not authorized to run action '" + desired_action.action_name + "'")
+                return
 
-    # Wait for the process to finish up, and send the stdout, stderr, and exit
-    # code from it.
-    action_output = action_process.communicate()
-    print("handle_comm_session: Action '" + desired_action.action_name + "' completed")
-    try:
-        comm_session.send_msg(PrivleapCommServerResultStdoutMsg(desired_action.action_name, action_output[0]))
-    except Exception:
-        print("handle_comm_session: action triggered, but could not send RESULT_STDOUT")
-        print(traceback.format_exc())
+        if desired_action.auth_group is not None:
+            # Action exists but can only be run by certain groups.
+            # We need to get the list of groups this user is a member of to
+            # determine whether they are authorized or not.
+            user_gid = pwd.getpwnam(comm_session.user_name).pw_gid
+            group_list = [grp.getgrgid(gid)[0] for gid in os.getgrouplist(comm_session.user_name, user_gid)]
+            found_matching_group = False
+            for group in group_list:
+                if group == desired_action.auth_group:
+                    found_matching_group = True
+                    break
 
-    try:
-        comm_session.send_msg(PrivleapCommServerResultStderrMsg(desired_action.action_name, action_output[1]))
-    except Exception:
-        print("handle_comm_session: action triggered, but could not send RESULT_STDERR")
-        print(traceback.format_exc())
+            if not found_matching_group:
+                # User is not in the group authorized to run this action.
+                try:
+                    comm_session.send_msg(PrivleapCommServerUnauthorizedMsg())
+                except Exception:
+                    print("handle_comm_session: Could not send UNAUTHORIZED")
+                    print(traceback.format_exc())
 
-    try:
-        comm_session.send_msg(PrivleapCommServerResultExitcodeMsg(desired_action.action_name, action_process.returncode))
-    except Exception:
-        print("handle_comm_session: action triggered, but could not send RESULT_EXITCODE")
-        print(traceback.format_exc())
+                print("handle_comm_session: User is not in a group authorized to run action '" + desired_action.action_name + "'")
+                return
+
+        # TODO: Add identity verification here in the future.
+
+        # If we get this far, the user is authorized. Run the action.
+        action_process = subprocess.Popen(['/usr/bin/bash', '-c',
+                                           desired_action.action_command],
+                                          stdout = subprocess.PIPE,
+                                          stderr = subprocess.PIPE,
+                                          preexec_fn=os.setpgrp)
+        print("handle_comm_session: Triggered action '" + desired_action.action_name + "'")
+        try:
+            comm_session.send_msg(PrivleapCommServerTriggerMsg(desired_action.action_name))
+        except Exception:
+            # Client already disconnected. At this point the action is already
+            # running, and there's not any point in waiting for the process's stdout
+            # and stderr, so the thread can end here.
+            print("handle_comm_session: action triggered, but could not send TRIGGER")
+            print(traceback.format_exc())
+            return
+
+        # Wait for the process to finish up, and send the stdout, stderr, and exit
+        # code from it.
+        action_output = action_process.communicate()
+        print("handle_comm_session: Action '" + desired_action.action_name + "' completed")
+        try:
+            comm_session.send_msg(PrivleapCommServerResultStdoutMsg(desired_action.action_name, action_output[0]))
+        except Exception:
+            print("handle_comm_session: action triggered, but could not send RESULT_STDOUT")
+            print(traceback.format_exc())
+            return
+
+        try:
+            comm_session.send_msg(PrivleapCommServerResultStderrMsg(desired_action.action_name, action_output[1]))
+        except Exception:
+            print("handle_comm_session: action triggered, but could not send RESULT_STDERR")
+            print(traceback.format_exc())
+            return
+
+        try:
+            comm_session.send_msg(PrivleapCommServerResultExitcodeMsg(desired_action.action_name, action_process.returncode))
+        except Exception:
+            print("handle_comm_session: action triggered, but could not send RESULT_EXITCODE")
+            print(traceback.format_exc())
+            return
+
+    finally:
+        print("comm cleanup")
+        comm_session.close_session()
 
 def main():
     # Ensure that there aren't two servers running at once

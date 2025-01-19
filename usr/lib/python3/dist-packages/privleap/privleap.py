@@ -9,8 +9,7 @@ from enum import Enum
 import socket
 import os
 import stat
-from pwd import getpwnam
-from grp import getgrnam
+import pwd
 from io import StringIO
 import re
 
@@ -74,14 +73,14 @@ class PrivleapCommClientSignalMsg:
     def serialize(self):
         return "SIGNAL {0}".format(self.signal_name).encode("utf-8")
 
-class PrivleapCommClientResponseMsg:
-    response_bytes = None
-
-    def __init__(self, response_bytes: bytes):
-        self.response_bytes = response_bytes
-
-    def serialize(self):
-        return "RESPONSE ".encode("utf-8") + self.response_bytes
+#class PrivleapCommClientResponseMsg:
+#    response_bytes = None
+#
+#    def __init__(self, response_bytes: bytes):
+#        self.response_bytes = response_bytes
+#
+#    def serialize(self):
+#        return "RESPONSE ".encode("utf-8") + self.response_bytes
 
 class PrivleapCommServerTriggerMsg:
     action_name = None
@@ -162,10 +161,9 @@ class PrivleapSocket:
             if user_name == "":
                 raise ValueError("user_name must be provided when using PrivleapSocketType.COMMUNICATION")
             try:
-                # getpwnam and getgrnam return tuples, of which the third
-                # element (2) is the UID or GID.
-                target_uid = getpwnam(user_name)[2]
-                target_gid = getgrnam(user_name)[2]
+                user_info = pwd.getpwnam(user_name)
+                target_uid = user_info.pw_uid
+                target_gid = user_info.pw_gid
             except:
                 raise ValueError("user_name must be the name of a user that exists on the system")
             self.backend_socket = socket.socket(family = socket.AF_UNIX)
@@ -423,9 +421,9 @@ class PrivleapSession:
             if msg_type_str == "SIGNAL":
                 param_list = self.__parse_msg_parameters(recv_buf, str_count = 1, blob_at_end = False)
                 return PrivleapCommClientSignalMsg(param_list[0])
-            elif msg_type_str == "RESPONSE":
-                param_list = self.__parse_msg_parameters(recv_buf, str_count = 0, blob_at_end = True)
-                return PrivleapCommClientResponseMsg(param_list[0])
+            #elif msg_type_str == "RESPONSE":
+            #    param_list = self.__parse_msg_parameters(recv_buf, str_count = 0, blob_at_end = True)
+            #    return PrivleapCommClientResponseMsg(param_list[0])
             else:
                 raise ValueError("Invalid message type '" + msg_type_str + "' for socket")
         # Client-side comm socket, we're receiving, so expect server comm messages
@@ -491,8 +489,8 @@ class PrivleapSession:
             # and msg_obj_type != PrivleapCommServerChallengePassMsg \
                         raise ValueError("Invalid message type for socket.")
         else:
-            if msg_obj_type != PrivleapCommClientSignalMsg \
-            and msg_obj_type != PrivleapCommClientResponseMsg:
+            if msg_obj_type != PrivleapCommClientSignalMsg:
+            # and msg_obj_type != PrivleapCommClientResponseMsg
                 raise ValueError("Invalid message type for socket.")
 
         self.__send_msg(msg_obj)

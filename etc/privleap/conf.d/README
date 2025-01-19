@@ -1,0 +1,42 @@
+This is the configuration directory for privleapd. You can define actions here
+that users can then run using leaprun (or any other program that implements the
+privleap protocol as a client).
+
+Each configuration file in this directory must end in a .conf extension, and
+the filename must consist only of the ASCII 7-bit characters a-z, A-Z,
+underscore (_), hyphen (-), and period (.). Files that do not adhere to this
+requirement are silently ignored (including this README). Files in nested
+directories are ignored. Symlinks to files are followed so long as the symlink
+name adheres to the filename requirements. (The file used as the symlink's
+target is not obligated to follow the filename requirements, since its filename
+isn't used in any meaningful way by privleap.)
+
+Each configuration file defines an *action*. Each action can be executed in
+response to a signal. The name of the action defined by the configuration file
+is the configuration file's name with `.conf` trimmed off of the end. For
+instance, a file named `restart-tor.conf` defines an action named `restart-tor`.
+
+Each configuration file is formatted as follows:
+
+* Lines starting with zero or more whitespace characters followed immediately
+  by a `#` are comments. Other lines are interpreted as key/value pairs, with
+  the keys and values separated by a single equals (=) sign.
+* Blank lines are ignored.
+* The following keys are recognized:
+    * Command= - The Bash code to run when this action is triggered.
+    * AuthorizedUser= - The user that is permitted to trigger this action. If
+      this key is undefined, any user may trigger this action, otherwise only
+      requests for this action from this user are accepted.
+    * AuthorizedGroup= - The group that is permitted to trigger this action.
+      If this key is undefined, any group may trigger this action, otherwise
+      only requests for this action from this group are accepted. Note that if
+      you are using AuthorizedGroup, you probably do NOT want to use
+      AuthorizedUser in tandem, otherwise only the specified user will be able
+      to trigger the action. If you want all users in a group and specific users
+      outside of that group to be allowed to trigger an action, create multiple
+      actions, one for the group and one for each user.
+
+privleapd must be restarted for any changes to the configuration directory to
+take effect. Note that if a configuration file contains a syntax error (for
+instance, a line with no = sign separating the key and value), privleapd will
+fail to start.
