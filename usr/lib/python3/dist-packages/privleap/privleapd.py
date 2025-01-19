@@ -13,8 +13,10 @@ import re
 import select
 from threading import Thread
 import os
+import pwd
 import grp
 import subprocess
+import traceback
 
 class PrivleapdGlobal:
     config_dir = "/etc/privleap/conf.d"
@@ -24,45 +26,54 @@ class PrivleapdGlobal:
 def handle_control_session(control_socket: PrivleapSocket):
     try:
         control_session = control_socket.get_session()
-        control_msg = control_session.get_message()
-    except Exception as err:
+        control_msg = control_session.get_msg()
+    except Exception:
         print("handle_control_session: could not start session with client")
-        print(f"{err=}")
+        print(traceback.format_exc())
         return
 
-    if type(control_msg) == PrivleapControlClientCreateMessage:
-        found_user = False
+    if type(control_msg) == PrivleapControlClientCreateMsg:
         for sock in PrivleapdGlobal.socket_list:
             if sock.user_name == control_msg.user_name:
                 # User already has an open socket
                 try:
-                    control_session.send_message(PrivleapControlServerExistsMessage())
-                except Exception as err:
+                    control_session.send_msg(PrivleapControlServerExistsMsg())
+                except Exception:
                     print("handle_control_session: handling CREATE, could not send EXISTS")
-                    print(f"{err=}")
-                found_user = True
-                break
-        if not found_user:
+                    print(traceback.format_exc())
+                print("handle_control_session: handled CREATE message for user '" + control_msg.user_name + "', socket already exists")
+                return
+
+        user_list = [pw[0] for pw in pwd.getpwall()]
+        if not control_msg.user_name in user_list:
             try:
-                comm_socket = PrivleapSocket(PrivleapSocketType.COMMUNICATION, control_msg.user_name)
-                PrivleapdGlobal.socket_list.append(comm_socket)
-                try:
-                    control_session.send_message(PrivleapControlServerOkMessage())
-                except Exception as err:
-                    print("handle_control_session: handling CREATE, could not send OK")
-                    print(f"{err=}")
-                print("handle_control_session: handled CREATE message for user '" + control_msg.user_name + "'")
-            except Exception as err:
-                # TODO: This should never happen, should this really be just
-                #  a warning?
-                print("WARNING: Failed to create socket for user '" + control_msg.user_name + "'!", file=sys.stderr)
-                print(f"{err=}")
-                try:
-                    control_session.send_message(PrivleapControlServerErrorMessage())
-                except Exception as err2:
-                    print("handle_control_session: handling CREATE, could not send ERROR")
-                    print(f"{err2=}")
-    elif type(control_msg) == PrivleapControlClientDestroyMessage:
+                control_session.send_msg(PrivleapControlServerErrorMsg())
+            except Exception:
+                print("handle_control_session: handling CREATE, could not send ERROR")
+                print(traceback.format_exc())
+            print("handle_control_session: User '" + control_msg.user_name + "' does not exist")
+
+        try:
+            comm_socket = PrivleapSocket(PrivleapSocketType.COMMUNICATION, control_msg.user_name)
+            PrivleapdGlobal.socket_list.append(comm_socket)
+            try:
+                control_session.send_msg(PrivleapControlServerOkMsg())
+            except Exception:
+                print("handle_control_session: handling CREATE, could not send OK")
+                print(traceback.format_exc())
+            print("handle_control_session: handled CREATE message for user '" + control_msg.user_name + "', socket created")
+        except Exception:
+            # TODO: This should never happen, should this really be just
+            #  a warning?
+            print("WARNING: Failed to create socket for user '" + control_msg.user_name + "'!", file=sys.stderr)
+            print(traceback.format_exc())
+            try:
+                control_session.send_msg(PrivleapControlServerErrorMsg())
+            except Exception:
+                print("handle_control_session: handling CREATE, could not send ERROR")
+                print(traceback.format_exc())
+
+    elif type(control_msg) == PrivleapControlClientDestroyMsg:
         found_user = False
         remove_sock_idx = -1
         for sock_idx, sock in enumerate(PrivleapdGlobal.socket_list):
@@ -71,12 +82,12 @@ def handle_control_session(control_socket: PrivleapSocket):
                 if os.path.exists(socket_path):
                     try:
                         os.remove(socket_path)
-                    except Exception as err:
+                    except Exception:
                         # Probably just a TOCTOU issue, i.e. someone already
                         # removed the socket. Most likely caused by the user
                         # fiddling with things, no big deal.
                         print("handle_control_session: handling DESTROY, no socket to delete at '" + socket_path + "'")
-                        print(f"{err=}")
+                        print(traceback.format_exc())
                 remove_sock_idx = sock_idx
                 found_user = True
                 break
@@ -84,17 +95,18 @@ def handle_control_session(control_socket: PrivleapSocket):
         if found_user:
             PrivleapdGlobal.socket_list.pop(remove_sock_idx)
             try:
-                control_session.send_message(PrivleapControlServerOkMessage())
-            except Exception as err:
+                control_session.send_msg(PrivleapControlServerOkMsg())
+            except Exception:
                 print("handle_control_session: handling DESTROY, could not send OK")
-                print(f"{err=}")
-            print("handle_control_session: handled DESTROY message for user '" + control_msg.user_name + "'")
+                print(traceback.format_exc())
+            print("handle_control_session: handled DESTROY message for user '" + control_msg.user_name + "', socket deleted")
         else:
             try:
-                control_session.send_message(PrivleapControlServerNouserMessage())
-            except Exception as err:
+                control_session.send_msg(PrivleapControlServerNouserMsg())
+            except Exception:
                 print("handle_control_session: handling DESTROY, could not send NOUSER")
-                print(f"{err=}")
+                print(traceback.format_exc())
+            print("handle_control_session: handled DESTROY message for user '" + control_msg.user_name + "', socket did not exist")
     else:
         print("CRITICAL ERROR: privleapd mis-parsed a control command from the client!")
         sys.exit(2)
@@ -104,13 +116,13 @@ def handle_control_session(control_socket: PrivleapSocket):
 def handle_comm_session(comm_socket):
     try:
         comm_session = comm_socket.get_session()
-        comm_msg = comm_session.get_message()
-    except Exception as err:
+        comm_msg = comm_session.get_msg()
+    except Exception:
         print("handle_comm_session: could not start session with client")
-        print(f"{err=}")
+        print(traceback.format_exc())
         return
 
-    if type(comm_msg) != PrivleapCommClientSignalMessage:
+    if type(comm_msg) != PrivleapCommClientSignalMsg:
         # Illegal message, a SIGNAL needs to be the first message.
         comm_session.close_session()
         print("handle_comm_session: Did not read SIGNAL as first message, forcibly closed connection.")
@@ -127,10 +139,10 @@ def handle_comm_session(comm_socket):
         # No such action, send back UNAUTHORIZED since we don't want to leak
         # the list of available actions to the client.
         try:
-            comm_session.send_message(PrivleapCommServerUnauthorizedMessage())
-        except Exception as err:
+            comm_session.send_msg(PrivleapCommServerUnauthorizedMsg())
+        except Exception:
             print("handle_comm_session: Could not send UNAUTHORIZED")
-            print(f"{err=}")
+            print(traceback.format_exc())
 
         comm_session.close_session()
         print("handle_comm_session: Could not find action '" + signal_name + "'")
@@ -141,10 +153,10 @@ def handle_comm_session(comm_socket):
         if desired_action.auth_user != comm_session.user_name:
             # User is not authorized to run this action.
             try:
-                comm_session.send_message(PrivleapCommServerUnauthorizedMessage())
-            except Exception as err:
+                comm_session.send_msg(PrivleapCommServerUnauthorizedMsg())
+            except Exception:
                 print("handle_comm_session: Could not send UNAUTHORIZED")
-                print(f"{err=}")
+                print(traceback.format_exc())
 
             comm_session.close_session()
             print("handle_comm_session: User is not authorized to run action '" + desired_action.action_name + "'")
@@ -165,10 +177,10 @@ def handle_comm_session(comm_socket):
         if not found_matching_group:
             # User is not in the group authorized to run this action.
             try:
-                comm_session.send_message(PrivleapCommServerUnauthorizedMessage())
-            except Exception as err:
+                comm_session.send_msg(PrivleapCommServerUnauthorizedMsg())
+            except Exception:
                 print("handle_comm_session: Could not send UNAUTHORIZED")
-                print(f"{err=}")
+                print(traceback.format_exc())
 
             comm_session.close_session()
             print("handle_comm_session: User is not in a group authorized to run action '" + desired_action.action_name + "'")
@@ -178,36 +190,38 @@ def handle_comm_session(comm_socket):
 
     # If we get this far, the user is authorized. Run the action.
     action_process = subprocess.Popen(['/usr/bin/bash', '-c', desired_action.action_command], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+    print("handle_comm_session: Triggered action '" + desired_action.action_name + "'")
     try:
-        comm_session.send_message(PrivleapCommServerTriggerMessage(desired_action.action_name))
-    except Exception as err:
+        comm_session.send_msg(PrivleapCommServerTriggerMsg(desired_action.action_name))
+    except Exception:
         # Client already disconnected. At this point the action is already
         # running, and there's not any point in waiting for the process's stdout
         # and stderr, so the thread can end here.
         print("handle_comm_session: action triggered, but could not send TRIGGER")
-        print(f"{err=}")
+        print(traceback.format_exc())
         return
 
     # Wait for the process to finish up, and send the stdout, stderr, and exit
     # code from it.
     action_output = action_process.communicate()
+    print("handle_comm_session: Action '" + desired_action.action_name + "' completed")
     try:
-        comm_session.send_message(PrivleapCommServerResultStdoutMessage(desired_action.action_name, action_output[0]))
-    except Exception as err:
+        comm_session.send_msg(PrivleapCommServerResultStdoutMsg(desired_action.action_name, action_output[0]))
+    except Exception:
         print("handle_comm_session: action triggered, but could not send RESULT_STDOUT")
-        print(f"{err=}")
+        print(traceback.format_exc())
 
     try:
-        comm_session.send_message(PrivleapCommServerResultStderrMessage(desired_action.action_name, action_output[1]))
-    except Exception as err:
+        comm_session.send_msg(PrivleapCommServerResultStderrMsg(desired_action.action_name, action_output[1]))
+    except Exception:
         print("handle_comm_session: action triggered, but could not send RESULT_STDERR")
-        print(f"{err=}")
+        print(traceback.format_exc())
 
     try:
-        comm_session.send_message(PrivleapCommServerResultExitcodeMessage(desired_action.action_name, action_process.returncode))
-    except Exception as err:
+        comm_session.send_msg(PrivleapCommServerResultExitcodeMsg(desired_action.action_name, action_process.returncode))
+    except Exception:
         print("handle_comm_session: action triggered, but could not send RESULT_EXITCODE")
-        print(f"{err=}")
+        print(traceback.format_exc())
 
 def main():
     # Ensure that there aren't two servers running at once
@@ -235,7 +249,12 @@ def main():
         sys.exit(1)
     # Cleanup any sockets left behind by an old privleapd process
     if os.path.exists(PrivleapCommon.state_dir):
-        shutil.rmtree(PrivleapCommon.state_dir)
+        try:
+            shutil.rmtree(PrivleapCommon.state_dir)
+        except:
+            print("ERROR: Could not delete '" + PrivleapCommon.state_dir + "'!",
+                  file=sys.stderr)
+            sys.exit(1)
 
     # Parse configuration directory
     filename_validate_regex = re.compile(r"[./a-zA-Z_-]+\.conf")
@@ -254,21 +273,31 @@ def main():
                 conf_data = f.read()
             action = PrivleapAction(action_name, conf_data)
             PrivleapdGlobal.action_list.append(action)
-        except Exception as err:
+        except Exception:
             print("ERROR: Failed to parse config file '" + config_file.path + "'!",
                   file=sys.stderr)
-            print(f"{err=}")
+            print(traceback.format_exc())
             sys.exit(1)
 
     # Create the directories for the sockets
     if not os.path.exists(PrivleapCommon.state_dir):
-        os.makedirs(PrivleapCommon.state_dir)
+        try:
+            os.makedirs(PrivleapCommon.state_dir)
+        except:
+            print("ERROR: Cannot create '" + PrivleapCommon.state_dir + "'!",
+                  file=sys.stderr)
+            sys.exit(1)
     else:
         print("ERROR: '" + PrivleapCommon.state_dir + "' should not exist yet, but does!",
               file=sys.stderr)
         sys.exit(1)
     if not os.path.exists(PrivleapCommon.comm_path):
-        os.makedirs(PrivleapCommon.comm_path)
+        try:
+            os.makedirs(PrivleapCommon.comm_path)
+        except:
+            print("ERROR: Cannot create '" + PrivleapCommon.comm_path + "'!",
+                  file=sys.stderr)
+            sys.exit(1)
     else:
         print("ERROR: '" + PrivleapCommon.comm_path + "' should not exist yet, but does!",
               file=sys.stderr)
@@ -281,9 +310,9 @@ def main():
     # once could be dangerous.
     try:
         control_socket = PrivleapSocket(PrivleapSocketType.CONTROL)
-    except Exception as err:
+    except Exception:
         print("ERROR: Failed to open control socket!", file=sys.stderr)
-        print(f"{err=}")
+        print(traceback.format_exc())
         sys.exit(1)
 
     PrivleapdGlobal.socket_list.append(control_socket)

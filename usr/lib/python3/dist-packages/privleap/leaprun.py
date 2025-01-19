@@ -49,32 +49,32 @@ def main():
 
     try:
         # noinspection PyUnboundLocalVariable
-        comm_session.send_message(PrivleapCommClientSignalMessage(signal_name))
+        comm_session.send_msg(PrivleapCommClientSignalMsg(signal_name))
     except:
         generic_error("Could not request privleapd to run action '" + signal_name + "'!")
 
     try:
-        comm_msg = comm_session.get_message()
+        comm_msg = comm_session.get_msg()
     except:
         generic_error("privleapd forcibly closed the connection!")
 
     # noinspection PyUnboundLocalVariable
-    if type(comm_msg) == PrivleapCommServerUnauthorizedMessage:
+    if type(comm_msg) == PrivleapCommServerUnauthorizedMsg:
         generic_error("You are unauthorized to run action '" + signal_name + "'.")
-    elif type(comm_msg) == PrivleapCommServerTriggerMessage:
+    elif type(comm_msg) == PrivleapCommServerTriggerMsg:
         exit_code = 0
 
         for _ in range(3):
             try:
-                comm_msg = comm_session.get_message()
+                comm_msg = comm_session.get_msg()
             except:
                 generic_error("Action triggered, but privleapd closed the connection before sending all output!")
 
-            if type(comm_msg) == PrivleapCommServerResultStdoutMessage:
+            if type(comm_msg) == PrivleapCommServerResultStdoutMsg:
                 _ = sys.stdout.buffer.write(comm_msg.stdout_bytes)
-            elif type(comm_msg) == PrivleapCommServerResultStderrMessage:
+            elif type(comm_msg) == PrivleapCommServerResultStderrMsg:
                 _ = sys.stderr.buffer.write(comm_msg.stderr_bytes)
-            elif type(comm_msg) == PrivleapCommServerResultExitcodeMessage:
+            elif type(comm_msg) == PrivleapCommServerResultExitcodeMsg:
                 exit_code = int(comm_msg.exit_code)
             else:
                 unexpected_msg_error(comm_msg)

@@ -18,7 +18,7 @@ class PrivleapSocketType(Enum):
     CONTROL = 1
     COMMUNICATION = 2
 
-class PrivleapControlClientCreateMessage:
+class PrivleapControlClientCreateMsg:
     user_name = None
 
     def __init__(self, user_name: str):
@@ -30,7 +30,7 @@ class PrivleapControlClientCreateMessage:
     def serialize(self):
         return "CREATE {0}".format(self.user_name).encode("utf-8")
 
-class PrivleapControlClientDestroyMessage:
+class PrivleapControlClientDestroyMsg:
     user_name = None
 
     def __init__(self, user_name: str):
@@ -42,27 +42,27 @@ class PrivleapControlClientDestroyMessage:
     def serialize(self):
         return "DESTROY {0}".format(self.user_name).encode("utf-8")
 
-class PrivleapControlServerOkMessage:
+class PrivleapControlServerOkMsg:
     @staticmethod
     def serialize():
         return "OK".encode("utf-8")
 
-class PrivleapControlServerErrorMessage:
+class PrivleapControlServerErrorMsg:
     @staticmethod
     def serialize():
         return "ERROR".encode("utf-8")
 
-class PrivleapControlServerExistsMessage:
+class PrivleapControlServerExistsMsg:
     @staticmethod
     def serialize():
         return "EXISTS".encode("utf-8")
 
-class PrivleapControlServerNouserMessage:
+class PrivleapControlServerNouserMsg:
     @staticmethod
     def serialize():
         return "NOUSER".encode("utf-8")
 
-class PrivleapCommClientSignalMessage:
+class PrivleapCommClientSignalMsg:
     signal_name = None
 
     def __init__(self, signal_name: str):
@@ -74,7 +74,7 @@ class PrivleapCommClientSignalMessage:
     def serialize(self):
         return "SIGNAL {0}".format(self.signal_name).encode("utf-8")
 
-class PrivleapCommClientResponseMessage:
+class PrivleapCommClientResponseMsg:
     response_bytes = None
 
     def __init__(self, response_bytes: bytes):
@@ -83,7 +83,7 @@ class PrivleapCommClientResponseMessage:
     def serialize(self):
         return "RESPONSE ".encode("utf-8") + self.response_bytes
 
-class PrivleapCommServerTriggerMessage:
+class PrivleapCommServerTriggerMsg:
     action_name = None
 
     def __init__(self, action_name: str):
@@ -92,7 +92,7 @@ class PrivleapCommServerTriggerMessage:
     def serialize(self):
         return "TRIGGER {0}".format(self.action_name).encode("utf-8")
 
-class PrivleapCommServerResultStdoutMessage:
+class PrivleapCommServerResultStdoutMsg:
     action_name = None
     stdout_bytes = None
 
@@ -103,7 +103,7 @@ class PrivleapCommServerResultStdoutMessage:
     def serialize(self):
         return "RESULT_STDOUT {0} ".format(self.action_name).encode("utf-8") + self.stdout_bytes
 
-class PrivleapCommServerResultStderrMessage:
+class PrivleapCommServerResultStderrMsg:
     action_name = None
     stderr_bytes = None
 
@@ -114,7 +114,7 @@ class PrivleapCommServerResultStderrMessage:
     def serialize(self):
         return "RESULT_STDERR {0} ".format(self.action_name).encode("utf-8") + self.stderr_bytes
 
-class PrivleapCommServerResultExitcodeMessage:
+class PrivleapCommServerResultExitcodeMsg:
     action_name = None
     exit_code = None
 
@@ -125,7 +125,7 @@ class PrivleapCommServerResultExitcodeMessage:
     def serialize(self):
         return "RESULT_EXITCODE {0} {1}" . format(self.action_name, self.exit_code).encode("utf-8")
 
-#class PrivleapCommServerChallengeMessage:
+#class PrivleapCommServerChallengeMsg:
 #    challenge_type = None
 #
 #    def __init__(self, challenge_type: str):
@@ -134,12 +134,12 @@ class PrivleapCommServerResultExitcodeMessage:
 #    def serialize(self):
 #        return "CHALLENGE {0}".format(self.challenge_type).encode("utf-8")
 #
-#class PrivleapCommServerChallengePassMessage:
+#class PrivleapCommServerChallengePassMsg:
 #    @staticmethod
 #    def serialize():
 #        return "CHALLENGE_PASS".encode("utf-8")
 
-class PrivleapCommServerUnauthorizedMessage:
+class PrivleapCommServerUnauthorizedMsg:
     @staticmethod
     def serialize():
         return "UNAUTHORIZED".encode("utf-8")
@@ -225,13 +225,13 @@ class PrivleapSession:
         self.is_control_session = is_control_session
         self.is_session_open = True
 
-    # DO NOT USE __recv_message ON THE SERVER! This is intentionally vulnerable
+    # DO NOT USE __recv_msg ON THE SERVER! This is intentionally vulnerable
     # to a denial-of-service attack where the remote process deliberately sends
     # data slowly (or just refuses to send data at all) in order to lock up the
     # local process. This is safe for the client (which may need to receive very
     # large amounts of data from the server), but dangerous for the server
     # (which needs to not lock up if a client tries to cause insane delays).
-    def __recv_message(self):
+    def __recv_msg(self):
         header_len = 4
         recv_buf = b''
 
@@ -259,12 +259,12 @@ class PrivleapSession:
         return recv_buf
 
     # While there aren't security issues with doing so, you probably shouldn't
-    # use __recv_message_cautious on the client. It may result in a disconnect
+    # use __recv_msg_cautious on the client. It may result in a disconnect
     # while the server is still trying to send data to the client. It bails out
     # if a read times out, or if it takes more than five combined loop
     # iterations to read a message (thus giving at most ~0.5 seconds for the
     # client to send a whole message).
-    def __recv_message_cautious(self):
+    def __recv_msg_cautious(self):
         max_loops = 5
         header_len = 4
         recv_buf = b''
@@ -299,7 +299,7 @@ class PrivleapSession:
         return recv_buf
 
     @staticmethod
-    def __get_message_type_field(recv_buf: bytes):
+    def __get_msg_type_field(recv_buf: bytes):
         # Default to the length of the recv_buf if no space is found
         type_field_len = len(recv_buf)
 
@@ -315,11 +315,11 @@ class PrivleapSession:
         return recv_buf[:type_field_len].decode("utf-8")
 
     @staticmethod
-    def __parse_message_parameters(recv_buf: bytes, str_count: int, blob_at_end: bool):
+    def __parse_msg_parameters(recv_buf: bytes, str_count: int, blob_at_end: bool):
         output_list = list()
         recv_buf_pos = 0
 
-        # __parse_message_parameters has to ignore the first string in the
+        # __parse_msg_parameters has to ignore the first string in the
         # message, since the first string is the message type, not a parameter.
         # Thus we have to parse one more string than specified by str_count.
         for i in range(0, str_count + 1):
@@ -337,7 +337,7 @@ class PrivleapSession:
                     break
 
             # Ignore the message type field, we parsed that out already in
-            # __get_message_type_field
+            # __get_msg_type_field
             if i == 0:
                 # If space_idx isn't equal to len(recv_buf), we hit an actual space,
                 # so we want to pick up scanning immediately *after* that space. If
@@ -377,15 +377,15 @@ class PrivleapSession:
         return output_list
 
 
-    def get_message(self):
+    def get_msg(self):
         if not self.is_session_open:
             raise IOError("Session is closed.")
 
         if self.is_server_side:
-            recv_buf = self.__recv_message_cautious()
+            recv_buf = self.__recv_msg_cautious()
         else:
-            recv_buf = self.__recv_message()
-        msg_type_str = self.__get_message_type_field(recv_buf)
+            recv_buf = self.__recv_msg()
+        msg_type_str = self.__get_msg_type_field(recv_buf)
 
         # Note, we parse the arguments of every single message type, even if the
         # message should have no arguments. This is because the parser ensures
@@ -395,62 +395,62 @@ class PrivleapSession:
         # Server-side control socket, we're receiving, so expect client control messages
         if self.is_control_session and self.is_server_side:
             if msg_type_str == "CREATE":
-                param_list = self.__parse_message_parameters(recv_buf, str_count = 1, blob_at_end = False)
-                return PrivleapControlClientCreateMessage(param_list[0])
+                param_list = self.__parse_msg_parameters(recv_buf, str_count = 1, blob_at_end = False)
+                return PrivleapControlClientCreateMsg(param_list[0])
             elif msg_type_str == "DESTROY":
-                param_list = self.__parse_message_parameters(recv_buf, str_count = 1, blob_at_end = False)
-                return PrivleapControlClientDestroyMessage(param_list[0])
+                param_list = self.__parse_msg_parameters(recv_buf, str_count = 1, blob_at_end = False)
+                return PrivleapControlClientDestroyMsg(param_list[0])
             else:
                 raise ValueError("Invalid message type '" + msg_type_str + "' for socket")
         # Client-side control socket, we're receiving, so expect server control messages
         elif self.is_control_session and not self.is_server_side:
             if msg_type_str == "OK":
-                self.__parse_message_parameters(recv_buf, str_count = 0, blob_at_end = False)
-                return PrivleapControlServerOkMessage()
+                self.__parse_msg_parameters(recv_buf, str_count = 0, blob_at_end = False)
+                return PrivleapControlServerOkMsg()
             elif msg_type_str == "ERROR":
-                self.__parse_message_parameters(recv_buf, str_count = 0, blob_at_end = False)
-                return PrivleapControlServerErrorMessage()
+                self.__parse_msg_parameters(recv_buf, str_count = 0, blob_at_end = False)
+                return PrivleapControlServerErrorMsg()
             elif msg_type_str == "EXISTS":
-                self.__parse_message_parameters(recv_buf, str_count = 0, blob_at_end = False)
-                return PrivleapControlServerExistsMessage()
+                self.__parse_msg_parameters(recv_buf, str_count = 0, blob_at_end = False)
+                return PrivleapControlServerExistsMsg()
             elif msg_type_str == "NOUSER":
-                self.__parse_message_parameters(recv_buf, str_count = 0, blob_at_end = False)
-                return PrivleapControlServerNouserMessage()
+                self.__parse_msg_parameters(recv_buf, str_count = 0, blob_at_end = False)
+                return PrivleapControlServerNouserMsg()
             else:
                 raise ValueError("Invalid message type '" + msg_type_str + "' for socket")
         # Server-side comm socket, we're receiving, so expect client comm messages
         elif not self.is_control_session and self.is_server_side:
             if msg_type_str == "SIGNAL":
-                param_list = self.__parse_message_parameters(recv_buf, str_count = 1, blob_at_end = False)
-                return PrivleapCommClientSignalMessage(param_list[0])
+                param_list = self.__parse_msg_parameters(recv_buf, str_count = 1, blob_at_end = False)
+                return PrivleapCommClientSignalMsg(param_list[0])
             elif msg_type_str == "RESPONSE":
-                param_list = self.__parse_message_parameters(recv_buf, str_count = 0, blob_at_end = True)
-                return PrivleapCommClientResponseMessage(param_list[0])
+                param_list = self.__parse_msg_parameters(recv_buf, str_count = 0, blob_at_end = True)
+                return PrivleapCommClientResponseMsg(param_list[0])
             else:
                 raise ValueError("Invalid message type '" + msg_type_str + "' for socket")
         # Client-side comm socket, we're receiving, so expect server comm messages
         else:
             if msg_type_str == "TRIGGER":
-                param_list = self.__parse_message_parameters(recv_buf, str_count = 1, blob_at_end = False)
-                return PrivleapCommServerTriggerMessage(param_list[0])
+                param_list = self.__parse_msg_parameters(recv_buf, str_count = 1, blob_at_end = False)
+                return PrivleapCommServerTriggerMsg(param_list[0])
             elif msg_type_str == "RESULT_STDOUT":
-                param_list = self.__parse_message_parameters(recv_buf, str_count = 1, blob_at_end = True)
-                return PrivleapCommServerResultStdoutMessage(param_list[0], param_list[1])
+                param_list = self.__parse_msg_parameters(recv_buf, str_count = 1, blob_at_end = True)
+                return PrivleapCommServerResultStdoutMsg(param_list[0], param_list[1])
             elif msg_type_str == "RESULT_STDERR":
-                param_list = self.__parse_message_parameters(recv_buf, str_count = 1, blob_at_end = True)
-                return PrivleapCommServerResultStderrMessage(param_list[0], param_list[1])
+                param_list = self.__parse_msg_parameters(recv_buf, str_count = 1, blob_at_end = True)
+                return PrivleapCommServerResultStderrMsg(param_list[0], param_list[1])
             elif msg_type_str == "RESULT_EXITCODE":
-                param_list = self.__parse_message_parameters(recv_buf, str_count = 2, blob_at_end = False)
-                return PrivleapCommServerResultExitcodeMessage(param_list[0], param_list[1])
+                param_list = self.__parse_msg_parameters(recv_buf, str_count = 2, blob_at_end = False)
+                return PrivleapCommServerResultExitcodeMsg(param_list[0], param_list[1])
             #elif msg_type_str == "CHALLENGE":
-            #    param_list = self.__parse_message_parameters(recv_buf, str_count = 1, blob_at_end = False)
-            #    return PrivleapCommServerChallengeMessage(param_list[0])
+            #    param_list = self.__parse_msg_parameters(recv_buf, str_count = 1, blob_at_end = False)
+            #    return PrivleapCommServerChallengeMsg(param_list[0])
             #elif msg_type_str == "CHALLENGE_PASS":
-            #    self.__parse_message_parameters(recv_buf, str_count = 0, blob_at_end = False)
-            #    return PrivleapCommServerChallengePassMessage()
+            #    self.__parse_msg_parameters(recv_buf, str_count = 0, blob_at_end = False)
+            #    return PrivleapCommServerChallengePassMsg()
             elif msg_type_str == "UNAUTHORIZED":
-                self.__parse_message_parameters(recv_buf, str_count = 0, blob_at_end = False)
-                return PrivleapCommServerUnauthorizedMessage()
+                self.__parse_msg_parameters(recv_buf, str_count = 0, blob_at_end = False)
+                return PrivleapCommServerUnauthorizedMsg()
             else:
                 raise ValueError("Invalid message type '" + msg_type_str + "' for socket")
 
@@ -465,34 +465,34 @@ class PrivleapSession:
                 raise ConnectionAbortedError("Connection unexpectedly closed")
             msg_payload_sent += msg_sent
 
-    def send_message(self, msg_obj):
+    def send_msg(self, msg_obj):
         if not self.is_session_open:
             raise IOError("Session is closed.")
 
         msg_obj_type = type(msg_obj)
 
         if self.is_control_session and self.is_server_side:
-            if msg_obj_type != PrivleapControlServerOkMessage \
-            and msg_obj_type != PrivleapControlServerErrorMessage \
-            and msg_obj_type != PrivleapControlServerExistsMessage \
-            and msg_obj_type != PrivleapControlServerNouserMessage:
+            if msg_obj_type != PrivleapControlServerOkMsg \
+            and msg_obj_type != PrivleapControlServerErrorMsg \
+            and msg_obj_type != PrivleapControlServerExistsMsg \
+            and msg_obj_type != PrivleapControlServerNouserMsg:
                 raise ValueError("Invalid message type for socket.")
         elif self.is_control_session and not self.is_server_side:
-            if msg_obj_type != PrivleapControlClientCreateMessage \
-            and msg_obj_type != PrivleapControlClientDestroyMessage:
+            if msg_obj_type != PrivleapControlClientCreateMsg \
+            and msg_obj_type != PrivleapControlClientDestroyMsg:
                 raise ValueError("Invalid message type for socket.")
         elif not self.is_control_session and self.is_server_side:
-            if msg_obj_type != PrivleapCommServerTriggerMessage \
-            and msg_obj_type != PrivleapCommServerResultStdoutMessage \
-            and msg_obj_type != PrivleapCommServerResultStderrMessage \
-            and msg_obj_type != PrivleapCommServerResultExitcodeMessage \
-            and msg_obj_type != PrivleapCommServerUnauthorizedMessage:
-            # and msg_obj_type != PrivleapCommServerChallengeMessage \
-            # and msg_obj_type != PrivleapCommServerChallengePassMessage \
+            if msg_obj_type != PrivleapCommServerTriggerMsg \
+            and msg_obj_type != PrivleapCommServerResultStdoutMsg \
+            and msg_obj_type != PrivleapCommServerResultStderrMsg \
+            and msg_obj_type != PrivleapCommServerResultExitcodeMsg \
+            and msg_obj_type != PrivleapCommServerUnauthorizedMsg:
+            # and msg_obj_type != PrivleapCommServerChallengeMsg \
+            # and msg_obj_type != PrivleapCommServerChallengePassMsg \
                         raise ValueError("Invalid message type for socket.")
         else:
-            if msg_obj_type != PrivleapCommClientSignalMessage \
-            and msg_obj_type != PrivleapCommClientResponseMessage:
+            if msg_obj_type != PrivleapCommClientSignalMsg \
+            and msg_obj_type != PrivleapCommClientResponseMsg:
                 raise ValueError("Invalid message type for socket.")
 
         self.__send_msg(msg_obj)

@@ -53,22 +53,22 @@ def main():
     if control_action == "--create":
         try:
             # noinspection PyUnboundLocalVariable
-            control_session.send_message(PrivleapControlClientCreateMessage(control_user))
+            control_session.send_msg(PrivleapControlClientCreateMsg(control_user))
         except:
             generic_error("Could not request privleapd to create a comm socket!")
 
         try:
-            control_msg = control_session.get_message()
+            control_msg = control_session.get_msg()
         except:
             generic_error("privleapd forcibly closed the connection!")
 
         # noinspection PyUnboundLocalVariable
-        if type(control_msg) == PrivleapControlServerOkMessage:
+        if type(control_msg) == PrivleapControlServerOkMsg:
             print("Comm socket created for user '" + control_user + "'.")
             sys.exit(0)
-        elif type(control_msg) == PrivleapControlServerErrorMessage:
+        elif type(control_msg) == PrivleapControlServerErrorMsg:
             generic_error("privleapd encountered an error while creating a comm socket for user '" + control_user + "'!")
-        elif type(control_msg) == PrivleapControlServerExistsMessage:
+        elif type(control_msg) == PrivleapControlServerExistsMsg:
             print("Comm socket already exists for user '" + control_user + "'.")
             sys.exit(0)
         else:
@@ -77,22 +77,22 @@ def main():
     else:
         try:
             # noinspection PyUnboundLocalVariable
-            control_session.send_message(PrivleapControlClientDestroyMessage(control_user))
+            control_session.send_msg(PrivleapControlClientDestroyMsg(control_user))
         except:
             generic_error("Could not request privleapd to destroy a comm socket!")
 
         try:
-            control_msg = control_session.get_message()
+            control_msg = control_session.get_msg()
         except:
             generic_error("privleapd forcibly closed the connection!")
 
         # noinspection PyUnboundLocalVariable
-        if type(control_msg) == PrivleapControlServerOkMessage:
+        if type(control_msg) == PrivleapControlServerOkMsg:
             print("Comm socket destroyed for user '" + control_user + "'.")
             sys.exit(0)
-        elif type(control_msg) == PrivleapControlServerErrorMessage:
+        elif type(control_msg) == PrivleapControlServerErrorMsg:
             generic_error("privleapd encountered an error while destroying a comm socket for user '" + control_user + "'!")
-        elif type(control_msg) == PrivleapControlServerNouserMessage:
+        elif type(control_msg) == PrivleapControlServerNouserMsg:
             print("Comm socket does not exist for user '" + control_user + "'.")
             sys.exit(0)
         else:
