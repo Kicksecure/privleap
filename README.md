@@ -62,10 +62,7 @@ privleapd.service`).
 
 ## Configuration format
 
-privleap stores its configuration under `/etc/privleap/conf.d`, which this
-document will refer to as `$CONFDIR` for brevity's sake.
-
-See etc/privleap/conf.d/README for all the details of privleap configuration.
+privleap stores its configuration under `/etc/privleap/conf.d`. See etc/privleap/conf.d/README in the code for all the details of privleap configuration.
 
 ## Protocol
 
