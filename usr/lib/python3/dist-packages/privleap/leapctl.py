@@ -49,6 +49,9 @@ def main():
     if control_action != "--create" and control_action != "--destroy":
         print_usage()
 
+    if not PrivleapCommon.validate_id(control_user, PrivleapValidateType.USER_GROUP_NAME):
+        generic_error("User name '" + control_user + "' is invalid!")
+
     user_list = [pw[0] for pw in pwd.getpwall()]
     if not control_user in user_list:
         generic_error("Specified user does not exist.")

@@ -9,7 +9,6 @@
 from privleap.privleap import *
 import sys
 import shutil
-import re
 import select
 from threading import Thread
 import os
@@ -42,6 +41,8 @@ def handle_control_session(control_socket: PrivleapSocket):
             return
 
         if type(control_msg) == PrivleapControlClientCreateMsg:
+            # The PrivleapControlClientCreateMsg constructor validates the
+            # username for us, so we don't have to do it again here.
             for sock in PrivleapdGlobal.socket_list:
                 if sock.user_name == control_msg.user_name:
                     # User already has an open socket
@@ -86,6 +87,8 @@ def handle_control_session(control_socket: PrivleapSocket):
                 return
 
         elif type(control_msg) == PrivleapControlClientDestroyMsg:
+            # The PrivleapControlClientDestroyMsg constructor validates the
+            # username for us, so we don't have to do it again here.
             remove_sock_idx = -1
             for sock_idx, sock in enumerate(PrivleapdGlobal.socket_list):
                 if sock.user_name == control_msg.user_name:
@@ -335,12 +338,11 @@ def main():
             sys.exit(1)
 
     # Parse configuration directory
-    filename_validate_regex = re.compile(r"[./a-zA-Z_-]+\.conf")
     for config_file in os.scandir(PrivleapdGlobal.config_dir):
         if not config_file.is_file():
             continue
 
-        if not filename_validate_regex.match(config_file.path):
+        if not PrivleapCommon.validate_id(config_file.path, PrivleapValidateType.CONFIG_FILE):
             continue
 
         # action_name is config file name minus the ".conf" at the end, which

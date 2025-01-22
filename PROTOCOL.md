@@ -51,6 +51,13 @@ permissions `0600`. The containing directory `/run/privleapd` is owned by
 `root:root` and uses permissions `0644`. The `control` socket is used to
 manage communication sockets for each individual user account.
 
+Any messages sent by the client must be no longer than 4096 bytes long (not
+including the four-byte message length header). `privleapd` will forcibly
+disconnect a client that attempts to send a longer message than this. This is
+expected to be enough to allow any practically-sized usernames, signal names,
+and authentication data to be passed now and in the future. The server may send
+messages longer than this, although it is not generally recommended.
+
 `privleapd` understands the following messages passed via the `control` socket:
 
 * `CREATE <username>` - Creates a communication socket for the specified user.

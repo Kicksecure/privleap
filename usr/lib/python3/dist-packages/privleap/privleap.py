@@ -17,12 +17,16 @@ class PrivleapSocketType(Enum):
     CONTROL = 1
     COMMUNICATION = 2
 
+class PrivleapValidateType(Enum):
+    USER_GROUP_NAME = 1
+    CONFIG_FILE = 2
+    SIGNAL_NAME = 3
+
 class PrivleapControlClientCreateMsg:
     user_name = None
 
     def __init__(self, user_name: str):
-        validate_regex = re.compile(r"[a-zA-Z_-]")
-        if not validate_regex.match(user_name):
+        if not PrivleapCommon.validate_id(user_name, PrivleapValidateType.USER_GROUP_NAME):
             raise ValueError("Specified username is invalid.")
         self.user_name = user_name
 
@@ -33,8 +37,7 @@ class PrivleapControlClientDestroyMsg:
     user_name = None
 
     def __init__(self, user_name: str):
-        validate_regex = re.compile(r"[a-zA-Z_-]")
-        if not validate_regex.match(user_name):
+        if not PrivleapCommon.validate_id(user_name, PrivleapValidateType.USER_GROUP_NAME):
             raise ValueError("Specified username is invalid.")
         self.user_name = user_name
 
@@ -65,27 +68,19 @@ class PrivleapCommClientSignalMsg:
     signal_name = None
 
     def __init__(self, signal_name: str):
-        validate_regex = re.compile(r"[.a-zA-Z_-]")
-        if not validate_regex.match(signal_name):
+        if not PrivleapCommon.validate_id(signal_name, PrivleapValidateType.SIGNAL_NAME):
             raise ValueError("Specified signal name is invalid.")
         self.signal_name = signal_name
 
     def serialize(self):
         return "SIGNAL {0}".format(self.signal_name).encode("utf-8")
 
-#class PrivleapCommClientResponseMsg:
-#    response_bytes = None
-#
-#    def __init__(self, response_bytes: bytes):
-#        self.response_bytes = response_bytes
-#
-#    def serialize(self):
-#        return "RESPONSE ".encode("utf-8") + self.response_bytes
-
 class PrivleapCommServerTriggerMsg:
     action_name = None
 
     def __init__(self, action_name: str):
+        if not PrivleapCommon.validate_id(action_name, PrivleapValidateType.SIGNAL_NAME):
+            raise ValueError("Specified action name is invalid.")
         self.action_name = action_name
 
     def serialize(self):
@@ -95,6 +90,8 @@ class PrivleapCommServerTriggerErrorMsg:
     action_name = None
 
     def __init__(self, action_name: str):
+        if not PrivleapCommon.validate_id(action_name, PrivleapValidateType.SIGNAL_NAME):
+            raise ValueError("Specified action name is invalid.")
         self.action_name = action_name
 
     def serialize(self):
@@ -105,6 +102,8 @@ class PrivleapCommServerResultStdoutMsg:
     stdout_bytes = None
 
     def __init__(self, action_name: str, stdout_bytes: bytes):
+        if not PrivleapCommon.validate_id(action_name, PrivleapValidateType.SIGNAL_NAME):
+            raise ValueError("Specified action name is invalid.")
         self.action_name = action_name
         self.stdout_bytes = stdout_bytes
 
@@ -116,6 +115,8 @@ class PrivleapCommServerResultStderrMsg:
     stderr_bytes = None
 
     def __init__(self, action_name: str, stderr_bytes: bytes):
+        if not PrivleapCommon.validate_id(action_name, PrivleapValidateType.SIGNAL_NAME):
+            raise ValueError("Specified action name is invalid.")
         self.action_name = action_name
         self.stderr_bytes = stderr_bytes
 
@@ -127,25 +128,13 @@ class PrivleapCommServerResultExitcodeMsg:
     exit_code = None
 
     def __init__(self, action_name: str, exit_code: str):
+        if not PrivleapCommon.validate_id(action_name, PrivleapValidateType.SIGNAL_NAME):
+            raise ValueError("Specified action name is invalid.")
         self.action_name = action_name
         self.exit_code = exit_code
 
     def serialize(self):
         return "RESULT_EXITCODE {0} {1}" . format(self.action_name, self.exit_code).encode("utf-8")
-
-#class PrivleapCommServerChallengeMsg:
-#    challenge_type = None
-#
-#    def __init__(self, challenge_type: str):
-#        self.challenge_type = challenge_type
-#
-#    def serialize(self):
-#        return "CHALLENGE {0}".format(self.challenge_type).encode("utf-8")
-#
-#class PrivleapCommServerChallengePassMsg:
-#    @staticmethod
-#    def serialize():
-#        return "CHALLENGE_PASS".encode("utf-8")
 
 class PrivleapCommServerUnauthorizedMsg:
     @staticmethod
@@ -169,12 +158,17 @@ class PrivleapSocket:
         else:
             if user_name == "":
                 raise ValueError("user_name must be provided when using PrivleapSocketType.COMMUNICATION")
+
+            if not PrivleapCommon.validate_id(user_name, PrivleapValidateType.USER_GROUP_NAME):
+                raise ValueError("User name '" + user_name + "' is invalid.")
+
             try:
                 user_info = pwd.getpwnam(user_name)
                 target_uid = user_info.pw_uid
                 target_gid = user_info.pw_gid
             except:
-                raise ValueError("user_name must be the name of a user that exists on the system")
+                raise ValueError("User '" + user_name + "' does not exist.")
+
             self.backend_socket = socket.socket(family = socket.AF_UNIX)
             socket_path = PrivleapCommon.comm_path + "/" + user_name
             self.backend_socket.bind(socket_path)
@@ -210,22 +204,33 @@ class PrivleapSession:
         if type(session_info) is str:
             if user_name != "":
                 raise ValueError("user_name cannot be passed if session_info is a string")
+
             if is_control_session:
                 socket_path = PrivleapCommon.control_path
+
             else:
+                if not PrivleapCommon.validate_id(session_info, PrivleapValidateType.USER_GROUP_NAME):
+                    raise ValueError("User name'" + session_info + "'is invalid.")
+
                 self.user_name = session_info
                 socket_path = PrivleapCommon.comm_path + '/' + session_info
+
             if not os.access(socket_path, os.R_OK | os.W_OK):
-                raise PermissionError("Cannot access " + socket_path + " for reading and writing")
+                raise PermissionError("Cannot access '" + socket_path + "' for reading and writing")
 
             self.backend_socket = socket.socket(family=socket.AF_UNIX)
             self.backend_socket.connect(socket_path)
             self.backend_socket.settimeout(0.1)
+
         elif type(session_info) is socket.socket:
+            if user_name != "" and not PrivleapCommon.validate_id(user_name, PrivleapValidateType.USER_GROUP_NAME):
+                raise ValueError("User name '" + user_name + "' is invalid.")
+
             self.backend_socket = session_info
             self.user_name = user_name
             self.backend_socket.settimeout(0.1)
             self.is_server_side = True
+
         else:
             raise ValueError("session_info must be either type 'str' or type 'socket'")
 
@@ -237,7 +242,7 @@ class PrivleapSession:
     # data slowly (or just refuses to send data at all) in order to lock up the
     # local process. This is safe for the client (which may need to receive very
     # large amounts of data from the server), but dangerous for the server
-    # (which needs to not lock up if a client tries to cause insane delays).
+    # (which needs to not lock up if a client tries to cause large delays).
     def __recv_msg(self):
         header_len = 4
         recv_buf = b''
@@ -252,6 +257,11 @@ class PrivleapSession:
             recv_buf += tmp_buf
 
         msg_len = int.from_bytes(recv_buf, byteorder='big')
+
+        if self.is_server_side:
+            if msg_len > 4096:
+                raise ValueError("Received message is too long")
+
         recv_buf = b''
 
         while len(recv_buf) != msg_len:
@@ -312,8 +322,9 @@ class PrivleapSession:
 
         # Find first ASCII space, if it exists
         for idx, byte_val in enumerate(recv_buf):
-            # Don't allow NUL or non-7-bit-ASCII in the type field
-            if byte_val > 0x7F or byte_val == 0:
+            # Don't allow anything other than printable 7-bit-ASCII in the type
+            # field
+            if byte_val < 0x1F or byte_val > 0x7F:
                 raise ValueError("Invalid byte found in ASCII string data")
             if byte_val == 0x20:
                 type_field_len = idx
@@ -335,9 +346,10 @@ class PrivleapSession:
 
             space_idx = len(recv_buf)
             for j in range(recv_buf_pos, len(recv_buf)):
-                # Don't allow NUL or non-7-bit-ASCII in the type field
+                # Don't allow anything other than printable 7-bit-ASCII in the type
+                # field
                 byte_val = recv_buf[j]
-                if byte_val > 0x7F or byte_val == 0:
+                if byte_val < 0x1F or byte_val > 0x7F:
                     raise ValueError("Invalid byte found in ASCII string data")
                 if byte_val == 0x20:
                     space_idx = j
@@ -430,9 +442,6 @@ class PrivleapSession:
             if msg_type_str == "SIGNAL":
                 param_list = self.__parse_msg_parameters(recv_buf, str_count = 1, blob_at_end = False)
                 return PrivleapCommClientSignalMsg(param_list[0])
-            #elif msg_type_str == "RESPONSE":
-            #    param_list = self.__parse_msg_parameters(recv_buf, str_count = 0, blob_at_end = True)
-            #    return PrivleapCommClientResponseMsg(param_list[0])
             else:
                 raise ValueError("Invalid message type '" + msg_type_str + "' for socket")
         # Client-side comm socket, we're receiving, so expect server comm messages
@@ -452,12 +461,6 @@ class PrivleapSession:
             elif msg_type_str == "RESULT_EXITCODE":
                 param_list = self.__parse_msg_parameters(recv_buf, str_count = 2, blob_at_end = False)
                 return PrivleapCommServerResultExitcodeMsg(param_list[0], param_list[1])
-            #elif msg_type_str == "CHALLENGE":
-            #    param_list = self.__parse_msg_parameters(recv_buf, str_count = 1, blob_at_end = False)
-            #    return PrivleapCommServerChallengeMsg(param_list[0])
-            #elif msg_type_str == "CHALLENGE_PASS":
-            #    self.__parse_msg_parameters(recv_buf, str_count = 0, blob_at_end = False)
-            #    return PrivleapCommServerChallengePassMsg()
             elif msg_type_str == "UNAUTHORIZED":
                 self.__parse_msg_parameters(recv_buf, str_count = 0, blob_at_end = False)
                 return PrivleapCommServerUnauthorizedMsg()
@@ -498,12 +501,9 @@ class PrivleapSession:
             and msg_obj_type != PrivleapCommServerResultStderrMsg \
             and msg_obj_type != PrivleapCommServerResultExitcodeMsg \
             and msg_obj_type != PrivleapCommServerUnauthorizedMsg:
-            # and msg_obj_type != PrivleapCommServerChallengeMsg \
-            # and msg_obj_type != PrivleapCommServerChallengePassMsg \
                         raise ValueError("Invalid message type for socket.")
         else:
             if msg_obj_type != PrivleapCommClientSignalMsg:
-            # and msg_obj_type != PrivleapCommClientResponseMsg
                 raise ValueError("Invalid message type for socket.")
 
         self.__send_msg(msg_obj)
@@ -541,17 +541,25 @@ class PrivleapAction:
             if config_key == "Command":
                 self.action_command = config_val
             elif config_key == "AuthorizedUser":
-                self.auth_user = config_val
+                if PrivleapCommon.validate_id(config_val, PrivleapValidateType.USER_GROUP_NAME):
+                    self.auth_user = config_val
+                else:
+                    raise ValueError("Invalid user name '" + config_val + "'.")
             elif config_key == "AuthorizedGroup":
-                self.auth_group = config_val
+                if PrivleapCommon.validate_id(config_val, PrivleapValidateType.USER_GROUP_NAME):
+                    self.auth_group = config_val
+                else:
+                    raise ValueError("Invalid group name '" + config_val + "'.")
             elif config_key == "TargetUser":
-                self.target_user = config_val
+                if PrivleapCommon.validate_id(config_val, PrivleapValidateType.USER_GROUP_NAME):
+                    self.target_user = config_val
+                else:
+                    raise ValueError("Invalid user name '" + config_val + "'.")
             elif config_key == "TargetGroup":
-                self.target_group = config_val
-            elif config_key == "VerifyIdentity":
-                raise NotImplementedError("Identity verification is not yet implemented in privleap.")
-            elif config_key == "IdentityMechanism":
-                raise NotImplementedError("Identity verification is not yet implemented in privleap.")
+                if PrivleapCommon.validate_id(config_val, PrivleapValidateType.USER_GROUP_NAME):
+                    self.target_group = config_val
+                else:
+                    raise ValueError("Invalid user name '" + config_val + "'.")
             else:
                 raise ValueError("Unrecognized key '" + config_key + "' found.")
 
@@ -559,3 +567,23 @@ class PrivleapCommon:
     state_dir = "/run/privleapd"
     control_path = state_dir + "/control"
     comm_path = state_dir + "/comm"
+    config_file_regex = re.compile(r"[-A-Za-z_./]+\.conf\Z")
+    user_name_regex = re.compile(r"[A-Za-z_][-A-Za-z0-9_]*\$?\Z")
+    signal_name_regex = re.compile(r"[-A-Za-z_.]+\Z")
+
+    @staticmethod
+    def validate_id(id_string: str, validate_type: PrivleapValidateType):
+        if len(id_string) > 100:
+            return False
+
+        if validate_type is PrivleapValidateType.USER_GROUP_NAME:
+            if PrivleapCommon.user_name_regex.match(id_string):
+                return True
+        elif validate_type is PrivleapValidateType.CONFIG_FILE:
+            if PrivleapCommon.config_file_regex.match(id_string):
+                return True
+        elif validate_type is PrivleapValidateType.SIGNAL_NAME:
+            if PrivleapCommon.signal_name_regex.match(id_string):
+                return True
+
+        return False
