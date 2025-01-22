@@ -1,0 +1,41 @@
+commit 95618b825baefb8216ae502ac993ea0628c4d202
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Jan 22 00:26:02 2025 -0600
+
+    Allow streaming stdout and stderr, don't drop the entire server's privileges when spawning a process
+
+commit 8b0a3899d739919adc943cd6273c2aab58f72ccc
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Tue Jan 21 22:58:44 2025 -0600
+
+    Allow running actions as users other than root, handle launch-time errors gracefully
+
+commit c1b6cf4a7e5c91249c983153b5dfd38bb7c70573
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Jan 19 15:45:30 2025 -0600
+
+    Fix README
+
+commit 9f130920d95ba64f74f81aeadd485ac32f8e392f
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Jan 19 15:42:29 2025 -0600
+
+    More bugfixes and polishing after testing and stress-testing
+
+commit 80ce8a040dd0fbaaf601c053a1730b5882286279
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Jan 19 01:43:19 2025 -0600
+
+    Various improvements
+
+commit 437146297eecf82beb26b149b79daa62cfcb983a
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Jan 19 00:39:21 2025 -0600
+
+    Bugfixes, add leapctl and leaprun code, polish readme
+
+commit d52eb866f9c5241942c5ff971a19ae71f1b13b3a
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Jan 17 16:45:42 2025 -0600
+
+    Initial commit, very incomplete
