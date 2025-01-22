@@ -11,17 +11,19 @@ name adheres to the filename requirements. (The file used as the symlink's
 target is not obligated to follow the filename requirements, since its filename
 isn't used in any meaningful way by privleap.)
 
-Each configuration file defines an *action*. Each action can be executed in
-response to a signal. The name of the action defined by the configuration file
-is the configuration file's name with `.conf` trimmed off of the end. For
-instance, a file named `restart-tor.conf` defines an action named `restart-tor`.
+Each configuration file defines one or more *actions*. Each action can be
+executed in response to a signal.
 
 Each configuration file is formatted as follows:
 
 * Lines starting with zero or more whitespace characters followed immediately
-  by a `#` are comments. Other lines are interpreted as key/value pairs, with
-  the keys and values separated by a single equals (=) sign.
+  by a `#` are comments. Other lines are interpreted as either headers, or
+  key/value pairs, with the keys and values separated by a single equals (=)
+  sign.
 * Blank lines are ignored.
+* Each action starts with a header formatted as "[action-name]". Actions may
+  only contain the ASCII 7-bit characters a-z, A-Z, underscore, hyphen, and
+  period.
 * The following keys are recognized:
     * Command= - The Bash code to run when this action is triggered.
     * AuthorizedUser= - The user that is permitted to trigger this action. If
@@ -40,5 +42,5 @@ Each configuration file is formatted as follows:
 
 privleapd must be restarted for any changes to the configuration directory to
 take effect. Note that if a configuration file contains a syntax error (for
-instance, a line with no = sign separating the key and value), privleapd will
-fail to start.
+instance, a non-header line with no = sign separating the key and value),
+privleapd will fail to start.

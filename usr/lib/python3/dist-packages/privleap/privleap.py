@@ -521,47 +521,32 @@ class PrivleapAction:
     target_user = "root"
     target_group = "root"
 
-    def __init__(self, action_name: str, conf_data: str):
+    def __init__(self, action_name: str = "", action_command: str = "", auth_user: str = "", auth_group: str = "", target_user: str = "", target_group: str = ""):
+        if action_name == "":
+            raise ValueError("action_name is empty")
+        if action_command == "":
+            raise ValueError("action_command is empty")
+        if target_user == "":
+            target_user = "root"
+        if target_group == "":
+            target_group = "root"
+
+        if not PrivleapCommon.validate_id(action_name, PrivleapValidateType.SIGNAL_NAME):
+            raise ValueError("Action name '" + action_name + "' is invalid")
+
+        for key, value in { "auth_user": auth_user,
+                            "auth_group": auth_group,
+                            "target_user": target_user,
+                            "target_group": target_group }.items():
+            if not value == "" and not PrivleapCommon.validate_id(value, PrivleapValidateType.USER_GROUP_NAME):
+                raise ValueError("Invalid value '" + value + "' for argument '" + key +"'")
+
         self.action_name = action_name
-
-        conf_stream = StringIO(conf_data)
-        detect_comment_regex = re.compile(r"\s*#")
-        for line in conf_stream:
-            line = line.strip()
-            if detect_comment_regex.match(line):
-                continue
-            elif line == "":
-                continue
-            line_parts = line.split('=', maxsplit = 1)
-            if len(line_parts) != 2:
-                raise ValueError("Invalid line '" + line + "' found.")
-
-            config_key = line_parts[0]
-            config_val = line_parts[1]
-            if config_key == "Command":
-                self.action_command = config_val
-            elif config_key == "AuthorizedUser":
-                if PrivleapCommon.validate_id(config_val, PrivleapValidateType.USER_GROUP_NAME):
-                    self.auth_user = config_val
-                else:
-                    raise ValueError("Invalid user name '" + config_val + "'.")
-            elif config_key == "AuthorizedGroup":
-                if PrivleapCommon.validate_id(config_val, PrivleapValidateType.USER_GROUP_NAME):
-                    self.auth_group = config_val
-                else:
-                    raise ValueError("Invalid group name '" + config_val + "'.")
-            elif config_key == "TargetUser":
-                if PrivleapCommon.validate_id(config_val, PrivleapValidateType.USER_GROUP_NAME):
-                    self.target_user = config_val
-                else:
-                    raise ValueError("Invalid user name '" + config_val + "'.")
-            elif config_key == "TargetGroup":
-                if PrivleapCommon.validate_id(config_val, PrivleapValidateType.USER_GROUP_NAME):
-                    self.target_group = config_val
-                else:
-                    raise ValueError("Invalid user name '" + config_val + "'.")
-            else:
-                raise ValueError("Unrecognized key '" + config_key + "' found.")
+        self.action_command = action_command
+        self.auth_user = auth_user if auth_user != "" else None
+        self.auth_group = auth_group if auth_user != "" else None
+        self.target_user = target_user
+        self.target_group = target_group
 
 class PrivleapCommon:
     state_dir = "/run/privleapd"
@@ -587,3 +572,75 @@ class PrivleapCommon:
                 return True
 
         return False
+
+    @staticmethod
+    def parse_config_file(config_data: str):
+        output_list = list()
+        conf_stream = StringIO(config_data)
+        detect_comment_regex = re.compile(r"\s*#")
+        detect_header_regex = re.compile(r"\[.*]\Z")
+        current_action_name = ""
+        current_action_command = ""
+        current_auth_user = ""
+        current_auth_group = ""
+        current_target_user = ""
+        current_target_group = ""
+        first_header_parsed = False
+        for line in conf_stream:
+            line = line.strip()
+            if line == "":
+                continue
+
+            if detect_comment_regex.match(line):
+                continue
+
+            if detect_header_regex.match(line):
+                if first_header_parsed:
+                    output_list.append(PrivleapAction(current_action_name,
+                                                      current_action_command,
+                                                      current_auth_user,
+                                                      current_auth_group,
+                                                      current_target_user,
+                                                      current_target_group))
+                    # We don't need to zero out current_action_name since we set
+                    # its value below.
+                    # current_action_name = ""
+                    current_action_command = ""
+                    current_auth_user = ""
+                    current_auth_group = ""
+                    current_target_user = ""
+                    current_target_group = ""
+                else:
+                    first_header_parsed = True
+
+                current_action_name = line[1:len(line)-1]
+                continue
+
+            line_parts = line.split('=', maxsplit = 1)
+            if len(line_parts) != 2:
+                raise ValueError("Invalid config line '" + line +"'")
+
+            config_key = line_parts[0]
+            config_val = line_parts[1]
+            if config_key == "Command":
+                current_action_command = config_val
+            elif config_key == "AuthorizedUser":
+                current_auth_user = config_val
+            elif config_key == "AuthorizedGroup":
+                current_auth_group = config_val
+            elif config_key == "TargetUser":
+                current_target_user = config_val
+            elif config_key == "TargetGroup":
+                current_target_group = config_val
+            else:
+                raise ValueError("Unrecognized key '" + config_key +"' found")
+
+        # The last action in the file won't be in the list yet, add it now
+        output_list.append(PrivleapAction(current_action_name,
+                                          current_action_command,
+                                          current_auth_user,
+                                          current_auth_group,
+                                          current_target_user,
+                                          current_target_group))
+
+        return output_list

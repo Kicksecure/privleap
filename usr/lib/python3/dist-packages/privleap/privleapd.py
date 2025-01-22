@@ -239,7 +239,7 @@ def handle_comm_session(comm_socket):
             # Send stdout and stderr blocks in a loop.
             stdout_done = False
             stderr_done = False
-            while not stdout_done and not stderr_done:
+            while not stdout_done or not stderr_done:
                 ready_streams = select.select([action_process.stdout, action_process.stderr], [], [])
                 if action_process.stdout in ready_streams[0]:
                     # This reads up to 1024 bytes but may read less.
@@ -345,14 +345,10 @@ def main():
         if not PrivleapCommon.validate_id(config_file.path, PrivleapValidateType.CONFIG_FILE):
             continue
 
-        # action_name is config file name minus the ".conf" at the end, which
-        # is five characters
-        action_name = config_file.name[:len(config_file.name) - 5]
         try:
             with open(config_file.path, "r") as f:
-                conf_data = f.read()
-            action = PrivleapAction(action_name, conf_data)
-            PrivleapdGlobal.action_list.append(action)
+                action_arr = PrivleapCommon.parse_config_file(f.read())
+            PrivleapdGlobal.action_list.extend(action_arr)
         except Exception:
             print("ERROR: Failed to parse config file '" + config_file.path + "'!",
                   file=sys.stderr)
