@@ -74,7 +74,7 @@ def main():
     elif type(comm_msg) == PrivleapCommServerTriggerMsg:
         exit_code = 0
 
-        for _ in range(3):
+        while True:
             try:
                 comm_msg = LeaprunGlobal.comm_session.get_msg()
             except:
@@ -86,11 +86,10 @@ def main():
                 _ = sys.stderr.buffer.write(comm_msg.stderr_bytes)
             elif type(comm_msg) == PrivleapCommServerResultExitcodeMsg:
                 exit_code = int(comm_msg.exit_code)
+                cleanup_and_exit(exit_code)
             else:
                 unexpected_msg_error(comm_msg)
 
-        cleanup_and_exit(exit_code)
-        cleanup_and_exit(exit_code)
     else:
         unexpected_msg_error(comm_msg)
 

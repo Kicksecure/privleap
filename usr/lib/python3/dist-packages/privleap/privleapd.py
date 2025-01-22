@@ -221,33 +221,57 @@ def handle_comm_session(comm_socket):
             return
 
         print("handle_comm_session: Triggered action '" + desired_action.action_name + "'")
-        try:
-            comm_session.send_msg(PrivleapCommServerTriggerMsg(desired_action.action_name))
-        except Exception:
-            # Client already disconnected. At this point the action is already
-            # running, and there's not any point in waiting for the process's stdout
-            # and stderr, so the thread can end here.
-            print("handle_comm_session: action triggered, but could not send TRIGGER")
-            print(traceback.format_exc())
-            return
 
-        # Wait for the process to finish up, and send the stdout, stderr, and exit
-        # code from it.
-        action_output = action_process.communicate()
+        try:
+            try:
+                comm_session.send_msg(PrivleapCommServerTriggerMsg(desired_action.action_name))
+            except Exception:
+                # Client already disconnected. At this point the action is
+                # already running, and there's not any point in waiting for the
+                # process's stdout and stderr, so the thread can end here.
+                print("handle_comm_session: action triggered, but could not send TRIGGER")
+                print(traceback.format_exc())
+                return
+
+            # Send stdout and stderr blocks in a loop.
+            stdout_done = False
+            stderr_done = False
+            while not stdout_done and not stderr_done:
+                ready_streams = select.select([action_process.stdout, action_process.stderr], [], [])
+                if action_process.stdout in ready_streams[0]:
+                    # This reads up to 1024 bytes but may read less.
+                    stdio_buf = action_process.stdout.read(1024)
+                    if stdio_buf == b"":
+                        stdout_done = True
+                    else:
+                        try:
+                            comm_session.send_msg(PrivleapCommServerResultStdoutMsg(desired_action.action_name, stdio_buf))
+                        except Exception:
+                            print("handle_comm_session: could not send RESULT_STDOUT")
+                            print(traceback.format_exc())
+                            return
+                if action_process.stderr in ready_streams[0]:
+                    stdio_buf = action_process.stderr.read(1024)
+                    if stdio_buf == b"":
+                        stderr_done = True
+                    else:
+                        try:
+                            comm_session.send_msg(PrivleapCommServerResultStderrMsg(desired_action.action_name, stdio_buf))
+                        except Exception:
+                            print("handle_comm_session: could not send RESULT_STDERR")
+                            print(traceback.format_exc())
+                            return
+
+            action_process.wait()
+
+        finally:
+            action_process.stdout.close()
+            action_process.stderr.close()
+            action_process.terminate()
+            action_process.wait()
+
+        # Process is done, send the exit code and clean up
         print("handle_comm_session: Action '" + desired_action.action_name + "' completed")
-        try:
-            comm_session.send_msg(PrivleapCommServerResultStdoutMsg(desired_action.action_name, action_output[0]))
-        except Exception:
-            print("handle_comm_session: action triggered, but could not send RESULT_STDOUT")
-            print(traceback.format_exc())
-            return
-
-        try:
-            comm_session.send_msg(PrivleapCommServerResultStderrMsg(desired_action.action_name, action_output[1]))
-        except Exception:
-            print("handle_comm_session: action triggered, but could not send RESULT_STDERR")
-            print(traceback.format_exc())
-            return
 
         try:
             comm_session.send_msg(PrivleapCommServerResultExitcodeMsg(desired_action.action_name, action_process.returncode))
@@ -264,7 +288,6 @@ def run_action(desired_action):
     # https://stackoverflow.com/a/6037494/19474638, using this technique since
     # it ensures the environment is also changed.
     user_info = pwd.getpwnam(desired_action.target_user)
-    group_info = grp.getgrnam(desired_action.target_group)
     action_env = os.environ.copy()
     action_env["HOME"] = user_info.pw_dir
     action_env["LOGNAME"] = user_info.pw_name
@@ -274,18 +297,9 @@ def run_action(desired_action):
                                        desired_action.action_command],
                                       stdout = subprocess.PIPE,
                                       stderr = subprocess.PIPE,
-                                      preexec_fn=fix_child_state(user_info.pw_name,
-                                                                 user_info.pw_uid,
-                                                                 group_info.gr_gid))
+                                      user = desired_action.target_user,
+                                      group = desired_action.target_group)
     return action_process
-
-def fix_child_state(user_name, user_uid, group_gid):
-    # Make sure the groups are set right for the target user and group.
-    os.initgroups(user_name, group_gid)
-
-    # Drop privileges to the target user (this is a no-op if the target user is
-    # root).
-    os.setuid(user_uid)
 
 def main():
     # Ensure that there aren't two servers running at once

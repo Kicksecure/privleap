@@ -115,13 +115,11 @@ understand:
   exits non-zero, `privleapd` will still consider this a success. The client
   can use the value accompanying the `RESULT_EXITCODE` message to determine whether the action actually succeeded or not.
 * `RESULT_STDOUT <action_name> <result_stdout_text>` - Indicates that the
-  action specified by `<action_name>` has completed execution, and that it
-  output `<result_stdout_text>` on STDOUT. `<result_stdout_text>` is arbitrary
-  binary data.
+  action specified by `<action_name>` wrote the given block of data to STDOUT.
+  `<result_stdout_text>` is arbitrary binary data.
 * `RESULT_STDERR <action_name> <result_stderr_text>` - Indicates that the
-  action specified by `<action_name>` has completed execution, and that it
-  output `<result_stderr_text>` on STDERR. `<result_stderr_text>` is arbitrary
-  binary data.
+  action specified by `<action_name>` wrote the given block of data to STDERR.
+  `<result_stderr_text>` is arbitrary binary data.
 * `RESULT_EXITCODE <action_name> <exit_code>` - Indicates that the action
   specified by `<action_name>` has completed execution, and that it exited with
   code `<exit_code>`. `<exit_code>` is a string representing a decimal integer
@@ -132,13 +130,11 @@ understand:
   whether they simply aren't allowed to perform the action, or whether the
   action doesn't even exist.
 
-`privleapd` will only send any of the above server-sent messages exactly once
-per session, and will only parse the first one of each of the above
-client-sent messages per session. `privleapd` will terminate the session
-immediately after sending `UNAUTHORIZED`, or immediately after sending both
-`RESULT_EXITCODE`. It is an error for the client to send more than one of the
-above client-sent messages per session, and doing so will result in `privleapd`
-forcibly disconnecting the client.
+`privleapd` will only parse the first one of each of the above client-sent
+messages per session. `privleapd` will terminate the session immediately after
+sending `UNAUTHORIZED`, or immediately after sending `RESULT_EXITCODE`.
+privleapd *may* send multiple `RESULT_STDOUT` and `RESULT_STDERR` messages in a
+single session.
 
 In actual operation, the client (most likely `leaprun`) is expected to open a
 session with `privleapd` and send a `SIGNAL` message. If the user is
