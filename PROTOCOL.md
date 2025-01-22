@@ -55,19 +55,19 @@ manage communication sockets for each individual user account.
 
 * `CREATE <username>` - Creates a communication socket for the specified user.
   `privleapd` will respond with `OK` if this succeeds, `EXISTS` if the socket
-  already exists, and `ERROR` if this fails.
+  already exists, and `CONTROL_ERROR` if this fails.
 * `DESTROY <username>` - Destroys a communication socket for the specified
   user. `privleapd` will respond with `OK` if this succeeds, `NOUSER` if the
-  specified user does not have a communication socket, and `ERROR` if this
-  fails.
+  specified user does not have a communication socket, and `CONTROL_ERROR` if
+  this fails.
 
 `privleapd` can send the following messages on the `control` socket, which
 clients must be able to understand:
 
 * `OK` - The operation specified by the first client-sent message (either
   `CREATE` or `DESTROY`) in this session succeeded.
-* `ERROR` - The operation specified by the first client-sent message (either
-  `CREATE` or `DESTROY`) in this session failed.
+* `CONTROL_ERROR` - The operation specified by the first client-sent message
+  (either `CREATE` or `DESTROY`) in this session failed.
 * `EXISTS` - The first client-sent message was a `CREATE` message, but the
   username specified in the message already has a communication socket open.
 * `NOUSER` - The first client-sent message was a `DESTROY` message, but the
@@ -108,6 +108,12 @@ understand:
   action has started execution, it can disconnect from `privleapd` immediately,
   otherwise it should wait to disconnect until receiving a `RESULT_EXITCODE`
   message.
+* `TRIGGER_ERROR <action_name>` - Indicates that the action specified by
+  `<action_name>` was authorized, but launching it failed. This is usually due
+  to invalid or faulty configuration. Note that `TRIGGER_ERROR` is reserved for
+  actual problems *starting* the action. If the action starts successfully but
+  exits non-zero, `privleapd` will still consider this a success. The client
+  can use the value accompanying the `RESULT_EXITCODE` message to determine whether the action actually succeeded or not.
 * `RESULT_STDOUT <action_name> <result_stdout_text>` - Indicates that the
   action specified by `<action_name>` has completed execution, and that it
   output `<result_stdout_text>` on STDOUT. `<result_stdout_text>` is arbitrary

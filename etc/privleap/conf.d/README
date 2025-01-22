@@ -35,6 +35,8 @@ Each configuration file is formatted as follows:
       to trigger the action. If you want all users in a group and specific users
       outside of that group to be allowed to trigger an action, create multiple
       actions, one for the group and one for each user.
+    * TargetUser= - The user that the action will run as. Defaults to "root".
+    * TargetGroup= - The group that the action will run as. Defaults to "root".
 
 privleapd must be restarted for any changes to the configuration directory to
 take effect. Note that if a configuration file contains a syntax error (for

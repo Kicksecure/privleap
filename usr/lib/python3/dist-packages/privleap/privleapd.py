@@ -56,7 +56,7 @@ def handle_control_session(control_socket: PrivleapSocket):
             user_list = [pw[0] for pw in pwd.getpwall()]
             if not control_msg.user_name in user_list:
                 try:
-                    control_session.send_msg(PrivleapControlServerErrorMsg())
+                    control_session.send_msg(PrivleapControlServerControlErrorMsg())
                 except Exception:
                     print("handle_control_session: handling CREATE, could not send ERROR")
                     print(traceback.format_exc())
@@ -79,7 +79,7 @@ def handle_control_session(control_socket: PrivleapSocket):
                 print("WARNING: Failed to create socket for user '" + control_msg.user_name + "'!", file=sys.stderr)
                 print(traceback.format_exc())
                 try:
-                    control_session.send_msg(PrivleapControlServerErrorMsg())
+                    control_session.send_msg(PrivleapControlServerControlErrorMsg())
                 except Exception:
                     print("handle_control_session: handling CREATE, could not send ERROR")
                     print(traceback.format_exc())
@@ -126,7 +126,6 @@ def handle_control_session(control_socket: PrivleapSocket):
             sys.exit(2)
 
     finally:
-        print("control cleanup")
         control_session.close_session()
 
 def handle_comm_session(comm_socket):
@@ -208,11 +207,19 @@ def handle_comm_session(comm_socket):
         # TODO: Add identity verification here in the future.
 
         # If we get this far, the user is authorized. Run the action.
-        action_process = subprocess.Popen(['/usr/bin/bash', '-c',
-                                           desired_action.action_command],
-                                          stdout = subprocess.PIPE,
-                                          stderr = subprocess.PIPE,
-                                          preexec_fn=os.setpgrp)
+        try:
+            action_process = run_action(desired_action)
+        except Exception:
+            try:
+                comm_session.send_msg(PrivleapCommServerTriggerErrorMsg(desired_action.action_name))
+            except Exception:
+                print("handle_comm_session: Could not send TRIGGER_ERROR")
+                print(traceback.format_exc())
+
+            print("handle_comm_session: action '" + desired_action.action_name + "' authorized, but trigger failed")
+            print(traceback.format_exc())
+            return
+
         print("handle_comm_session: Triggered action '" + desired_action.action_name + "'")
         try:
             comm_session.send_msg(PrivleapCommServerTriggerMsg(desired_action.action_name))
@@ -250,8 +257,35 @@ def handle_comm_session(comm_socket):
             return
 
     finally:
-        print("comm cleanup")
         comm_session.close_session()
+
+def run_action(desired_action):
+    # User privilege de-escalation technique inspired by
+    # https://stackoverflow.com/a/6037494/19474638, using this technique since
+    # it ensures the environment is also changed.
+    user_info = pwd.getpwnam(desired_action.target_user)
+    group_info = grp.getgrnam(desired_action.target_group)
+    action_env = os.environ.copy()
+    action_env["HOME"] = user_info.pw_dir
+    action_env["LOGNAME"] = user_info.pw_name
+    action_env["PWD"] = os.getcwd()
+    action_env["USER"] = user_info.pw_name
+    action_process = subprocess.Popen(['/usr/bin/bash', '-c',
+                                       desired_action.action_command],
+                                      stdout = subprocess.PIPE,
+                                      stderr = subprocess.PIPE,
+                                      preexec_fn=fix_child_state(user_info.pw_name,
+                                                                 user_info.pw_uid,
+                                                                 group_info.gr_gid))
+    return action_process
+
+def fix_child_state(user_name, user_uid, group_gid):
+    # Make sure the groups are set right for the target user and group.
+    os.initgroups(user_name, group_gid)
+
+    # Drop privileges to the target user (this is a no-op if the target user is
+    # root).
+    os.setuid(user_uid)
 
 def main():
     # Ensure that there aren't two servers running at once

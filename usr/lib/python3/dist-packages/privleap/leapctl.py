@@ -74,7 +74,7 @@ def main():
         if type(control_msg) == PrivleapControlServerOkMsg:
             print("Comm socket created for user '" + control_user + "'.")
             cleanup_and_exit(0)
-        elif type(control_msg) == PrivleapControlServerErrorMsg:
+        elif type(control_msg) == PrivleapControlServerControlErrorMsg:
             generic_error("privleapd encountered an error while creating a comm socket for user '" + control_user + "'!")
         elif type(control_msg) == PrivleapControlServerExistsMsg:
             print("Comm socket already exists for user '" + control_user + "'.")

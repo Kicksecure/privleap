@@ -46,10 +46,10 @@ class PrivleapControlServerOkMsg:
     def serialize():
         return "OK".encode("utf-8")
 
-class PrivleapControlServerErrorMsg:
+class PrivleapControlServerControlErrorMsg:
     @staticmethod
     def serialize():
-        return "ERROR".encode("utf-8")
+        return "CONTROL_ERROR".encode("utf-8")
 
 class PrivleapControlServerExistsMsg:
     @staticmethod
@@ -90,6 +90,15 @@ class PrivleapCommServerTriggerMsg:
 
     def serialize(self):
         return "TRIGGER {0}".format(self.action_name).encode("utf-8")
+
+class PrivleapCommServerTriggerErrorMsg:
+    action_name = None
+
+    def __init__(self, action_name: str):
+        self.action_name = action_name
+
+    def serialize(self):
+        return "TRIGGER_ERROR {0}".format(self.action_name).encode("utf-8")
 
 class PrivleapCommServerResultStdoutMsg:
     action_name = None
@@ -405,9 +414,9 @@ class PrivleapSession:
             if msg_type_str == "OK":
                 self.__parse_msg_parameters(recv_buf, str_count = 0, blob_at_end = False)
                 return PrivleapControlServerOkMsg()
-            elif msg_type_str == "ERROR":
+            elif msg_type_str == "CONTROL_ERROR":
                 self.__parse_msg_parameters(recv_buf, str_count = 0, blob_at_end = False)
-                return PrivleapControlServerErrorMsg()
+                return PrivleapControlServerControlErrorMsg()
             elif msg_type_str == "EXISTS":
                 self.__parse_msg_parameters(recv_buf, str_count = 0, blob_at_end = False)
                 return PrivleapControlServerExistsMsg()
@@ -431,6 +440,9 @@ class PrivleapSession:
             if msg_type_str == "TRIGGER":
                 param_list = self.__parse_msg_parameters(recv_buf, str_count = 1, blob_at_end = False)
                 return PrivleapCommServerTriggerMsg(param_list[0])
+            elif msg_type_str == "TRIGGER_ERROR":
+                param_list = self.__parse_msg_parameters(recv_buf, str_count = 1, blob_at_end = False)
+                return PrivleapCommServerTriggerErrorMsg(param_list[0])
             elif msg_type_str == "RESULT_STDOUT":
                 param_list = self.__parse_msg_parameters(recv_buf, str_count = 1, blob_at_end = True)
                 return PrivleapCommServerResultStdoutMsg(param_list[0], param_list[1])
@@ -471,7 +483,7 @@ class PrivleapSession:
 
         if self.is_control_session and self.is_server_side:
             if msg_obj_type != PrivleapControlServerOkMsg \
-            and msg_obj_type != PrivleapControlServerErrorMsg \
+            and msg_obj_type != PrivleapControlServerControlErrorMsg \
             and msg_obj_type != PrivleapControlServerExistsMsg \
             and msg_obj_type != PrivleapControlServerNouserMsg:
                 raise ValueError("Invalid message type for socket.")
@@ -481,6 +493,7 @@ class PrivleapSession:
                 raise ValueError("Invalid message type for socket.")
         elif not self.is_control_session and self.is_server_side:
             if msg_obj_type != PrivleapCommServerTriggerMsg \
+            and msg_obj_type != PrivleapCommServerTriggerErrorMsg \
             and msg_obj_type != PrivleapCommServerResultStdoutMsg \
             and msg_obj_type != PrivleapCommServerResultStderrMsg \
             and msg_obj_type != PrivleapCommServerResultExitcodeMsg \
@@ -505,6 +518,8 @@ class PrivleapAction:
     action_command = None
     auth_user = None
     auth_group = None
+    target_user = "root"
+    target_group = "root"
 
     def __init__(self, action_name: str, conf_data: str):
         self.action_name = action_name
@@ -529,6 +544,10 @@ class PrivleapAction:
                 self.auth_user = config_val
             elif config_key == "AuthorizedGroup":
                 self.auth_group = config_val
+            elif config_key == "TargetUser":
+                self.target_user = config_val
+            elif config_key == "TargetGroup":
+                self.target_group = config_val
             elif config_key == "VerifyIdentity":
                 raise NotImplementedError("Identity verification is not yet implemented in privleap.")
             elif config_key == "IdentityMechanism":

@@ -69,6 +69,8 @@ def main():
     # noinspection PyUnboundLocalVariable
     if type(comm_msg) == PrivleapCommServerUnauthorizedMsg:
         generic_error("You are unauthorized to run action '" + signal_name + "'.")
+    elif type(comm_msg) == PrivleapCommServerTriggerErrorMsg:
+        generic_error("An error was encountered launching action '" + signal_name + "'.")
     elif type(comm_msg) == PrivleapCommServerTriggerMsg:
         exit_code = 0
 
