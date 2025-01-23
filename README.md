@@ -46,10 +46,10 @@ The full syntax of the `leaprun` command is:
 
 The full syntax of the `leapctl` command is:
 
-    leapctl <--create|--destroy> <username>
+    leapctl <--create|--destroy> <user>
 
-    username : The name of the user account to create or destroy a
-               communication socket of.
+    user : The username or UID of the user account to create or destroy a
+           communication socket of.
 	--create : Specifies that leapctl should request a communication socket to
 	           be created for the specified user.
 	--destroy : Specifies that leapctl should request a communication socket

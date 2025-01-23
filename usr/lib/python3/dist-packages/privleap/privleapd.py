@@ -301,7 +301,8 @@ def run_action(desired_action):
                                       stdout = subprocess.PIPE,
                                       stderr = subprocess.PIPE,
                                       user = desired_action.target_user,
-                                      group = desired_action.target_group)
+                                      group = desired_action.target_group,
+                                      env = action_env)
     return action_process
 
 def main():
@@ -409,7 +410,7 @@ def main():
                 handle_control_session(ready_sock_obj)
             else:
                 comm_thread = Thread(target = handle_comm_session, args = [ready_sock_obj])
-                comm_thread.run()
+                comm_thread.start()
 
 if __name__ == "__main__":
     main()

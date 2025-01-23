@@ -3,7 +3,7 @@ that users can then run using leaprun (or any other program that implements the
 privleap protocol as a client).
 
 Each configuration file in this directory must end in a .conf extension, and
-the filename must consist only of the ASCII 7-bit characters a-z, A-Z,
+the filename must consist only of the ASCII 7-bit characters a-z, A-Z, 0-9,
 underscore (_), hyphen (-), and period (.). Files that do not adhere to this
 requirement are silently ignored (including this README). Files in nested
 directories are ignored. Symlinks to files are followed so long as the symlink
@@ -22,7 +22,7 @@ Each configuration file is formatted as follows:
   sign.
 * Blank lines are ignored.
 * Each action starts with a header formatted as "[action-name]". Actions may
-  only contain the ASCII 7-bit characters a-z, A-Z, underscore, hyphen, and
+  only contain the ASCII 7-bit characters a-z, A-Z, 0-9, underscore, hyphen, and
   period.
 * The following keys are recognized:
     * Command= - The Bash code to run when this action is triggered.

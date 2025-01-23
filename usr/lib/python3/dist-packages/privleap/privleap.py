@@ -552,9 +552,9 @@ class PrivleapCommon:
     state_dir = "/run/privleapd"
     control_path = state_dir + "/control"
     comm_path = state_dir + "/comm"
-    config_file_regex = re.compile(r"[-A-Za-z_./]+\.conf\Z")
+    config_file_regex = re.compile(r"[-A-Za-z0-9_./]+\.conf\Z")
     user_name_regex = re.compile(r"[A-Za-z_][-A-Za-z0-9_]*\$?\Z")
-    signal_name_regex = re.compile(r"[-A-Za-z_.]+\Z")
+    signal_name_regex = re.compile(r"[-A-Za-z0-9_.]+\Z")
 
     @staticmethod
     def validate_id(id_string: str, validate_type: PrivleapValidateType):
