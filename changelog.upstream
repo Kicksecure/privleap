@@ -1,3 +1,40 @@
+commit 5d85b477403bbe0ed98ec73903c0419ca92ff222
+Merge: ea6c142 4823d3c
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Thu Jan 23 09:34:59 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit 4823d3ca8d5e11e41d230dcec4a486e8670c275d
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Jan 22 22:21:17 2025 -0600
+
+    Fix readme, allow numbers in action names, fix environment and threading bugs
+
+commit c18cc94cd29c66cdaa8e0d059c0250ff089bc4bd
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Jan 22 19:19:25 2025 -0600
+
+    Automatically handle leapctl user socket management, fix systemd unit bug
+
+commit 8ea08423bbb318c505683b3f51e2383b82aebef2
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Jan 22 17:06:47 2025 -0600
+
+    Fix a logic error with stdio streaming, allow multiple actions to be defined in one file
+
+commit 6c653e64da4959de2b53b72ec49835c01808204b
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Jan 22 14:14:03 2025 -0600
+
+    Greatly improve input validation, trim unneeded code and commented-out code
+
+commit ea6c142117d8982f54e1259433c730b8d3f94a28
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Wed Jan 22 14:39:25 2025 +0000
+
+    bumped changelog version
+
 commit 95618b825baefb8216ae502ac993ea0628c4d202
 Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
 Date:   Wed Jan 22 00:26:02 2025 -0600
