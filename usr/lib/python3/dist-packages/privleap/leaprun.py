@@ -56,8 +56,13 @@ def main():
         generic_error("Could not connect to privleapd!")
 
     try:
+        signal_msg = PrivleapCommClientSignalMsg(signal_name)
+    except:
+        generic_error("Signal name '" + signal_name + "' is invalid!")
+
+    try:
         # noinspection PyUnboundLocalVariable
-        LeaprunGlobal.comm_session.send_msg(PrivleapCommClientSignalMsg(signal_name))
+        LeaprunGlobal.comm_session.send_msg(signal_msg)
     except:
         generic_error("Could not request privleapd to run action '" + signal_name + "'!")
 
@@ -72,8 +77,6 @@ def main():
     elif type(comm_msg) == PrivleapCommServerTriggerErrorMsg:
         generic_error("An error was encountered launching action '" + signal_name + "'.")
     elif type(comm_msg) == PrivleapCommServerTriggerMsg:
-        exit_code = 0
-
         while True:
             try:
                 comm_msg = LeaprunGlobal.comm_session.get_msg()

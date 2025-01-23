@@ -9,7 +9,6 @@
 from privleap.privleap import *
 import sys
 import shutil
-import re
 import select
 from threading import Thread
 import os
@@ -42,6 +41,8 @@ def handle_control_session(control_socket: PrivleapSocket):
             return
 
         if type(control_msg) == PrivleapControlClientCreateMsg:
+            # The PrivleapControlClientCreateMsg constructor validates the
+            # username for us, so we don't have to do it again here.
             for sock in PrivleapdGlobal.socket_list:
                 if sock.user_name == control_msg.user_name:
                     # User already has an open socket
@@ -86,6 +87,8 @@ def handle_control_session(control_socket: PrivleapSocket):
                 return
 
         elif type(control_msg) == PrivleapControlClientDestroyMsg:
+            # The PrivleapControlClientDestroyMsg constructor validates the
+            # username for us, so we don't have to do it again here.
             remove_sock_idx = -1
             for sock_idx, sock in enumerate(PrivleapdGlobal.socket_list):
                 if sock.user_name == control_msg.user_name:
@@ -236,7 +239,7 @@ def handle_comm_session(comm_socket):
             # Send stdout and stderr blocks in a loop.
             stdout_done = False
             stderr_done = False
-            while not stdout_done and not stderr_done:
+            while not stdout_done or not stderr_done:
                 ready_streams = select.select([action_process.stdout, action_process.stderr], [], [])
                 if action_process.stdout in ready_streams[0]:
                     # This reads up to 1024 bytes but may read less.
@@ -298,7 +301,8 @@ def run_action(desired_action):
                                       stdout = subprocess.PIPE,
                                       stderr = subprocess.PIPE,
                                       user = desired_action.target_user,
-                                      group = desired_action.target_group)
+                                      group = desired_action.target_group,
+                                      env = action_env)
     return action_process
 
 def main():
@@ -335,22 +339,17 @@ def main():
             sys.exit(1)
 
     # Parse configuration directory
-    filename_validate_regex = re.compile(r"[./a-zA-Z_-]+\.conf")
     for config_file in os.scandir(PrivleapdGlobal.config_dir):
         if not config_file.is_file():
             continue
 
-        if not filename_validate_regex.match(config_file.path):
+        if not PrivleapCommon.validate_id(config_file.path, PrivleapValidateType.CONFIG_FILE):
             continue
 
-        # action_name is config file name minus the ".conf" at the end, which
-        # is five characters
-        action_name = config_file.name[:len(config_file.name) - 5]
         try:
             with open(config_file.path, "r") as f:
-                conf_data = f.read()
-            action = PrivleapAction(action_name, conf_data)
-            PrivleapdGlobal.action_list.append(action)
+                action_arr = PrivleapCommon.parse_config_file(f.read())
+            PrivleapdGlobal.action_list.extend(action_arr)
         except Exception:
             print("ERROR: Failed to parse config file '" + config_file.path + "'!",
                   file=sys.stderr)
@@ -411,7 +410,7 @@ def main():
                 handle_control_session(ready_sock_obj)
             else:
                 comm_thread = Thread(target = handle_comm_session, args = [ready_sock_obj])
-                comm_thread.run()
+                comm_thread.start()
 
 if __name__ == "__main__":
     main()

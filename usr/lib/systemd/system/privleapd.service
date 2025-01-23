@@ -3,13 +3,13 @@
 
 [Unit]
 Description=privleap - Limited Privilege Escalation Framework
+StartLimitIntervalSec=10
+StartLimitBurst=3
 
 [Service]
 Type=exec
 ExecStart=/usr/bin/privleapd
 Restart=always
-StartLimitIntervalSec=10
-StartLimitBurst=3
 
 [Install]
 WantedBy=multi-user.target
