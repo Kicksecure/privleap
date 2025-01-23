@@ -9,6 +9,7 @@
 from privleap.privleap import *
 import sys
 import pwd
+import re
 
 class LeapctlGlobal:
     control_session = None
@@ -19,10 +20,10 @@ def cleanup_and_exit(exit_code):
     sys.exit(exit_code)
 
 def print_usage():
-    print("""leapctl <--create|--destroy> <username>
+    print("""leapctl <--create|--destroy> <user>
 
-    username : The name of the user account to create or destroy a
-               communication socket for.
+    user : The username or UID of the user account to create or destroy a
+           communication socket for.
     --create : Specifies that leapctl should request a communication socket to
                be created for the specified user.
     --destroy : Specifies that leapctl should request a communication socket
@@ -45,6 +46,17 @@ def main():
 
     control_action = sys.argv[1]
     control_user = sys.argv[2]
+
+    # Try to parse the username as a UID, this is needed for systemd
+    # compatibility
+    uid_regex = re.compile(r"\d+")
+    if uid_regex.match(control_user):
+        control_uid = int(control_user)
+        try:
+            user_info = pwd.getpwuid(control_uid)
+            control_user = user_info.pw_name
+        except:
+            generic_error("Specified user does not exist.")
 
     if control_action != "--create" and control_action != "--destroy":
         print_usage()
@@ -101,7 +113,7 @@ def main():
         if type(control_msg) == PrivleapControlServerOkMsg:
             print("Comm socket destroyed for user '" + control_user + "'.")
             cleanup_and_exit(0)
-        elif type(control_msg) == PrivleapControlServerErrorMsg:
+        elif type(control_msg) == PrivleapControlServerControlErrorMsg:
             generic_error("privleapd encountered an error while destroying a comm socket for user '" + control_user + "'!")
         elif type(control_msg) == PrivleapControlServerNouserMsg:
             print("Comm socket does not exist for user '" + control_user + "'.")
