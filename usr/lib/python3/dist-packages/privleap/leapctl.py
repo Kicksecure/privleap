@@ -3,23 +3,37 @@
 # Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
 # See the file COPYING for copying conditions.
 
-# leapctl.py - privleapd client for controlling available comm sockets.
+# pylint: disable=broad-exception-caught, too-many-branches, too-many-statements
+# Rationale:
+#   broad-exception-caught: except blocks are general error handlers.
+#   too-many-branches, too-many-statements: preferring less indirection over
+#     shorter functions.
 
-# from privleap import *
-from privleap.privleap import *
+"""leapctl.py - privleapd client for controlling available comm sockets."""
+
 import sys
-import pwd
 import re
+import pwd
+import dataclasses
 
+from typing import NoReturn
+
+# import privleap as pl
+import privleap.privleap as pl
+
+@dataclasses.dataclass
 class LeapctlGlobal:
-    control_session = None
+    """Global variables for leapctl."""
+    control_session: pl.PrivleapSession | None = None
 
-def cleanup_and_exit(exit_code):
+def cleanup_and_exit(exit_code: int) -> NoReturn:
+    """Ensures any active session is closed, then exits."""
     if LeapctlGlobal.control_session is not None:
         LeapctlGlobal.control_session.close_session()
     sys.exit(exit_code)
 
-def print_usage():
+def print_usage() -> NoReturn:
+    """Prints usage information."""
     print("""leapctl <--create|--destroy> <user>
 
     user : The username or UID of the user account to create or destroy a
@@ -30,68 +44,80 @@ def print_usage():
                 to be destroyed for the specified user.""")
     cleanup_and_exit(1)
 
-def generic_error(error_msg):
+def generic_error(error_msg: str) -> NoReturn:
+    """Prints an error, then cleans up and exits."""
     print("ERROR: " + error_msg, file=sys.stderr)
     cleanup_and_exit(1)
 
-def unexpected_msg_error(control_msg):
+def unexpected_msg_error(control_msg: pl.PrivleapMsg) -> NoReturn:
+    """Alerts about an unexpected message type being received from the
+    server."""
     print("ERROR: privleapd returned unexpected message as follows:",
-          file=sys.stderr)
-    print(control_msg, file=sys.stderr)
+        file=sys.stderr)
+    print(control_msg.serialize(), file=sys.stderr)
     cleanup_and_exit(1)
 
-def main():
+def main() -> NoReturn:
+    """Main function."""
     if len(sys.argv) != 3:
         print_usage()
 
-    control_action = sys.argv[1]
-    control_user = sys.argv[2]
+    control_action: str = sys.argv[1]
+    control_user: str = sys.argv[2]
 
     # Try to parse the username as a UID, this is needed for systemd
     # compatibility
-    uid_regex = re.compile(r"\d+")
+    uid_regex: re.Pattern[str] = re.compile(r"\d+")
     if uid_regex.match(control_user):
-        control_uid = int(control_user)
+        control_uid: int = int(control_user)
         try:
-            user_info = pwd.getpwuid(control_uid)
+            user_info: pwd.struct_passwd = pwd.getpwuid(control_uid)
             control_user = user_info.pw_name
-        except:
+        except Exception:
             generic_error("Specified user does not exist.")
 
-    if control_action != "--create" and control_action != "--destroy":
+    if control_action not in ("--create", "--destroy"):
         print_usage()
 
-    if not PrivleapCommon.validate_id(control_user, PrivleapValidateType.USER_GROUP_NAME):
+    if not pl.PrivleapCommon.validate_id(control_user,
+        pl.PrivleapValidateType.USER_GROUP_NAME):
         generic_error("User name '" + control_user + "' is invalid!")
 
-    user_list = [pw[0] for pw in pwd.getpwall()]
+    user_list: list[str] = [pw.pw_name for pw in pwd.getpwall()]
     if not control_user in user_list:
         generic_error("Specified user does not exist.")
 
     try:
-        LeapctlGlobal.control_session = PrivleapSession("", is_control_session = True)
-    except:
+        LeapctlGlobal.control_session = pl.PrivleapSession(session_info = "",
+            is_control_session = True)
+    except Exception:
         generic_error("Could not connect to privleapd!")
+
+    assert LeapctlGlobal.control_session is not None
 
     if control_action == "--create":
         try:
             # noinspection PyUnboundLocalVariable
-            LeapctlGlobal.control_session.send_msg(PrivleapControlClientCreateMsg(control_user))
-        except:
-            generic_error("Could not request privleapd to create a comm socket!")
+            LeapctlGlobal.control_session.send_msg(
+                pl.PrivleapControlClientCreateMsg(control_user))
+        except Exception:
+            generic_error(
+                "Could not request privleapd to create a comm socket!")
 
         try:
-            control_msg = LeapctlGlobal.control_session.get_msg()
-        except:
+            control_msg: pl.PrivleapMsg = LeapctlGlobal.control_session.get_msg()
+        except Exception:
             generic_error("privleapd didn't return a valid response!")
 
         # noinspection PyUnboundLocalVariable
-        if type(control_msg) == PrivleapControlServerOkMsg:
+        if isinstance(control_msg, pl.PrivleapControlServerOkMsg):
             print("Comm socket created for user '" + control_user + "'.")
             cleanup_and_exit(0)
-        elif type(control_msg) == PrivleapControlServerControlErrorMsg:
-            generic_error("privleapd encountered an error while creating a comm socket for user '" + control_user + "'!")
-        elif type(control_msg) == PrivleapControlServerExistsMsg:
+        elif isinstance(control_msg, pl.PrivleapControlServerControlErrorMsg):
+            generic_error(
+                ("privleapd encountered an error while creating a comm socket "
+                 "for user '" + control_user + "'!"))
+        elif isinstance(control_msg, pl.PrivleapControlServerExistsMsg):
             print("Comm socket already exists for user '" + control_user + "'.")
             cleanup_and_exit(0)
         else:
@@ -100,22 +126,26 @@ def main():
     else:
         try:
             # noinspection PyUnboundLocalVariable
-            LeapctlGlobal.control_session.send_msg(PrivleapControlClientDestroyMsg(control_user))
-        except:
-            generic_error("Could not request privleapd to destroy a comm socket!")
+            LeapctlGlobal.control_session.send_msg(
+                pl.PrivleapControlClientDestroyMsg(control_user))
+        except Exception:
+            generic_error(
+                "Could not request privleapd to destroy a comm socket!")
 
         try:
             control_msg = LeapctlGlobal.control_session.get_msg()
-        except:
+        except Exception:
             generic_error("privleapd didn't return a valid response!")
 
         # noinspection PyUnboundLocalVariable
-        if type(control_msg) == PrivleapControlServerOkMsg:
+        if isinstance(control_msg, pl.PrivleapControlServerOkMsg):
             print("Comm socket destroyed for user '" + control_user + "'.")
             cleanup_and_exit(0)
-        elif type(control_msg) == PrivleapControlServerControlErrorMsg:
-            generic_error("privleapd encountered an error while destroying a comm socket for user '" + control_user + "'!")
-        elif type(control_msg) == PrivleapControlServerNouserMsg:
+        elif isinstance(control_msg, pl.PrivleapControlServerControlErrorMsg):
+            generic_error(
+                ("privleapd encountered an error while destroying a comm "
+                 "socket for user '" + control_user + "'!"))
+        elif isinstance(control_msg, pl.PrivleapControlServerNouserMsg):
             print("Comm socket does not exist for user '" + control_user + "'.")
             cleanup_and_exit(0)
         else:
