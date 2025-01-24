@@ -1,3 +1,28 @@
+commit 765c472871d3a8675404f5780b6e0af0f3de954f
+Merge: aaedc49 9353c5a
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Fri Jan 24 08:29:27 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit 9353c5a4449c26a808a3681eae5aeee9b79c7e04
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Jan 24 00:53:10 2025 -0600
+
+    Make code PyLint-compliant (wip)
+
+commit 626c06651a28162fac3122fa79e4c1d1a0e7b441
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Thu Jan 23 21:08:02 2025 -0600
+
+    Add detailed type annotations to pass mypy (untested)
+
+commit aaedc494bc07d133c4f278ae7b5c0d9af907f2bb
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Thu Jan 23 16:26:21 2025 +0000
+
+    bumped changelog version
+
 commit e4d79b08facd849584e8085908ef90818c0b90eb
 Author: Patrick Schleizer <adrelanos@whonix.org>
 Date:   Thu Jan 23 11:12:05 2025 -0500
