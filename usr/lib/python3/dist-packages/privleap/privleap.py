@@ -17,9 +17,10 @@ import os
 import stat
 import pwd
 import re
-from typing import Tuple
 from enum import Enum
 from io import StringIO
+from pathlib import Path
+from typing import Tuple
 
 class PrivleapSocketType(Enum):
     """
@@ -44,8 +45,13 @@ class PrivleapMsg:
     Base class for all message classes.
     """
 
+    name: str = ""
+
     def serialize(self) -> bytes:
-        """Outputs raw bytes for message."""
+        """
+        Outputs raw bytes for message.
+        """
+
         return b""
 
 class PrivleapControlClientCreateMsg(PrivleapMsg):
@@ -57,17 +63,16 @@ class PrivleapControlClientCreateMsg(PrivleapMsg):
     Requests creation of a comm socket for a specified user.
     """
 
-    user_name: str | None = None
+    name = "CREATE"
 
     def __init__(self, user_name: str):
         if not PrivleapCommon.validate_id(user_name,
             PrivleapValidateType.USER_GROUP_NAME):
             raise ValueError("Specified username is invalid.")
-        self.user_name = user_name
+        self.user_name: str = user_name
 
     def serialize(self) -> bytes:
-        assert self.user_name is not None
-        return f"CREATE {self.user_name}".encode("utf-8")
+        return f"{self.name} {self.user_name}".encode("utf-8")
 
 class PrivleapControlClientDestroyMsg(PrivleapMsg):
     """
@@ -79,17 +84,16 @@ class PrivleapControlClientDestroyMsg(PrivleapMsg):
       user.
     """
 
-    user_name: str | None = None
+    name = "DESTROY"
 
     def __init__(self, user_name: str):
         if not PrivleapCommon.validate_id(user_name,
             PrivleapValidateType.USER_GROUP_NAME):
             raise ValueError("Specified username is invalid.")
-        self.user_name = user_name
+        self.user_name: str = user_name
 
     def serialize(self) -> bytes:
-        assert self.user_name is not None
-        return f"DESTROY {self.user_name}".encode("utf-8")
+        return f"{self.name} {self.user_name}".encode("utf-8")
 
 class PrivleapControlServerOkMsg(PrivleapMsg):
     """
@@ -101,8 +105,10 @@ class PrivleapControlServerOkMsg(PrivleapMsg):
       successful.
     """
 
+    name = "OK"
+
     def serialize(self) -> bytes:
-        return "OK".encode("utf-8")
+        return self.name.encode("utf-8")
 
 class PrivleapControlServerControlErrorMsg(PrivleapMsg):
     """
@@ -113,8 +119,10 @@ class PrivleapControlServerControlErrorMsg(PrivleapMsg):
     Indicates that the requested creation or destruction operation failed.
     """
 
+    name = "CONTROL_ERROR"
+
     def serialize(self) -> bytes:
-        return "CONTROL_ERROR".encode("utf-8")
+        return self.name.encode("utf-8")
 
 class PrivleapControlServerExistsMsg(PrivleapMsg):
     """
@@ -126,8 +134,10 @@ class PrivleapControlServerExistsMsg(PrivleapMsg):
       already has a comm socket.
     """
 
+    name = "EXISTS"
+
     def serialize(self) -> bytes:
-        return "EXISTS".encode("utf-8")
+        return self.name.encode("utf-8")
 
 class PrivleapControlServerNouserMsg(PrivleapMsg):
     """
@@ -139,8 +149,10 @@ class PrivleapControlServerNouserMsg(PrivleapMsg):
       does not have a comm socket.
     """
 
+    name = "NOUSER"
+
     def serialize(self) -> bytes:
-        return "NOUSER".encode("utf-8")
+        return self.name.encode("utf-8")
 
 class PrivleapCommClientSignalMsg(PrivleapMsg):
     """
@@ -151,17 +163,16 @@ class PrivleapCommClientSignalMsg(PrivleapMsg):
     Requests triggering the action who's name matches the signal name.
     """
 
-    signal_name: str | None = None
+    name = "SIGNAL"
 
     def __init__(self, signal_name: str):
         if not PrivleapCommon.validate_id(signal_name,
             PrivleapValidateType.SIGNAL_NAME):
             raise ValueError("Specified signal name is invalid.")
-        self.signal_name = signal_name
+        self.signal_name: str = signal_name
 
     def serialize(self) -> bytes:
-        assert self.signal_name is not None
-        return f"SIGNAL {self.signal_name}".encode("utf-8")
+        return f"{self.name} {self.signal_name}".encode("utf-8")
 
 class PrivleapCommServerTriggerMsg(PrivleapMsg):
     """
@@ -172,17 +183,16 @@ class PrivleapCommServerTriggerMsg(PrivleapMsg):
     Indicates that the requested action has been triggered.
     """
 
-    action_name: str | None = None
+    name = "TRIGGER"
 
     def __init__(self, action_name: str):
         if not PrivleapCommon.validate_id(action_name,
             PrivleapValidateType.SIGNAL_NAME):
             raise ValueError("Specified action name is invalid.")
-        self.action_name = action_name
+        self.action_name: str = action_name
 
     def serialize(self) -> bytes:
-        assert self.action_name is not None
-        return f"TRIGGER {self.action_name}".encode("utf-8")
+        return f"{self.name} {self.action_name}".encode("utf-8")
 
 class PrivleapCommServerTriggerErrorMsg(PrivleapMsg):
     """
@@ -194,17 +204,16 @@ class PrivleapCommServerTriggerErrorMsg(PrivleapMsg):
       launching the action's command failed.
     """
 
-    action_name: str | None = None
+    name = "TRIGGER_ERROR"
 
     def __init__(self, action_name: str):
         if not PrivleapCommon.validate_id(action_name,
             PrivleapValidateType.SIGNAL_NAME):
             raise ValueError("Specified action name is invalid.")
-        self.action_name = action_name
+        self.action_name: str = action_name
 
     def serialize(self) -> bytes:
-        assert self.action_name is not None
-        return f"TRIGGER_ERROR {self.action_name}".encode("utf-8")
+        return f"{self.name} {self.action_name}".encode("utf-8")
 
 class PrivleapCommServerResultStdoutMsg(PrivleapMsg):
     """
@@ -215,20 +224,17 @@ class PrivleapCommServerResultStdoutMsg(PrivleapMsg):
     Provides stdout data from the triggered action to the client.
     """
 
-    action_name: str | None = None
-    stdout_bytes: bytes | None = None
+    name = "RESULT_STDOUT"
 
     def __init__(self, action_name: str, stdout_bytes: bytes):
         if not PrivleapCommon.validate_id(action_name,
             PrivleapValidateType.SIGNAL_NAME):
             raise ValueError("Specified action name is invalid.")
-        self.action_name = action_name
-        self.stdout_bytes = stdout_bytes
+        self.action_name: str = action_name
+        self.stdout_bytes: bytes = stdout_bytes
 
     def serialize(self) -> bytes:
-        assert self.action_name is not None
-        assert self.stdout_bytes is not None
-        return f"RESULT_STDOUT {self.action_name} ".encode("utf-8") \
+        return f"{self.name} {self.action_name} ".encode("utf-8") \
             + self.stdout_bytes
 
 class PrivleapCommServerResultStderrMsg(PrivleapMsg):
@@ -239,20 +245,17 @@ class PrivleapCommServerResultStderrMsg(PrivleapMsg):
     Provides stderr data from the triggered action to the client.
     """
 
-    action_name: str | None = None
-    stderr_bytes: bytes | None = None
+    name = "RESULT_STDERR"
 
     def __init__(self, action_name: str, stderr_bytes: bytes):
         if not PrivleapCommon.validate_id(action_name,
             PrivleapValidateType.SIGNAL_NAME):
             raise ValueError("Specified action name is invalid.")
-        self.action_name = action_name
-        self.stderr_bytes = stderr_bytes
+        self.action_name: str = action_name
+        self.stderr_bytes: bytes = stderr_bytes
 
     def serialize(self) -> bytes:
-        assert self.action_name is not None
-        assert self.stderr_bytes is not None
-        return f"RESULT_STDERR {self.action_name} ".encode("utf-8") \
+        return f"{self.name} {self.action_name} ".encode("utf-8") \
             + self.stderr_bytes
 
 class PrivleapCommServerResultExitcodeMsg(PrivleapMsg):
@@ -265,21 +268,18 @@ class PrivleapCommServerResultExitcodeMsg(PrivleapMsg):
       specified exit code.
     """
 
-    action_name: str | None = None
-    # TODO: Can this be made an int instead?
-    exit_code: str | None = None
+    name = "RESULT_EXITCODE"
 
     def __init__(self, action_name: str, exit_code: str):
         if not PrivleapCommon.validate_id(
             action_name, PrivleapValidateType.SIGNAL_NAME):
             raise ValueError("Specified action name is invalid.")
-        self.action_name = action_name
-        self.exit_code = exit_code
+        self.action_name: str = action_name
+        # TODO: Can this be made an int instead?
+        self.exit_code: str = exit_code
 
     def serialize(self) -> bytes:
-        assert self.action_name is not None
-        assert self.exit_code is not None
-        return f"RESULT_EXITCODE {self.action_name} {self.exit_code}".encode(
+        return f"{self.name} {self.action_name} {self.exit_code}".encode(
             "utf-8")
 
 class PrivleapCommServerUnauthorizedMsg(PrivleapMsg):
@@ -293,8 +293,10 @@ class PrivleapCommServerUnauthorizedMsg(PrivleapMsg):
       clearly to the client for security reasons.
     """
 
+    name = "UNAUTHORIZED"
+
     def serialize(self) -> bytes:
-        return "UNAUTHORIZED".encode("utf-8")
+        return self.name.encode("utf-8")
 
 class PrivleapSession:
     """
@@ -302,48 +304,54 @@ class PrivleapSession:
       messages back and forth.
     """
 
-    backend_socket: socket.socket | None = None
-    is_control_session: bool = False
-    is_server_side: bool = False
-    is_session_open: bool = False
-    user_name: str | None = None
 
     # Only an extremely poorly designed client or server will ever fail to work
     # quickly enough for a 0.1-second timeout to be too short. On the other hand
     # a malicious client may attempt to lock up privleapd by sending incomplete
     # data and then hanging forever, so we timeout very quickly to avoid this
     # attack.
-    def __init__(self, session_info: str | socket.socket, user_name: str = "",
+    def __init__(self, session_info: str | socket.socket | None = None,
+        user_name: str | None = None,
         is_control_session: bool = False):
-        if isinstance(session_info, str):
-            if user_name != "":
+
+        self.user_name: str | None = None
+        self.backend_socket: socket.socket | None = None
+        self.is_control_session: bool = False
+        self.is_server_side: bool = False
+        self.is_session_open: bool = False
+
+        if isinstance(session_info, str) or session_info is None:
+            if user_name is not None:
                 raise ValueError("user_name cannot be passed if session_info "
                     "is a string")
 
             if is_control_session:
-                socket_path: str = PrivleapCommon.control_path
-
+                socket_path: Path = PrivleapCommon.control_path
             else:
+                if session_info is None:
+                    raise ValueError("session_info cannot be type 'None' if "
+                        "creating a comm session.")
                 if not PrivleapCommon.validate_id(session_info,
                     PrivleapValidateType.USER_GROUP_NAME):
                     raise ValueError("User name'"
                         + session_info
                         + "'is invalid.")
 
-                self.user_name: str = session_info
-                socket_path = PrivleapCommon.comm_path + '/' + session_info
+                self.user_name = session_info
+                socket_path = Path(PrivleapCommon.comm_dir, self.user_name)
 
             if not os.access(socket_path, os.R_OK | os.W_OK):
                 raise PermissionError("Cannot access '"
-                    + socket_path
+                    + str(socket_path)
                     + "' for reading and writing")
 
-            self.backend_socket = socket.socket(family=socket.AF_UNIX)
-            self.backend_socket.connect(socket_path)
+            self.backend_socket = socket.socket(
+                family=socket.AF_UNIX)
+            self.backend_socket.connect(str(socket_path))
             self.backend_socket.settimeout(0.1)
 
         elif isinstance(session_info, socket.socket):
-            if user_name != "" \
+            if user_name is not None \
                 and not PrivleapCommon.validate_id(user_name,
                     PrivleapValidateType.USER_GROUP_NAME):
                 raise ValueError("User name '" + user_name + "' is invalid.")
@@ -354,14 +362,15 @@ class PrivleapSession:
             self.is_server_side = True
 
         else:
-            raise ValueError("session_info must be either type 'str' or type "
-                "'socket'")
+            raise ValueError("session_info type is not 'str', 'socket', or "
+                "'None'")
 
         self.is_control_session = is_control_session
         self.is_session_open = True
 
     def __recv_msg(self) -> bytes:
-        """Receives a low-level message from the backend socket. You should use
+        """
+        Receives a low-level message from the backend socket. You should use
           get_msg() if you want to get an actual PrivleapMsg object back.
 
         DO NOT USE __recv_msg() ON THE SERVER! This is intentionally vulnerable
@@ -370,7 +379,9 @@ class PrivleapSession:
           lock up the server process. This is safe for the client (which may
           need to receive very large amounts of data from the server), but
           dangerous for the server (which needs to not lock up if a client tries
-          to cause large delays)."""
+          to cause large delays).
+        """
+
         assert self.backend_socket is not None
 
         header_len: int = 4
@@ -406,7 +417,8 @@ class PrivleapSession:
         return recv_buf
 
     def __recv_msg_cautious(self) -> bytes:
-        """Receives a low-level message from the backend socket. You should use
+        """
+        Receives a low-level message from the backend socket. You should use
           get_msg() if you want to get an actual PrivleapMsg object back.
 
         While there aren't security issues with doing so, you probably shouldn't
@@ -414,7 +426,8 @@ class PrivleapSession:
           while the server is still trying to send data to the client. It bails
           out if a read times out, or if it takes more than five combined loop
           iterations to read a message (thus giving at most ~0.5 seconds for the
-          client to send a whole message)."""
+          client to send a whole message).
+        """
 
         assert self.backend_socket is not None
 
@@ -476,6 +489,10 @@ class PrivleapSession:
         return recv_buf[:type_field_len].decode("utf-8")
 
     @staticmethod
+    # pylint: disable=too-many-branches
+    # Rationale:
+    #   too-many-branches: This function does a single job that can't be
+    #     reasonably made less complex or split into additional functions.
     def __parse_msg_parameters(recv_buf: bytes, str_count: int,
             blob_at_end: bool) -> Tuple[list[str], bytes | None]:
         """
@@ -545,6 +562,11 @@ class PrivleapSession:
 
         return output_list, blob
 
+    # pylint: disable=too-many-return-statements, too-many-branches
+    # Rationale:
+    #   too-many-return-statements, too-many-branches: This is essentially a
+    #     dispatch function, it shouldn't be split for readability's sake and it
+    #     can't use less return statements or branches.
     def get_msg(self) -> PrivleapMsg:
         """
         Gets a message from the backend socket and returns it as a PrivleapMsg
@@ -583,9 +605,10 @@ class PrivleapSession:
             raise ValueError("Invalid message type '"
                 + msg_type_str
                 + "' for socket")
+
         # Client-side control socket, we're receiving, so expect server control
         # messages
-        elif self.is_control_session and not self.is_server_side:
+        if self.is_control_session and not self.is_server_side:
             if msg_type_str == "OK":
                 self.__parse_msg_parameters(
                     recv_buf, str_count = 0, blob_at_end = False)
@@ -605,9 +628,10 @@ class PrivleapSession:
             raise ValueError("Invalid message type '"
                 + msg_type_str
                 + "' for socket")
+
         # Server-side comm socket, we're receiving, so expect client comm
         # messages
-        elif not self.is_control_session and self.is_server_side:
+        if not self.is_control_session and self.is_server_side:
             if msg_type_str == "SIGNAL":
                 param_list, _ = self.__parse_msg_parameters(
                     recv_buf, str_count = 1, blob_at_end = False)
@@ -615,39 +639,40 @@ class PrivleapSession:
             raise ValueError("Invalid message type '"
                 + msg_type_str
                 + "' for socket")
+
+        # self.is_server_side = False, self.is_control_socket = False
         # Client-side comm socket, we're receiving, so expect server comm
         # messages
-        else:
-            if msg_type_str == "TRIGGER":
-                param_list, _ = self.__parse_msg_parameters(
-                    recv_buf, str_count = 1, blob_at_end = False)
-                return PrivleapCommServerTriggerMsg(param_list[0])
-            if msg_type_str == "TRIGGER_ERROR":
-                param_list, _ = self.__parse_msg_parameters(
-                    recv_buf, str_count = 1, blob_at_end = False)
-                return PrivleapCommServerTriggerErrorMsg(param_list[0])
-            if msg_type_str == "RESULT_STDOUT":
-                param_list, blob = self.__parse_msg_parameters(
-                    recv_buf, str_count = 1, blob_at_end = True)
-                assert blob is not None
-                return PrivleapCommServerResultStdoutMsg(param_list[0], blob)
-            if msg_type_str == "RESULT_STDERR":
-                param_list, blob = self.__parse_msg_parameters(
-                    recv_buf, str_count = 1, blob_at_end = True)
-                assert blob is not None
-                return PrivleapCommServerResultStderrMsg(param_list[0], blob)
-            if msg_type_str == "RESULT_EXITCODE":
-                param_list, _ = self.__parse_msg_parameters(
-                    recv_buf, str_count = 2, blob_at_end = False)
-                return PrivleapCommServerResultExitcodeMsg(
-                    param_list[0], param_list[1])
-            if msg_type_str == "UNAUTHORIZED":
-                self.__parse_msg_parameters(
-                    recv_buf, str_count = 0, blob_at_end = False)
-                return PrivleapCommServerUnauthorizedMsg()
-            raise ValueError("Invalid message type '"
-                + msg_type_str
-                + "' for socket")
+        if msg_type_str == "TRIGGER":
+            param_list, _ = self.__parse_msg_parameters(
+                recv_buf, str_count = 1, blob_at_end = False)
+            return PrivleapCommServerTriggerMsg(param_list[0])
+        if msg_type_str == "TRIGGER_ERROR":
+            param_list, _ = self.__parse_msg_parameters(
+                recv_buf, str_count = 1, blob_at_end = False)
+            return PrivleapCommServerTriggerErrorMsg(param_list[0])
+        if msg_type_str == "RESULT_STDOUT":
+            param_list, blob = self.__parse_msg_parameters(
+                recv_buf, str_count = 1, blob_at_end = True)
+            assert blob is not None
+            return PrivleapCommServerResultStdoutMsg(param_list[0], blob)
+        if msg_type_str == "RESULT_STDERR":
+            param_list, blob = self.__parse_msg_parameters(
+                recv_buf, str_count = 1, blob_at_end = True)
+            assert blob is not None
+            return PrivleapCommServerResultStderrMsg(param_list[0], blob)
+        if msg_type_str == "RESULT_EXITCODE":
+            param_list, _ = self.__parse_msg_parameters(
+                recv_buf, str_count = 2, blob_at_end = False)
+            return PrivleapCommServerResultExitcodeMsg(
+                param_list[0], param_list[1])
+        if msg_type_str == "UNAUTHORIZED":
+            self.__parse_msg_parameters(
+                recv_buf, str_count = 0, blob_at_end = False)
+            return PrivleapCommServerUnauthorizedMsg()
+        raise ValueError("Invalid message type '"
+            + msg_type_str
+            + "' for socket")
 
     def __send_msg(self, msg_obj: PrivleapMsg) -> None:
         """
@@ -683,22 +708,22 @@ class PrivleapSession:
         msg_obj_type: type = type(msg_obj)
 
         if self.is_control_session and self.is_server_side:
-            if msg_obj_type != PrivleapControlServerOkMsg \
-                and msg_obj_type != PrivleapControlServerControlErrorMsg \
-                and msg_obj_type != PrivleapControlServerExistsMsg \
-                and msg_obj_type != PrivleapControlServerNouserMsg:
+            if msg_obj_type not in (PrivleapControlServerOkMsg,
+                PrivleapControlServerControlErrorMsg,
+                PrivleapControlServerExistsMsg,
+                PrivleapControlServerNouserMsg):
                 raise ValueError("Invalid message type for socket.")
         elif self.is_control_session and not self.is_server_side:
-            if msg_obj_type != PrivleapControlClientCreateMsg \
-                and msg_obj_type != PrivleapControlClientDestroyMsg:
+            if msg_obj_type not in (PrivleapControlClientCreateMsg,
+                PrivleapControlClientDestroyMsg):
                 raise ValueError("Invalid message type for socket.")
         elif not self.is_control_session and self.is_server_side:
-            if msg_obj_type != PrivleapCommServerTriggerMsg \
-                and msg_obj_type != PrivleapCommServerTriggerErrorMsg \
-                and msg_obj_type != PrivleapCommServerResultStdoutMsg \
-                and msg_obj_type != PrivleapCommServerResultStderrMsg \
-                and msg_obj_type != PrivleapCommServerResultExitcodeMsg \
-                and msg_obj_type != PrivleapCommServerUnauthorizedMsg:
+            if msg_obj_type not in (PrivleapCommServerTriggerMsg,
+                PrivleapCommServerTriggerErrorMsg,
+                PrivleapCommServerResultStdoutMsg,
+                PrivleapCommServerResultStderrMsg,
+                PrivleapCommServerResultExitcodeMsg,
+                PrivleapCommServerUnauthorizedMsg):
                 raise ValueError("Invalid message type for socket.")
         else:
             if msg_obj_type != PrivleapCommClientSignalMsg:
@@ -707,6 +732,11 @@ class PrivleapSession:
         self.__send_msg(msg_obj)
 
     def close_session(self) -> None:
+        """
+        Closes the session. No further messages can be sent by either side once
+          this is called.
+        """
+
         assert self.backend_socket is not None
         self.backend_socket.shutdown(socket.SHUT_RDWR)
         self.backend_socket.close()
@@ -720,22 +750,24 @@ class PrivleapSocket:
       communication.
     """
 
-    backend_socket: socket.socket | None = None
-    socket_type: PrivleapSocketType | None = None
-    user_name: str | None = None
+    def __init__(self, socket_type: PrivleapSocketType,
+        user_name: str | None = None):
 
-    def __init__(self, socket_type: PrivleapSocketType, user_name: str = ""):
+        self.backend_socket: socket.socket | None = None
+        self.socket_type: PrivleapSocketType | None = None
+        self.user_name: str | None = None
+
         if socket_type == PrivleapSocketType.CONTROL:
-            if user_name != "":
+            if user_name is not None:
                 raise ValueError("user_name is only valid with "
                     "PrivleapSocketType.COMMUNICATION")
             self.backend_socket = socket.socket(family = socket.AF_UNIX)
-            self.backend_socket.bind(PrivleapCommon.control_path)
+            self.backend_socket.bind(str(PrivleapCommon.control_path))
             os.chown(PrivleapCommon.control_path, 0, 0)
             os.chmod(PrivleapCommon.control_path, stat.S_IRUSR | stat.S_IWUSR)
             self.backend_socket.listen(10)
         else:
-            if user_name == "":
+            if user_name is None:
                 raise ValueError("user_name must be provided when using "
                     "PrivleapSocketType.COMMUNICATION")
 
@@ -747,12 +779,13 @@ class PrivleapSocket:
                 user_info: pwd.struct_passwd = pwd.getpwnam(user_name)
                 target_uid: int = user_info.pw_uid
                 target_gid: int = user_info.pw_gid
-            except:
-                raise ValueError("User '" + user_name + "' does not exist.")
+            except Exception as e:
+                raise ValueError(
+                    "User '" + user_name + "' does not exist.") from e
 
             self.backend_socket = socket.socket(family = socket.AF_UNIX)
-            socket_path = PrivleapCommon.comm_path + "/" + user_name
-            self.backend_socket.bind(socket_path)
+            socket_path = Path(PrivleapCommon.comm_dir, user_name)
+            self.backend_socket.bind(str(socket_path))
             os.chown(socket_path, target_uid, target_gid)
             os.chmod(socket_path, stat.S_IRUSR | stat.S_IWUSR)
             self.backend_socket.listen(10)
@@ -773,40 +806,45 @@ class PrivleapSocket:
         session_socket: socket.socket = self.backend_socket.accept()[0]
         if self.socket_type == PrivleapSocketType.CONTROL:
             return PrivleapSession(session_socket, is_control_session = True)
-        else:
-            assert self.user_name is not None
-            return PrivleapSession(
-                session_socket,
-                user_name = self.user_name,
-                is_control_session = False)
+
+        assert self.user_name is not None
+        return PrivleapSession(
+            session_socket,
+            user_name = self.user_name,
+            is_control_session = False)
 
 class PrivleapAction:
     """
     A single action defined by privleap's configuration.
     """
 
-    action_name = None
-    action_command = None
-    auth_user = None
-    auth_group = None
-    target_user = "root"
-    target_group = "root"
-
+    # pylint: disable=too-many-arguments
+    # Rationale:
+    #   too-many-arguments: This constructor loads configuration data, it's far
+    #     easier to do all data assignment and validation at once (and arguably
+    #     more readable too).
     def __init__(self,
-        action_name: str = "",
-        action_command: str = "",
-        auth_user: str = "",
-        auth_group: str = "",
-        target_user: str = "",
-        target_group: str = ""):
+        action_name: str | None = None,
+        action_command: str | None = None,
+        auth_user: str | None = None,
+        auth_group: str | None = None,
+        target_user: str | None = None,
+        target_group: str | None = None):
 
-        if action_name == "":
+        self.action_name: str | None = None
+        self.action_command: str | None = None
+        self.auth_user: str | None = None
+        self.auth_group: str | None = None
+        self.target_user: str = "root"
+        self.target_group: str = "root"
+
+        if action_name is None:
             raise ValueError("action_name is empty")
-        if action_command == "":
+        if action_command is None:
             raise ValueError("action_command is empty")
-        if target_user == "":
+        if target_user is None:
             target_user = "root"
-        if target_group == "":
+        if target_group is None:
             target_group = "root"
 
         if not PrivleapCommon.validate_id(
@@ -818,7 +856,7 @@ class PrivleapAction:
             "target_user": target_user,
             "target_group": target_group }.items():
 
-            if not value == "" and not PrivleapCommon.validate_id(
+            if value is not None and not PrivleapCommon.validate_id(
                 value, PrivleapValidateType.USER_GROUP_NAME):
                 raise ValueError("Invalid value '"
                     + value
@@ -828,8 +866,8 @@ class PrivleapAction:
 
         self.action_name = action_name
         self.action_command = action_command
-        self.auth_user = auth_user if auth_user != "" else None
-        self.auth_group = auth_group if auth_user != "" else None
+        self.auth_user = auth_user
+        self.auth_group = auth_group
         self.target_user = target_user
         self.target_group = target_group
 
@@ -838,9 +876,9 @@ class PrivleapCommon:
     Common constants and functions used throughout privleap.
     """
 
-    state_dir: str = "/run/privleapd"
-    control_path: str = state_dir + "/control"
-    comm_path: str = state_dir + "/comm"
+    state_dir: Path = Path("/run/privleapd")
+    control_path: Path = Path(state_dir, "control")
+    comm_dir: Path = Path(state_dir, "comm")
     config_file_regex: re.Pattern[str] \
         = re.compile(r"[-A-Za-z0-9_./]+\.conf\Z")
     user_name_regex: re.Pattern[str] \
@@ -872,22 +910,28 @@ class PrivleapCommon:
         return False
 
     @staticmethod
+    # pylint: disable=too-many-locals, too-many-branches
+    # Rationale:
+    #   too-many-locals, too-many-branches: This parses configuration data,
+    #     splitting it up would be unreasonable and make it more difficult to
+    #     read. Each section of the config file has quite a bit of data, so
+    #     parsing is non-trivial.
     def parse_config_file(config_data: str) -> list[PrivleapAction]:
         """
         Parses the data from a privleap configuration file and returns all
         privleap actions defined therein.
         """
 
-        output_list: list[PrivleapAction] = list()
+        output_list: list[PrivleapAction] = []
         conf_stream: StringIO = StringIO(config_data)
         detect_comment_regex: re.Pattern[str] = re.compile(r"\s*#")
         detect_header_regex: re.Pattern[str] = re.compile(r"\[.*]\Z")
-        current_action_name: str = ""
-        current_action_command: str = ""
-        current_auth_user: str = ""
-        current_auth_group: str = ""
-        current_target_user: str = ""
-        current_target_group: str = ""
+        current_action_name: str | None = None
+        current_action_command: str | None = None
+        current_auth_user: str | None = None
+        current_auth_group: str | None = None
+        current_target_user: str | None = None
+        current_target_group: str | None = None
         first_header_parsed: bool = False
         for line in conf_stream:
             line = line.strip()
@@ -905,14 +949,14 @@ class PrivleapCommon:
                         current_auth_group,
                         current_target_user,
                         current_target_group))
-                    # We don't need to zero out current_action_name since we set
+                    # We don't need to nullify current_action_name since we set
                     # its value below.
-                    # current_action_name = ""
-                    current_action_command = ""
-                    current_auth_user = ""
-                    current_auth_group = ""
-                    current_target_user = ""
-                    current_target_group = ""
+                    # current_action_name = None
+                    current_action_command = None
+                    current_auth_user = None
+                    current_auth_group = None
+                    current_target_user = None
+                    current_target_group = None
                 else:
                     first_header_parsed = True
 
