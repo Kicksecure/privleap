@@ -17,6 +17,11 @@ from typing import NoReturn
 # import privleap as pl
 import privleap.privleap as pl
 
+# pylint: disable=too-few-public-methods
+# Rationale:
+#   too-few-public-methods: This class just stores global variables, it needs no
+#     public methods. Namespacing global variables in a class makes things
+#     safer.
 class LeapctlGlobal:
     """
     Global variables for leapctl.

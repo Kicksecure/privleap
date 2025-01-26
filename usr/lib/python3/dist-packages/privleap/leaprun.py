@@ -18,6 +18,11 @@ import privleap.privleap as pl
 
 Buffer = Union[bytes, bytearray, memoryview]
 
+# pylint: disable=too-few-public-methods
+# Rationale:
+#   too-few-public-methods: This class just stores global variables, it needs no
+#     public methods. Namespacing global variables in a class makes things
+#     safer.
 class LeaprunGlobal:
     """
     Global variables for leaprun.
