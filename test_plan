@@ -9,7 +9,7 @@ Test plan for privleap:
   * [x] Attempt to destroy a socket for a user that does exist and has a corresponding group, and has a socket already created. Works?
   * [x] Attempt to destroy a socket for a user that does exist and has a corresponding group, but that doesn't have a socket already created. Errors out?
   * [x] Attempt to create a socket for a user that does exist and has a corresponding group, but don't run leapctl as root. Errors out because it can't connect to the control socket?
-  * [x] Attempt to do anything while privleapd isn't running. Errors out because it can't connect to the control socket?
+  * [n] Attempt to do anything while privleapd isn't running. Errors out because it can't connect to the control socket?
   * [x] Attempt to create a socket for a user that does exist and has a corresponding group, but that already has a socket created. Errors out?
   * [x] Manually create a socket with the same name as a user under /run/privleapd/comm using python3, then try to create a socket for that user using leapctl. Errors out and causes a server warning?
   * [x] Delete the manually created socket, then try to create and destroy the socket for that user with leapctl. Works?
@@ -17,9 +17,9 @@ Test plan for privleap:
   * [x] Shut down privleapd, create a small server that will reply to any request with an ERROR message. Attempt creating and destroying sockets. Fails with "encountered an error" messages?
   * [x] Shut down privleapd, create a small server that will abruptly close any session. Attempt creating and destroying sockets. Fails with "invalid response" messages? (Due to race conditions, sometimes this ends with an invalid response message, but other times it ends with a "could not request" error since it can't even manage to send a message before the connection is dead.)
   * [x] Run leapctl with no arguments. Outputs usage information?
-* [x] leaprun
+* [i] leaprun
   * [x] Try to run an action when there is no socket for the current user account. Errors out with "could not connect" messages?
-  * [x] Try to run an action when there is a socket file in the correct location and with the correct permissions, but that isn't actually connected to any process. Errors out with "could not connect" messages?
+  * [n] Try to run an action when there is a socket file in the correct location and with the correct permissions, but that isn't actually connected to any process. Errors out with "could not connect" messages?
   * [x] Start privleapd, and create a socket for your user account with leapctl, then stop privleapd. Try to run an action when privleapd isn't running. Errors out with "could not connect" messages?
   * [x] Try to run an action that doesn't exist. Returns an UNAUTHORIZED error?
   * [x] Try to run an action that exists, but that has a user restriction that prevents you from running it. Returns an UNAUTHORIZED error?
@@ -38,7 +38,7 @@ Test plan for privleap:
   * [x] Shut down privleapd, and write a small server that returns NOUSER messages in reply to a SIGNAL. Then try to run an action. Errors out with an invalid response error?
   * [x] Shut down privleapd, and write a small server that immediately disconnects any connection. Then try to run an action. Returns a "could not request" error? (Due to race conditions, sometimes this ends with an invalid response message, but other times it ends with a "could not request" error since it can't even manage to send a message before the connection is dead.)
   * [x] Shut down privleapd, and write a small server that reads a message and then disconnects the connection without explanation. Then try to run an action. Returns an "invalid response" error?
-  * [x] Modify privleapd so that it just doesn't send stderr. Then try to run an action. Returns a "not all output sent" error? Fix privleapd when done.
+  * [n] Modify privleapd so that it just doesn't send stderr. Then try to run an action. Returns a "not all output sent" error? Fix privleapd when done.
 * [i] privleapd
   * [x] Basic
     * [x] Try to run two simultaneous privleapd instances. Refuses with a "cannot run two processes at once" error?
@@ -46,36 +46,36 @@ Test plan for privleap:
     * [x] Try to run privleapd when /run/privleapd already exists and is immutable. Errors out with "could not delete /run/privleapd"?
     * [x] Try creating a configuration file with an invalid filename. File is ignored?
     * [x] Create a configuration file with invalid lines in it (lines that don't contain an = sign will work). Causes server to crash with a "failed to parse" error?
-  * [x] Control session handling
-    * [x] Mess up privleap.py -> PrivleapSession -> __init__ to throw an exception unconditionally. Then start server and try to connect to it. Errors out with "could not start session with client"? Fix privleap.py when you're done.
-    * [x] Create a simple control client that will connect to the control socket and then immediately disconnect. Then run it. Error is printed "could not get message from client"?
-    * [x] Create a simple control client that will attempt to create a socket for a user that doesn't exist. Then run it. Server returns ERROR?
-    * [x] Create a simple control client that will attempt to create a socket for a user that doesn't exist. The client should immediately disconnect after doing this. Then run it. Server returns ERROR, and fails to send ERROR message?
-    * [x] Create a simple control client that will attempt to destroy a socket for a user that doesn't exist. Then run it. Server returns NOUSER?
-    * [x] Create a simple control client that will send a CREATE request for a user that exists, but that already has a socket created for them. Run the client. Server returns EXISTS?
-    * [x] Create a simple control client that will send a CREATE request for a user that exists, but that already has a socket created for them. The client should immediately disconnect after doing this. Run the client. Server returns EXISTS, and fails to send EXISTS message?
-    * [x] Manually create a socket with the same name as a user under /run/privleapd/comm using python3, then create a simple control client that will send a CREATE request for that user. Server returns ERROR?
-    * [x] Manually create a socket with the same name as a user under /run/privleapd/comm using python3, then create a simple control client that will send a CREATE request for that user and then immediately disconnect. Server returns ERROR, and fails to send ERROR message?
-    * [x] Using leapctl, create a socket for a user, then manually delete that user's socket with rm, and then try to destroy it with leapctl. Server successfully destroys socket, but shows 'no socket to delete' message?
-    * [x] Create a simple control client that will send a DESTROY request for a user that has a socket in existence, and then immediately disconnect. Then run it. Server returns OK, but fails to send OK message?
-    * [x] Re-run the above client while the socket for the specified user does not exist. Server returns NOUSER, and fails to send NOUSER message?
-    * [x] Create a simple control client that attempts to send a totally invalid message (i.e. `BOB asdfghjkl`). Then run it. Server shows "could not get message from client"?
-    * [x] Create a simple control client that attempts to send an invalid variant of a valid message (i.e. `CREATE user exploit`). then run it. Server shows "could not get message from client"?
+  * [ ] Control session handling
+    * [ ] Mess up privleap.py -> PrivleapSession -> __init__ to throw an exception unconditionally. Then start server and try to connect to it. Errors out with "could not start session with client"? Fix privleap.py when you're done.
+    * [ ] Create a simple control client that will connect to the control socket and then immediately disconnect. Then run it. Error is printed "could not get message from client"?
+    * [ ] Create a simple control client that will attempt to create a socket for a user that doesn't exist. Then run it. Server returns ERROR?
+    * [ ] Create a simple control client that will attempt to create a socket for a user that doesn't exist. The client should immediately disconnect after doing this. Then run it. Server returns ERROR, and fails to send ERROR message?
+    * [ ] Create a simple control client that will attempt to destroy a socket for a user that doesn't exist. Then run it. Server returns NOUSER?
+    * [ ] Create a simple control client that will send a CREATE request for a user that exists, but that already has a socket created for them. Run the client. Server returns EXISTS?
+    * [ ] Create a simple control client that will send a CREATE request for a user that exists, but that already has a socket created for them. The client should immediately disconnect after doing this. Run the client. Server returns EXISTS, and fails to send EXISTS message?
+    * [ ] Manually create a socket with the same name as a user under /run/privleapd/comm using python3, then create a simple control client that will send a CREATE request for that user. Server returns ERROR?
+    * [ ] Manually create a socket with the same name as a user under /run/privleapd/comm using python3, then create a simple control client that will send a CREATE request for that user and then immediately disconnect. Server returns ERROR, and fails to send ERROR message?
+    * [ ] Using leapctl, create a socket for a user, then manually delete that user's socket with rm, and then try to destroy it with leapctl. Server successfully destroys socket, but shows 'no socket to delete' message?
+    * [ ] Create a simple control client that will send a DESTROY request for a user that has a socket in existence, and then immediately disconnect. Then run it. Server returns OK, but fails to send OK message?
+    * [ ] Re-run the above client while the socket for the specified user does not exist. Server returns NOUSER, and fails to send NOUSER message?
+    * [ ] Create a simple control client that attempts to send a totally invalid message (i.e. `BOB asdfghjkl`). Then run it. Server shows "could not get message from client"?
+    * [ ] Create a simple control client that attempts to send an invalid variant of a valid message (i.e. `CREATE user exploit`). then run it. Server shows "could not get message from client"?
   * [i] Comm session handling
-    * [x] Mess up privleap.py -> PrivleapSession -> __init__ to throw an exception when starting a comm session. Then start server, make a socket for a user, and try to connect to it. Errors out with "could not start session with client?" Fix privleap.py when you're done.
-    * [x] Create a simple comm client that will connect to a comm socket and then immediately disconnect. Then run it. Error is printed "could not get message from client"?
-    * [x] Create a simple comm client that will send an invalid message (i.e., `BOB asdfghjkl`). Then run it. Server shows "could not get message from client"?
-    * [x] Uncomment the 'RESPONSE' command plumbing in privleap.py so that `RESPONSE` is considered a valid comm command. Then write a simple comm client that will send it as the first message to the server. Then run it. Server returns 'Did not read SIGNAL as first message'? Re-comment all this junk (or better yet just reinstall privleap) after doing this.
-    * [x] Create a simple comm client that will send a SIGNAL message trying to run an action that doesn't exist, then immediately disconnects. Server returns UNAUTHORIZED, prints message about not being able to find action, and also fails to send UNAUTHORIZED message? (Works, race conditions means it takes a few tries)
-    * [x] Create a simple comm client that will send a SIGNAL message trying to run an action that exists but that the user isn't allowed to run, then immediately disconnects. Server returns UNAUTHORIZED, prints message about user not being unauthorized, and also fails to send UNAUTHORIZED message?
-    * [x] Create a simple comm client that will send a SIGNAL message trying to run an action that exists but that the user isn't in a group that is allowed to run, then immediately disconnects. Server returns UNAUTHORIZED, prints message about use not being in an authorized group, and also fails to send UNAUTHORIZED message? (Race conditions but works)
-    * [x] Create an action that isn't valid Bash code. Then attempt to run it with leaprun. Succeeds on the server side, exits non-zero on the client side and shows a "command not found" error?
-    * [x] Create a simple client that sends a SIGNAL message trying to run an action that exists and that the user is authorized to run, then immediately disconnects. Server returns TRIGGER, but fails to send TRIGGER message? Process is not immediately terminated on thread exit or some time thereafter?
-    * [x] Create a simple client that sends a SIGNAL message trying to run an action that exists and that the user is authorized to run, then reads the TRIGGER, then disconnects. Server returns TRIGGER, then RESULT_STDOUT, but fails to send RESULT_STDOUT message? (Race conditions but works)
-    * [x] Create a simple client that sends a SIGNAL message trying to run an action that exists and that the user is authorized to run, then reads the TRIGGER, then the RESULT_STDOUT, then disconnects. Server returns TRIGGER, then RESULT_STDOUT, then RESULT_STDERR, but fails to send RESULT_STDERR message? (Hard to trigger, required a loop, race conditions but works)
-    * [x] Create a simple client that sends a SIGNAL message trying to run an action that exists and that the user is authorized to run, then reads the TRIGGER, then the RESULT_STDOUT, then the RESULT_STDERR, then disconnects. Server returns TRIGGER, then RESULT_STDOUT, then RESULT_STDERR, then RESULT_EXITCODE, but fails to send RESULT_EXITCODE message? (Very hard to trigger, required a loop, race conditions but works)
-    * [x] Create a simple client that opens a comm session and then just shoves random data into the socket (literally from /dev/urandom). Run this several times in a loop (maybe 500 or 1000). Server gracefully rejects every connection?
-    * [x] Stress-test privleapd in a simulated DoS attack, where the attacker is attempting to lock up privleapd but not take down the entire system. Does it hold up well enough?
+    * [ ] Mess up privleap.py -> PrivleapSession -> __init__ to throw an exception when starting a comm session. Then start server, make a socket for a user, and try to connect to it. Errors out with "could not start session with client?" Fix privleap.py when you're done.
+    * [ ] Create a simple comm client that will connect to a comm socket and then immediately disconnect. Then run it. Error is printed "could not get message from client"?
+    * [ ] Create a simple comm client that will send an invalid message (i.e., `BOB asdfghjkl`). Then run it. Server shows "could not get message from client"?
+    * [ ] Uncomment the 'RESPONSE' command plumbing in privleap.py so that `RESPONSE` is considered a valid comm command. Then write a simple comm client that will send it as the first message to the server. Then run it. Server returns 'Did not read SIGNAL as first message'? Re-comment all this junk (or better yet just reinstall privleap) after doing this.
+    * [ ] Create a simple comm client that will send a SIGNAL message trying to run an action that doesn't exist, then immediately disconnects. Server returns UNAUTHORIZED, prints message about not being able to find action, and also fails to send UNAUTHORIZED message? (Works, race conditions means it takes a few tries)
+    * [ ] Create a simple comm client that will send a SIGNAL message trying to run an action that exists but that the user isn't allowed to run, then immediately disconnects. Server returns UNAUTHORIZED, prints message about user not being unauthorized, and also fails to send UNAUTHORIZED message?
+    * [ ] Create a simple comm client that will send a SIGNAL message trying to run an action that exists but that the user isn't in a group that is allowed to run, then immediately disconnects. Server returns UNAUTHORIZED, prints message about use not being in an authorized group, and also fails to send UNAUTHORIZED message? (Race conditions but works)
+    * [ ] Create an action that isn't valid Bash code. Then attempt to run it with leaprun. Succeeds on the server side, exits non-zero on the client side and shows a "command not found" error?
+    * [ ] Create a simple client that sends a SIGNAL message trying to run an action that exists and that the user is authorized to run, then immediately disconnects. Server returns TRIGGER, but fails to send TRIGGER message? Process is not immediately terminated on thread exit or some time thereafter?
+    * [ ] Create a simple client that sends a SIGNAL message trying to run an action that exists and that the user is authorized to run, then reads the TRIGGER, then disconnects. Server returns TRIGGER, then RESULT_STDOUT, but fails to send RESULT_STDOUT message? (Race conditions but works)
+    * [ ] Create a simple client that sends a SIGNAL message trying to run an action that exists and that the user is authorized to run, then reads the TRIGGER, then the RESULT_STDOUT, then disconnects. Server returns TRIGGER, then RESULT_STDOUT, then RESULT_STDERR, but fails to send RESULT_STDERR message? (Hard to trigger, required a loop, race conditions but works)
+    * [ ] Create a simple client that sends a SIGNAL message trying to run an action that exists and that the user is authorized to run, then reads the TRIGGER, then the RESULT_STDOUT, then the RESULT_STDERR, then disconnects. Server returns TRIGGER, then RESULT_STDOUT, then RESULT_STDERR, then RESULT_EXITCODE, but fails to send RESULT_EXITCODE message? (Very hard to trigger, required a loop, race conditions but works)
+    * [ ] Create a simple client that opens a comm session and then just shoves random data into the socket (literally from /dev/urandom). Run this several times in a loop (maybe 500 or 1000). Server gracefully rejects every connection?
+    * [ ] Stress-test privleapd in a simulated DoS attack, where the attacker is attempting to lock up privleapd but not take down the entire system. Does it hold up well enough?
 
 TODO:
   * Publish actual instructions for stress testing and the results of using those instructions (i.e. benchmark performance while under attack).
