@@ -1,3 +1,9 @@
+privleap (3:0.6-1) bookworm; urgency=medium
+
+  * New upstream version (local package).
+
+ -- Patrick Schleizer <adrelanos@whonix.org>  Wed, 29 Jan 2025 13:13:32 +0000
+
 privleap (3:0.5-1) bookworm; urgency=medium
 
   * New upstream version (local package).

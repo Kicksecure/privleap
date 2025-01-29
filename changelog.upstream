@@ -1,3 +1,53 @@
+commit 4af5d30a429933f25c36d14333540cf63330d5c5
+Merge: 2ba6007 244c062
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Wed Jan 29 08:07:51 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit 244c0626f20b4138731867e75e2249c5a280b023
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Jan 29 00:13:24 2025 -0600
+
+    Implement more tests, add autopkgtest support, fix test bugs
+
+commit 2ba6007fbf01bd6c747a1c106f265348a7f31ce5
+Merge: a9f9403 c688060
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Tue Jan 28 14:09:58 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit c6880608fab0d57ef6eb9133f2985242413b0aac
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Mon Jan 27 22:21:10 2025 -0600
+
+    Add more tests for privleapd, refactor tests (wip)
+
+commit 205a56b02bf8032e36551d1edcdf62863efd4f27
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Jan 26 18:40:40 2025 -0600
+
+    Add unit tests (wip)
+
+commit d0159f0da4e7873ae127681063dfb807cf7bf6fa
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Jan 26 11:41:56 2025 -0600
+
+    Use logging rather than print in privleapd
+
+commit 5e56987b0a7f543ad84c7d2b57bb21913ec5ffef
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sat Jan 25 23:13:19 2025 -0600
+
+    Extensive post-review refactoring
+
+commit a9f940338959e7719eafe0046595ab008b04881b
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Fri Jan 24 13:29:42 2025 +0000
+
+    bumped changelog version
+
 commit 765c472871d3a8675404f5780b6e0af0f3de954f
 Merge: aaedc49 9353c5a
 Author: Patrick Schleizer <adrelanos@whonix.org>
