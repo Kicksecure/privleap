@@ -128,7 +128,7 @@ def handle_control_destroy_msg(control_session: pl.PrivleapSession,
 
     if remove_sock_idx is not None:
         PrivleapdGlobal.socket_list.pop(cast(SupportsIndex,
-                                             remove_sock_idx))
+            remove_sock_idx))
         logging.info("Handled DESTROY message for user '%s', socket destroyed",
             control_msg.user_name)
         send_msg_safe(
@@ -238,8 +238,8 @@ def lookup_desired_action(action_name: str, comm_session: pl.PrivleapSession) \
 
     # No such action, send back UNAUTHORIZED since we don't want to leak
     # the list of available actions to the client.
-    send_msg_safe(comm_session, pl.PrivleapCommServerUnauthorizedMsg())
     logging.warning("Could not find action '%s'!", action_name)
+    send_msg_safe(comm_session, pl.PrivleapCommServerUnauthorizedMsg())
     return None
 
 def authenticate_user(action: pl.PrivleapAction,

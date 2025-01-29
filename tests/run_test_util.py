@@ -13,7 +13,6 @@
 run_test_util.py - Utility functions for run_test.py.
 """
 
-import select
 import subprocess
 import os
 import sys
@@ -45,6 +44,8 @@ class PlTestGlobal:
     privleap_state_comm_dir: Path = Path(privleap_state_dir, "comm")
     readline_timeout: float = 1
     privleapd_running: bool = False
+    no_service_handling = False
+    all_asserts_passed = True
 
 SelectInfo = (Tuple[list[IO[bytes]], list[IO[bytes]], list[IO[bytes]]])
 
@@ -56,45 +57,45 @@ def proc_try_readline(proc: subprocess.Popen[str], timeout: float,
       of the process must be in non-blocking mode.
     """
 
-    # TODO: This function is just a disaster from a readability standpoint.
-    #   Trying to avoid deadlocks, unnecessary delays, and incorrect returns of
-    #   None was not easy, but surely there's a better way to write it than
-    #   this.
-
     assert proc.stdout is not None
     assert proc.stderr is not None
+
+    # If there's a line already in the buffer, find and return it.
     if "\n" in PlTestGlobal.linebuf:
         linebuf_parts: list[str] = PlTestGlobal.linebuf.split("\n",
             maxsplit = 1)
         PlTestGlobal.linebuf = linebuf_parts[1]
         return linebuf_parts[0] + "\n"
+
+    # Select the correct stream to read from.
     if read_stderr:
         target_stream: IO[str] = proc.stderr
     else:
         target_stream = proc.stdout
+
+    # Attempt to read from the stream, adding whatever is available from the
+    # stream into a buffer.
     current_time: datetime = datetime.now()
     end_time = current_time + timedelta(seconds = timeout)
     while True:
+        try:
+            PlTestGlobal.linebuf += target_stream.read()
+        except Exception:
+            pass
+        if "\n" in PlTestGlobal.linebuf:
+            break
         current_time = datetime.now()
         if current_time >= end_time:
             break
-        ready_streams: SelectInfo = select.select([target_stream], [], [],
-            (end_time - current_time).total_seconds())
-        if len(ready_streams[0]) == 0:
-            if current_time > end_time:
-                break
-            continue
-        try:
-            PlTestGlobal.linebuf += target_stream.read()
-        except IOError:
-            continue
-        if current_time > end_time:
-            break
+
+    # Retrieve a line from the buffer and return it.
     linebuf_parts = PlTestGlobal.linebuf.split("\n",
         maxsplit = 1)
     if len(linebuf_parts) == 2:
         PlTestGlobal.linebuf = linebuf_parts[1]
         return linebuf_parts[0] + "\n"
+
+    # If there was no line to retrieve, return None.
     return None
 
 def ensure_running_as_root() -> None:
@@ -115,12 +116,12 @@ def ensure_path_lacks_files(path: Path) -> None:
 
     if path.exists() and not path.is_dir():
         logging.critical("Path '%s' contains a non-dir at '%s'!", str(path),
-                         str(path))
+            str(path))
         sys.exit(1)
     for parent_path in path.parents:
         if parent_path.exists() and not parent_path.is_dir():
             logging.critical("Path '%s' contains a non-dir at '%s'!", str(path),
-                             str(parent_path))
+                str(parent_path))
             sys.exit(1)
 
 def setup_test_account(test_username: str, test_home_dir: Path) -> None:
@@ -133,21 +134,21 @@ def setup_test_account(test_username: str, test_home_dir: Path) -> None:
     if test_username not in user_name_list:
         try:
             subprocess.run(["useradd", "-m", test_username],
-                           check = True)
+                check = True)
         except Exception as e:
             logging.critical("Could not create user '%s'!",
-                             test_username, exc_info = e)
+                test_username, exc_info = e)
             sys.exit(1)
     user_gid: int = pwd.getpwnam(test_username).pw_gid
     group_list: list[str] = [grp.getgrgid(gid).gr_name \
-                             for gid in os.getgrouplist(test_username, user_gid)]
+        for gid in os.getgrouplist(test_username, user_gid)]
     if not "sudo" in group_list:
         try:
             subprocess.run(["adduser", test_username, "sudo"],
-                           check = True)
+                check = True)
         except Exception as e:
             logging.critical("Could not add user '%s' to group 'sudo'!",
-                             test_username, exc_info = e)
+                test_username, exc_info = e)
             sys.exit(1)
     ensure_path_lacks_files(test_home_dir)
     if not test_home_dir.exists():
@@ -193,14 +194,16 @@ def stop_privleapd_service() -> None:
     Stops the privleapd service. This must be called before testing starts.
     """
 
+    if PlTestGlobal.no_service_handling:
+        return
     try:
         subprocess.run(["systemctl", "stop", "privleapd"], check = True)
     except Exception as e:
         logging.critical("Could not stop privleapd service!",
-                         exc_info = e)
+            exc_info = e)
         sys.exit(1)
 
-def start_privleapd_subprocess() -> None:
+def start_privleapd_subprocess(allow_error_output: bool = False) -> None:
     """
     Launches privleapd as a subprocess so its output can be monitored by the
       tester.
@@ -225,20 +228,21 @@ def start_privleapd_subprocess() -> None:
         fcntl.F_SETFL, os.O_NONBLOCK)
     fcntl.fcntl(PlTestGlobal.privleapd_proc.stderr.fileno(),
         fcntl.F_SETFL, os.O_NONBLOCK)
-    time.sleep(1)
-    early_privleapd_output: str | None = proc_try_readline(
-        PlTestGlobal.privleapd_proc, PlTestGlobal.readline_timeout,
-        read_stderr = True)
-    if early_privleapd_output is not None:
-        logging.critical("privleapd returned error messages at startup!")
-        while True:
-            logging.critical(early_privleapd_output)
-            early_privleapd_output = proc_try_readline(
-                PlTestGlobal.privleapd_proc, PlTestGlobal.readline_timeout,
-                read_stderr = True)
-            if early_privleapd_output is None:
-                break
-        sys.exit(1)
+    time.sleep(PlTestGlobal.readline_timeout)
+    if not allow_error_output:
+        early_privleapd_output: str | None = proc_try_readline(
+            PlTestGlobal.privleapd_proc, PlTestGlobal.readline_timeout,
+            read_stderr = True)
+        if early_privleapd_output is not None:
+            logging.critical("privleapd returned error messages at startup!")
+            while True:
+                logging.critical(early_privleapd_output)
+                early_privleapd_output = proc_try_readline(
+                    PlTestGlobal.privleapd_proc, PlTestGlobal.readline_timeout,
+                    read_stderr = True)
+                if early_privleapd_output is None:
+                    break
+            sys.exit(1)
     PlTestGlobal.privleapd_running = True
 
 def stop_privleapd_subprocess() -> None:
@@ -288,37 +292,44 @@ def write_privleap_test_config() -> None:
     """
 
     with open(Path(PlTestGlobal.privleap_conf_dir, "unit-test.conf"), "w",
-              encoding = "utf-8") as config_file:
+        encoding = "utf-8") as config_file:
         config_file.write(PlTestData.primary_test_config_file)
 
 def compare_privleapd_stdout(assert_line_list: list[str], quiet: bool = False) \
-        -> bool:
+    -> bool:
     """
     Compares the stdout output of privleapd with a string list, testing to see
-      if each returned line matches the corresponding expected line.
+      if each expected line has a corresponding returned line. The list of
+      expected lines may omit arbitrary output lines.
     """
 
     assert PlTestGlobal.privleapd_proc is not None
-    result: bool = True
+    result_good: bool = True
+    read_lines: list[str] = []
     for line in assert_line_list:
-        proc_line = proc_try_readline(PlTestGlobal.privleapd_proc,
-                                      PlTestGlobal.readline_timeout, read_stderr = True)
-        if proc_line != line:
-            result = False
-            if not quiet:
-                logging.error("Mismatched server output line: '%s'", proc_line)
-                logging.error("Expected server output line: '%s'", line)
-    # Ensure there are no further lines in stdout. If there are, warn about each
-    # unexpected line
+        while True:
+            proc_line = proc_try_readline(PlTestGlobal.privleapd_proc,
+                PlTestGlobal.readline_timeout, read_stderr = True)
+            if proc_line is None:
+                result_good = False
+                break
+            read_lines.append(proc_line)
+            if proc_line != line:
+                continue
+            # If we get this far, line == proc_line
+            break
     while True:
         proc_line = proc_try_readline(PlTestGlobal.privleapd_proc,
             PlTestGlobal.readline_timeout, read_stderr = True)
         if proc_line is None:
             break
-        result = False
+        read_lines.append(proc_line)
+    if not result_good:
         if not quiet:
-            logging.error("Unexpected server output line: '%s'", proc_line)
-    return result
+            logging.error("Unexpected response from server!")
+            for line in read_lines:
+                logging.error("%s", line)
+    return result_good
 
 def discard_privleapd_stderr() -> None:
     """
@@ -338,6 +349,9 @@ def start_privleapd_service() -> None:
     Starts the privleapd service. This should only be called once all testing is
       done.
     """
+
+    if PlTestGlobal.no_service_handling:
+        return
     try:
         subprocess.run(["systemctl", "start", "privleapd"], check = True)
     except Exception as e:
@@ -405,6 +419,9 @@ Command=1>&2 echo 'test-act-stderr'
 
 [test-act-stdout-stderr-interleaved]
 Command=echo 'stdout00'; 1>&2 echo 'stderr00'; echo 'stdout01'; 1>&2 echo 'stderr01'
+
+[test-act-invalid-bash]
+Command=ahem, this will not work
 """
     invalid_filename_test_config_file: str = """[test-act-invalid]
 Command=echo 'test-act-invalid'
@@ -450,19 +467,16 @@ Commandecho 'test-act-crash'
     root_socket_created: bytes = b"Comm socket created for user 'root'.\n"
     root_socket_destroyed: bytes = b"Comm socket destroyed for user 'root'.\n"
     leapctl_help: bytes \
-        = (b"leapctl <--create|--destroy> <user>\n"
-           + b"\n"
-           + b"    user : The username or UID of the user account to create or destroy a\n"
-           + b"           communication socket for.\n"
-           + b"    --create : Specifies that leapctl should request a communication "
-           + b"socket to\n"
-           + b"               be created for the specified user.\n"
-           + b"    --destroy : Specifies that leapctl should request a communication "
-           + b"socket\n"
-           + b"                to be destroyed for the specified user.\n")
-    privleapd_test_act_free_failed: bytes \
-        = (b"ERROR: Could not request privleapd to "
-           + b"run action 'test-act-free'!\n")
+= (b"leapctl <--create|--destroy> <user>\n"
++ b"\n"
++ b"    user : The username or UID of the user account to create or destroy a\n"
++ b"           communication socket for.\n"
++ b"    --create : Specifies that leapctl should request a communication "
++ b"socket to\n"
++ b"               be created for the specified user.\n"
++ b"    --destroy : Specifies that leapctl should request a communication "
++ b"socket\n"
++ b"                to be destroyed for the specified user.\n")
     test_act_nonexistent_unauthorized: bytes \
         = (b"ERROR: You are unauthorized to run action "
            + b"'test-act-userrestrict'.\n")
@@ -475,21 +489,15 @@ Commandecho 'test-act-crash'
     test_act_grouprestrict_userpermit_unauthorized: bytes \
         = (b"ERROR: You are unauthorized to run action "
            + b"'test-act-grouprestrict-userpermit'.\n")
+    bad_config_file_lines: list[str] = [
+        "parse_config_files: CRITICAL: Failed to parse config file "
+        + "'/etc/privleap/conf.d/crash.conf'!\n",
+        "Traceback (most recent call last):\n",
+        "ValueError: Invalid config line 'Commandecho 'test-act-crash''\n"
+    ]
     control_disconnect_lines: list[str] = [
         "handle_control_session: ERROR: Could not get message from client!\n",
         "Traceback (most recent call last):\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleapd.py\", line "
-        + "162, in handle_control_session\n",
-        "    control_msg = control_session.get_msg()\n",
-        "                  ^^^^^^^^^^^^^^^^^^^^^^^^^\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", line "
-        + "582, in get_msg\n",
-        "    recv_buf: bytes = self.__recv_msg_cautious()\n",
-        "                      ^^^^^^^^^^^^^^^^^^^^^^^^^^\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", line "
-        + "447, in __recv_msg_cautious\n",
-        "    raise ConnectionAbortedError(\"Connection unexpectedly "
-        + "closed\")\n",
         "ConnectionAbortedError: Connection unexpectedly closed\n"
     ]
     control_create_invalid_user_socket_lines: list[str] = [
@@ -501,16 +509,6 @@ Commandecho 'test-act-crash'
         + "exist\n",
         "send_msg_safe: ERROR: Could not send 'CONTROL_ERROR'\n",
         "Traceback (most recent call last):\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleapd.py\", "
-        + "line 52, in send_msg_safe\n",
-        "    session.send_msg(msg)\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", "
-        + "line 732, in send_msg\n",
-        "    self.__send_msg(msg_obj)\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", "
-        + "line 691, in __send_msg\n",
-        "    msg_sent: int = self.backend_socket.send(\n",
-        "                    ^^^^^^^^^^^^^^^^^^^^^^^^^\n",
         "BrokenPipeError: [Errno 32] Broken pipe\n"
     ]
     destroy_invalid_user_socket_lines: list[str] = [
@@ -527,69 +525,24 @@ Commandecho 'test-act-crash'
         "handle_control_create_msg: INFO: Handled CREATE message for user "
         + f"'{PlTestGlobal.test_username}', socket already exists\n",
         "send_msg_safe: ERROR: Could not send 'EXISTS'\n",
-        "Traceback (most recent call last):\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleapd.py\", "
-        + "line 52, in send_msg_safe\n",
-        "    session.send_msg(msg)\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", "
-        + "line 732, in send_msg\n",
-        "    self.__send_msg(msg_obj)\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", "
-        + "line 691, in __send_msg\n",
-        "    msg_sent: int = self.backend_socket.send(\n",
-        "                    ^^^^^^^^^^^^^^^^^^^^^^^^^\n",
         "BrokenPipeError: [Errno 32] Broken pipe\n"
     ]
     create_blocked_user_socket_lines: list[str] = [
         "handle_control_create_msg: ERROR: Failed to create socket for user "
         + f"'{PlTestGlobal.test_username}'!\n",
         "Traceback (most recent call last):\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleapd.py\", line "
-        + "84, in handle_control_create_msg\n",
-        "    comm_socket: pl.PrivleapSocket = pl.PrivleapSocket(\n",
-        "                                     ^^^^^^^^^^^^^^^^^^\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", line "
-        + "788, in __init__\n",
-        "    self.backend_socket.bind(str(socket_path))\n",
         "OSError: [Errno 98] Address already in use\n"
     ]
     create_blocked_user_socket_and_bail_lines: list[str] = [
         "handle_control_create_msg: ERROR: Failed to create socket for "
         + f"user '{PlTestGlobal.test_username}'!\n",
         "Traceback (most recent call last):\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleapd.py\", "
-        + "line 84, in handle_control_create_msg\n",
-        "    comm_socket: pl.PrivleapSocket = pl.PrivleapSocket(\n",
-        "                                     ^^^^^^^^^^^^^^^^^^\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", "
-        + "line 788, in __init__\n",
-        "    self.backend_socket.bind(str(socket_path))\n",
         "OSError: [Errno 98] Address already in use\n",
         "send_msg_safe: ERROR: Could not send 'CONTROL_ERROR'\n",
-        "Traceback (most recent call last):\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleapd.py\", "
-        + "line 84, in handle_control_create_msg\n",
-        "    comm_socket: pl.PrivleapSocket = pl.PrivleapSocket(\n",
-        "                                     ^^^^^^^^^^^^^^^^^^\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", "
-        + "line 788, in __init__\n",
-        "    self.backend_socket.bind(str(socket_path))\n",
         "OSError: [Errno 98] Address already in use\n",
-        "\n",
         "During handling of the above exception, another exception "
         + "occurred:\n",
-        "\n",
         "Traceback (most recent call last):\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleapd.py\", "
-        + "line 52, in send_msg_safe\n",
-        "    session.send_msg(msg)\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", "
-        + "line 732, in send_msg\n",
-        "    self.__send_msg(msg_obj)\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", "
-        + "line 691, in __send_msg\n",
-        "    msg_sent: int = self.backend_socket.send(\n",
-        "                    ^^^^^^^^^^^^^^^^^^^^^^^^^\n",
         "BrokenPipeError: [Errno 32] Broken pipe\n",
         ]
     destroy_missing_user_socket_lines: list[str] = [
@@ -603,16 +556,6 @@ Commandecho 'test-act-crash'
         + f"user '{PlTestGlobal.test_username}', socket destroyed\n",
         "send_msg_safe: ERROR: Could not send 'OK'\n",
         "Traceback (most recent call last):\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleapd.py\", "
-        + "line 52, in send_msg_safe\n",
-        "    session.send_msg(msg)\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", "
-        + "line 732, in send_msg\n",
-        "    self.__send_msg(msg_obj)\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", "
-        + "line 691, in __send_msg\n",
-        "    msg_sent: int = self.backend_socket.send(\n",
-        "                    ^^^^^^^^^^^^^^^^^^^^^^^^^\n",
         "BrokenPipeError: [Errno 32] Broken pipe\n"
     ]
     privleapd_verify_not_running_twice_fail: bytes \
@@ -620,77 +563,64 @@ Commandecho 'test-act-crash'
            + b"privleapd processes at the same time!\n")
     privleapd_ensure_running_as_root_fail: bytes \
         = b"ensure_running_as_root: CRITICAL: privleapd must run as root!\n"
-    could_not_delete_run_privleapd: bytes \
-        = (b"cleanup_old_state_dir: CRITICAL: Could not delete '/run/privleapd'!\n"
-           + b"Traceback (most recent call last):\n"
-           + b"  File \"/usr/lib/python3/dist-packages/privleap/privleapd.py\", line 448, "
-           + b"in cleanup_old_state_dir\n"
-           + b"    shutil.rmtree(pl.PrivleapCommon.state_dir)\n"
-           + b"  File \"/usr/lib/python3.11/shutil.py\", line 732, in rmtree\n"
-           + b"    _rmtree_safe_fd(fd, path, onerror)\n"
-           + b"  File \"/usr/lib/python3.11/shutil.py\", line 683, in _rmtree_safe_fd\n"
-           + b"    onerror(os.unlink, fullname, sys.exc_info())\n"
-           + b"  File \"/usr/lib/python3.11/shutil.py\", line 681, in _rmtree_safe_fd\n"
-           + b"    os.unlink(entry.name, dir_fd=topfd)\n"
-           + b"PermissionError: [Errno 1] Operation not permitted: 'control'\n")
     test_act_invalid_unauthorized: bytes \
         = b"ERROR: You are unauthorized to run action 'test-act-invalid'.\n"
-    # noinspection SpellCheckingInspection
-    privleapd_config_file_parse_fail: bytes \
-        = (b"parse_config_files: CRITICAL: Failed to parse config file "
-           + b"'/etc/privleap/conf.d/crash.conf'!\n"
-           + b"Traceback (most recent call last):\n"
-           + b"  File \"/usr/lib/python3/dist-packages/privleap/privleapd.py\", line 470, "
-           + b"in parse_config_files\n"
-           + b"    = pl.PrivleapCommon.parse_config_file(f.read())\n"
-           + b"      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"
-           + b"  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", line 968, "
-           + b"in parse_config_file\n"
-           + b"    raise ValueError(\"Invalid config line '\" + line +\"'\")\n"
-           + b"ValueError: Invalid config line 'Commandecho 'test-act-crash''\n")
     destroy_bad_user_socket_and_bail_lines: list[str] = [
         "handle_control_destroy_msg: INFO: Handled DESTROY message for user "
         + f"'{PlTestGlobal.test_username}', socket did not exist\n",
         "send_msg_safe: ERROR: Could not send 'NOUSER'\n",
         "Traceback (most recent call last):\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleapd.py\", line "
-        + "52, in send_msg_safe\n",
-        "    session.send_msg(msg)\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", line "
-        + "732, in send_msg\n",
-        "    self.__send_msg(msg_obj)\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", line "
-        + "691, in __send_msg\n",
-        "    msg_sent: int = self.backend_socket.send(\n",
-        "                    ^^^^^^^^^^^^^^^^^^^^^^^^^\n",
         "BrokenPipeError: [Errno 32] Broken pipe\n"
     ]
     send_invalid_control_message_lines: list[str] = [
         "handle_control_session: ERROR: Could not get message from client!\n",
         "Traceback (most recent call last):\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleapd.py\", line "
-        + "162, in handle_control_session\n",
-        "    control_msg = control_session.get_msg()\n",
-        "                  ^^^^^^^^^^^^^^^^^^^^^^^^^\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", line "
-        + "605, in get_msg\n",
-        "    raise ValueError(\"Invalid message type '\"\n",
         "ValueError: Invalid message type 'BOB' for socket\n"
     ]
     send_corrupted_control_message_lines: list[str] = [
         "handle_control_session: ERROR: Could not get message from client!\n",
         "Traceback (most recent call last):\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleapd.py\", line "
-        + "162, in handle_control_session\n",
-        "    control_msg = control_session.get_msg()\n",
-        "                  ^^^^^^^^^^^^^^^^^^^^^^^^^\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", line "
-        + "598, in get_msg\n",
-        "    param_list, _ = self.__parse_msg_parameters(\n",
-        "                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n",
-        "  File \"/usr/lib/python3/dist-packages/privleap/privleap.py\", line "
-        + "561, in __parse_msg_parameters\n",
-        "    raise ValueError(\"recv_buf contains data past the last "
-        + "string\")\n",
         "ValueError: recv_buf contains data past the last string\n"
+    ]
+    bail_comm_lines: list[str] = [
+        "get_signal_msg: ERROR: Could not get message from client!\n",
+        "Traceback (most recent call last):\n",
+        "ConnectionAbortedError: Connection unexpectedly closed\n"
+    ]
+    send_invalid_comm_message_lines: list[str] = [
+        "get_signal_msg: ERROR: Could not get message from client!\n",
+        "Traceback (most recent call last):\n",
+        "ValueError: Invalid message type 'BOB' for socket\n"
+    ]
+    send_nonexistent_signal_and_bail_lines: list[str] = [
+        "lookup_desired_action: WARNING: Could not find action 'nonexistent'!\n",
+        "send_msg_safe: ERROR: Could not send 'UNAUTHORIZED'\n",
+        "BrokenPipeError: [Errno 32] Broken pipe\n"
+    ]
+    send_userrestrict_signal_and_bail_lines: list[str] = [
+        "authenticate_user: WARNING: User is not authorized to run action "
+        + "'test-act-userrestrict'!\n",
+        "send_msg_safe: ERROR: Could not send 'UNAUTHORIZED'\n",
+        "Traceback (most recent call last):\n",
+        "BrokenPipeError: [Errno 32] Broken pipe\n"
+    ]
+    send_grouprestrict_signal_and_bail_lines: list[str] = [
+        "authenticate_user: WARNING: User is not in a group authorized to run "
+        + "action 'test-act-grouprestrict'!\n",
+        "send_msg_safe: ERROR: Could not send 'UNAUTHORIZED'\n",
+        "BrokenPipeError: [Errno 32] Broken pipe\n"
+    ]
+    send_invalid_bash_signal_lines: list[str] = [
+        "handle_comm_session: INFO: Triggered action 'test-act-invalid-bash'\n",
+        "send_action_results: INFO: Action 'test-act-invalid-bash' completed\n"
+    ]
+    send_valid_signal_and_bail_lines: list[str] = [
+        "handle_comm_session: INFO: Triggered action 'test-act-free'\n",
+        "send_msg_safe: ERROR: Could not send 'TRIGGER'\n",
+        "BrokenPipeError: [Errno 32] Broken pipe\n"
+    ]
+    send_random_garbage_lines: list[str] = [
+        "get_signal_msg: ERROR: Could not get message from client!\n",
+        "Traceback (most recent call last):\n",
+        "ConnectionAbortedError: Connection unexpectedly closed\n"
     ]

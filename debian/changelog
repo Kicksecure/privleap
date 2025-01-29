@@ -1,4 +1,4 @@
-privleap (3:0.5-1) unstable; urgency=medium
+privleap (3:0.5-1) bookworm; urgency=medium
 
   * New upstream version (local package).
 

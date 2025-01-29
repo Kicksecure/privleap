@@ -68,3 +68,33 @@ privleap stores its configuration under `/etc/privleap/conf.d`. See etc/privleap
 
 The privleap protocol is defined in PROTOCOL.md. If you want to implement your
 own privleap client or server, this should give you the information you need.
+
+## Testing
+
+The recommended way to run privleap's regression tests is with autopkgtest. You
+will need a Debian 12 machine to build the privleap package and run the tests.
+
+* Install `mmdebstrap`, `debhelper`, `python3`, and `autopkgtest` on
+  your machine.
+* Create an isolated testing environment by running the following commands:
+
+    mkdir -p ~/.cache/sbuild
+    sudo mmdebstrap \
+      --include=ca-certificates \
+      --skip=output/dev \
+      --variant=buildd \
+      bookworm \
+      ~/.cache/sbuild/bookworm-amd64.tar.zst \
+      --customize-hook='chroot "$1" passwd --delete root' \
+      --customize-hook='chroot "$1" useradd --home-dir /home/user --create-home user' \
+      --customize-hook='chroot "$1" passwd --delete user' \
+      --customize-hook='cp /etc/hosts "$1/etc/hosts"' \
+      --customize-hook=/usr/share/autopkgtest/setup-commands/setup-testbed \
+      https://deb.debian.org/debian
+
+* Build the privleap package by `cd`'ing to the privleap source tree, and
+  running `dpkg-buildpackage -b -us -uc`. This will produce a `.deb` file in
+  the parent directory.
+* Run the autopkgtest by running `cd ..`, then
+  `autopkgtest --apt-upgrade -B privleap*.deb ./privleap -- unshare`. The tests
+  will run in an unshare-based chroot.
