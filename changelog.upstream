@@ -1,3 +1,46 @@
+commit b053c19918f936036c5c0d969f6857bedc4cbb5c
+Merge: 5cbeeb9 28a4f89
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Thu Jan 30 11:33:25 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit 28a4f89c0fa977f0dbaad20b267c3342d3652ac5
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Jan 29 21:55:11 2025 -0600
+
+    Clarify a couple of comments
+
+commit 5d634a423aad3eae0d8f8c1673608bd64576172c
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Jan 29 21:52:38 2025 -0600
+
+    Remove unneeded action_name parameters in messages, use an int for exit code handling
+
+commit 04f1d068df5affa253a54191cc43dbf9ee0423d0
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Jan 29 21:34:41 2025 -0600
+
+    privleapd: set SHELL in child processes, set the current working directory properly
+
+commit 1434245e39e9ffb4ad31ae8a76f86d442398694b
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Jan 29 21:00:16 2025 -0600
+
+    Re-enable previously failing tests, fix pylint gripes
+
+commit 5845034c68f42ebd65331ea72ddeff075e59f8d4
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Jan 29 20:26:31 2025 -0600
+
+    Make tests more robust, add test log header and summary
+
+commit 5cbeeb9a9765128f50550221b69a5e50702ed9ce
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Wed Jan 29 14:02:47 2025 +0000
+
+    bumped changelog version
+
 commit 22416f2c2eb1056ae8111bdea5851ce7faef2ba4
 Author: Patrick Schleizer <adrelanos@whonix.org>
 Date:   Wed Jan 29 09:02:33 2025 -0500
