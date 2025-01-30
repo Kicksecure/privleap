@@ -3,11 +3,13 @@
 ## Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
 ## See the file COPYING for copying conditions.
 
-# pylint: disable=broad-exception-caught,global-statement
+# pylint: disable=broad-exception-caught,global-statement,too-many-lines
 # Rationale:
 #   broad-exception-caught: We use broad exception catching for general-purpose
 #     error handlers.
 #   global-statement: Only used for the assert count variables, not a problem.
+#   too-many-lines: This file isn't too far over 1000 lines, and breaking it up
+#     wouldn't enhance readability that much (it might even make it worse).
 
 """
 run_test.py - Tests for privleap. This is implemented as an entire program as
@@ -30,6 +32,7 @@ from pathlib import Path
 from typing import NoReturn, Tuple, IO
 from collections.abc import Callable
 
+# import privleap as pl
 import privleap.privleap as pl
 import run_test_util as util
 from run_test_util import stop_privleapd_subprocess
@@ -593,7 +596,7 @@ def privleapd_create_invalid_user_socket_and_bail_test(bogus: str) -> bool:
         control_session.close_session()
         if util.compare_privleapd_stdout(
             PlTestData.create_invalid_user_socket_and_bail_lines,
-            quiet = True if i != 19 else False):
+            quiet = i != 19):
             return True
     return False
 
@@ -675,7 +678,7 @@ def privleapd_create_existing_user_socket_and_bail_test(bogus: str) -> bool:
         control_session.close_session()
         if util.compare_privleapd_stdout(
             PlTestData.create_existing_user_socket_and_bail_lines,
-            quiet = True if i != 19 else False):
+            quiet = i != 19):
             return True
     return False
 
@@ -725,7 +728,7 @@ def privleapd_create_blocked_user_socket_and_bail_test(bogus: str) -> bool:
         control_session.close_session()
         if util.compare_privleapd_stdout(
             PlTestData.create_blocked_user_socket_and_bail_lines,
-            quiet = True if i != 19 else False):
+            quiet = i != 19):
             return True
     return False
 
@@ -759,64 +762,60 @@ def privleapd_destroy_missing_user_socket_test(bogus: str) -> bool:
         assert_success = False
     return assert_success
 
-# TODO: This test is broken, it passes every so often but 99% of the time it
-#   fails. Why is unclear.
-#def privleapd_destroy_user_socket_and_bail_test(bogus: str) -> bool:
-#    """
-#    Test how privleapd handles a control client that requests a socket to be
-#      destroyed for a user with a socket in existence, and then disconnects
-#      before privleapd can send a reply.
-#    """
-#
-#    if bogus != "":
-#        return False
-#    util.discard_privleapd_stderr()
-#    # This test is prone to race conditions, so we try 20 times and consider it
-#    # good if one of those times passes.
-#    for i in range(20):
-#        control_session: pl.PrivleapSession = pl.PrivleapSession(
-#            is_control_session = True)
-#        control_session.send_msg(pl.PrivleapControlClientCreateMsg(
-#            PlTestGlobal.test_username))
-#        _ = control_session.get_msg()
-#        control_session.close_session()
-#        util.discard_privleapd_stderr()
-#        control_session = pl.PrivleapSession(
-#            is_control_session = True)
-#        control_session.send_msg(pl.PrivleapControlClientDestroyMsg(
-#            PlTestGlobal.test_username))
-#        control_session.close_session()
-#        if util.compare_privleapd_stdout(
-#            PlTestData.destroy_user_socket_and_bail_lines,
-#            quiet = True if i != 19 else False):
-#            return True
-#    return False
+def privleapd_destroy_user_socket_and_bail_test(bogus: str) -> bool:
+    """
+    Test how privleapd handles a control client that requests a socket to be
+      destroyed for a user with a socket in existence, and then disconnects
+      before privleapd can send a reply.
+    """
 
-# TODO: This test is broken, it passes every so often but 99% of the time it
-#   fails. Why is unclear.
-#def privleapd_destroy_bad_user_socket_and_bail_test(bogus: str) -> bool:
-#    """
-#    Test how privleapd handles a control client that requests a socket to be
-#      destroyed for a user with a socket in existence, and then disconnects
-#      before privleapd can send a reply.
-#    """
-#
-#    if bogus != "":
-#        return False
-#    util.discard_privleapd_stderr()
-#    # This test is prone to race conditions, so we try 20 times and consider it
-#    # good if one of those times passes.
-#    for i in range(20):
-#        control_session: pl.PrivleapSession = pl.PrivleapSession(
-#            is_control_session = True)
-#        control_session.send_msg(pl.PrivleapControlClientDestroyMsg(
-#            PlTestGlobal.test_username))
-#        control_session.close_session()
-#        if util.compare_privleapd_stdout(
-#            PlTestData.destroy_bad_user_socket_and_bail_lines,
-#            quiet = True if i != 19 else False):
-#            return True
-#    return False
+    if bogus != "":
+        return False
+    util.discard_privleapd_stderr()
+    # This test is prone to race conditions, so we try 20 times and consider it
+    # good if one of those times passes.
+    for i in range(20):
+        control_session: pl.PrivleapSession = pl.PrivleapSession(
+            is_control_session = True)
+        control_session.send_msg(pl.PrivleapControlClientCreateMsg(
+            PlTestGlobal.test_username))
+        _ = control_session.get_msg()
+        control_session.close_session()
+        util.discard_privleapd_stderr()
+        control_session = pl.PrivleapSession(
+            is_control_session = True)
+        control_session.send_msg(pl.PrivleapControlClientDestroyMsg(
+            PlTestGlobal.test_username))
+        control_session.close_session()
+        if util.compare_privleapd_stdout(
+            PlTestData.destroy_user_socket_and_bail_lines,
+            quiet = i != 19):
+            return True
+    return False
+
+def privleapd_destroy_bad_user_socket_and_bail_test(bogus: str) -> bool:
+    """
+    Test how privleapd handles a control client that requests a socket to be
+      destroyed for a user with a socket in existence, and then disconnects
+      before privleapd can send a reply.
+    """
+
+    if bogus != "":
+        return False
+    util.discard_privleapd_stderr()
+    # This test is prone to race conditions, so we try 20 times and consider it
+    # good if one of those times passes.
+    for i in range(20):
+        control_session: pl.PrivleapSession = pl.PrivleapSession(
+            is_control_session = True)
+        control_session.send_msg(pl.PrivleapControlClientDestroyMsg(
+            PlTestGlobal.test_username))
+        control_session.close_session()
+        if util.compare_privleapd_stdout(
+            PlTestData.destroy_bad_user_socket_and_bail_lines,
+            quiet = i != 19):
+            return True
+    return False
 
 def privleapd_send_invalid_control_message_test(bogus: str) -> bool:
     """
@@ -919,7 +918,7 @@ def privleapd_send_nonexistent_signal_and_bail_test(bogus: str) -> bool:
         comm_session.close_session()
         if util.compare_privleapd_stdout(
             PlTestData.send_nonexistent_signal_and_bail_lines,
-            quiet = True if i != 19 else False):
+            quiet = i != 19):
             return True
     return False
 
@@ -943,7 +942,7 @@ def privleapd_send_userrestrict_signal_and_bail_test(bogus: str) -> bool:
         comm_session.close_session()
         if util.compare_privleapd_stdout(
             PlTestData.send_userrestrict_signal_and_bail_lines,
-            quiet = True if i != 19 else False):
+            quiet = i != 19):
             return True
     return False
 
@@ -967,7 +966,7 @@ def privleapd_send_grouprestrict_signal_and_bail_test(bogus: str) -> bool:
         comm_session.close_session()
         if util.compare_privleapd_stdout(
             PlTestData.send_grouprestrict_signal_and_bail_lines,
-            quiet = True if i != 19 else False):
+            quiet = i != 19):
             return True
     return False
 
@@ -989,7 +988,7 @@ def privleapd_send_invalid_bash_signal_test(bogus: str) -> bool:
             comm_session_msg = comm_session.get_msg()
             if isinstance(comm_session_msg,
                 pl.PrivleapCommServerResultExitcodeMsg):
-                if comm_session_msg.exit_code != "127":
+                if comm_session_msg.exit_code != 127:
                     logging.error(
                         "Invalid Bash code did not exit with code 127!")
                     return False
@@ -1022,7 +1021,7 @@ def privleapd_send_valid_signal_and_bail_test(bogus: str) -> bool:
         comm_session.close_session()
         if util.compare_privleapd_stdout(
             PlTestData.send_valid_signal_and_bail_lines,
-            quiet = True if i != 19 else False):
+            quiet = i != 19):
             return True
     return False
 
@@ -1168,13 +1167,13 @@ def run_privleapd_tests() -> None:
         "", "Test privleapd socket destroy request for user with deleted "
             "socket")
     # ---
-#    privleapd_assert_function(privleapd_destroy_user_socket_and_bail_test,
-#        "", "Test privleapd socket destroy request for existing user, with "
-#            "abrupt disconnect")
+    privleapd_assert_function(privleapd_destroy_user_socket_and_bail_test,
+        "", "Test privleapd socket destroy request for existing user, with "
+            "abrupt disconnect")
     # ---
-#    privleapd_assert_function(privleapd_destroy_bad_user_socket_and_bail_test,
-#        "", "Test privleapd socket destroy request for existing user with no "
-#            "socket, with abrupt disconnect")
+    privleapd_assert_function(privleapd_destroy_bad_user_socket_and_bail_test,
+        "", "Test privleapd socket destroy request for existing user with no "
+            "socket, with abrupt disconnect")
     # ---
     privleapd_assert_function(privleapd_send_invalid_control_message_test,
         "", "Test privleapd against an invalid control message")
@@ -1213,6 +1212,48 @@ def run_privleapd_tests() -> None:
     logging.info("privleapd passed asserts: %s, failed asserts: %s",
         privleapd_asserts_passed, privleapd_asserts_failed)
 
+def print_test_header() -> None:
+    """
+    Indicates where in the logs a test started at.
+    """
+
+    logging.info("""
+-------------------------------------
+|        BEGIN PRIVLEAP TEST        |
+-------------------------------------
+""")
+
+def print_result_summary() -> None:
+    """
+    Prints a summary of the test results via the logging mechanism.
+    """
+
+    # pylint: disable=logging-fstring-interpolation
+    # Rationale:
+    logging.info("""
+-------------------------------------
+|            TEST SUMMARY           |
+-------------------------------------
+
+| Component | Asserts | Pass | Fail |
+| --------- | ------- | ---- | ---- |
+| leapctl   | %7d | %4d | %4d |
+| leaprun   | %7d | %4d | %4d |
+| privleapd | %7d | %4d | %4d |
+
+-------------------------------------
+|         END PRIVLEAP TEST         |
+-------------------------------------
+""", leapctl_asserts_failed + leapctl_asserts_passed,
+    leaprun_asserts_passed,
+    leaprun_asserts_failed,
+    leaprun_asserts_failed + leaprun_asserts_passed,
+    leaprun_asserts_passed,
+    leaprun_asserts_failed,
+    privleapd_asserts_failed + privleapd_asserts_passed,
+    privleapd_asserts_passed,
+    privleapd_asserts_failed)
+
 def main() -> NoReturn:
     """
     Main function.
@@ -1223,6 +1264,7 @@ def main() -> NoReturn:
 
     logging.basicConfig(format = "%(funcName)s: %(levelname)s: %(message)s",
         level = logging.INFO)
+    print_test_header()
     util.ensure_running_as_root()
     util.stop_privleapd_service()
     util.setup_test_account(PlTestGlobal.test_username,
@@ -1237,6 +1279,7 @@ def main() -> NoReturn:
     util.restore_old_privleap_config()
     util.stop_privleapd_subprocess()
     util.start_privleapd_service()
+    print_result_summary()
     if PlTestGlobal.all_asserts_passed:
         sys.exit(0)
     else:

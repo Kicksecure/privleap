@@ -21,6 +21,7 @@ import subprocess
 import socket
 import re
 import logging
+import time
 from pathlib import Path
 from typing import Tuple, cast, SupportsIndex, IO, NoReturn
 
@@ -41,6 +42,7 @@ class PrivleapdGlobal:
     action_list: list[pl.PrivleapAction] = []
     socket_list: list[pl.PrivleapSocket] = []
     pid_file_path: Path = Path(pl.PrivleapCommon.state_dir, "pid")
+    in_test_mode = False
 
 def send_msg_safe(session: pl.PrivleapSession, msg: pl.PrivleapMsg) -> bool:
     """
@@ -48,6 +50,10 @@ def send_msg_safe(session: pl.PrivleapSession, msg: pl.PrivleapMsg) -> bool:
       client has already closed the session.
     """
 
+    if PrivleapdGlobal.in_test_mode:
+        # Insert a bit of delay before sending replies, to allow the test suite
+        # to win race conditions reliably.
+        time.sleep(0.01)
     try:
         session.send_msg(msg)
     except Exception as e:
@@ -61,8 +67,8 @@ def handle_control_create_msg(control_session: pl.PrivleapSession,
     Handles a CREATE control message from the client.
     """
 
-    # The PrivleapControlClientCreateMsg constructor validates the
-    # username for us, so we don't have to do it again here.
+    # The PrivleapControlClientCreateMsg constructor ensures the username is
+    # valid, but doesn't check for its existence on the system.
     assert control_msg.user_name is not None
     for sock in PrivleapdGlobal.socket_list:
         if sock.user_name == control_msg.user_name:
@@ -102,8 +108,8 @@ def handle_control_destroy_msg(control_session: pl.PrivleapSession,
     Handles a DESTROY control message from the client.
     """
 
-    # The PrivleapControlClientDestroyMsg constructor validates the
-    # username for us, so we don't have to do it again here.
+    # The PrivleapControlClientDestroyMsg constructor ensures the username is
+    # valid, but doesn't check for its existence on the system.
     assert control_msg.user_name is not None
     remove_sock_idx: int | None = None
     for sock_idx, sock in enumerate(PrivleapdGlobal.socket_list):
@@ -192,6 +198,7 @@ def run_action(desired_action: pl.PrivleapAction) -> subprocess.Popen[bytes]:
     action_env: dict[str, str] = os.environ.copy()
     action_env["HOME"] = user_info.pw_dir
     action_env["LOGNAME"] = user_info.pw_name
+    action_env["SHELL"] = "/usr/bin/bash"
     action_env["PWD"] = user_info.pw_dir
     action_env["USER"] = user_info.pw_name
     assert desired_action.action_command is not None
@@ -202,7 +209,8 @@ def run_action(desired_action: pl.PrivleapAction) -> subprocess.Popen[bytes]:
         stderr = subprocess.PIPE,
         user = desired_action.target_user,
         group = desired_action.target_group,
-        env = action_env)
+        env = action_env,
+        cwd = user_info.pw_dir)
     return action_process
 
 def get_signal_msg(comm_session: pl.PrivleapSession) \
@@ -310,8 +318,7 @@ def send_action_results(comm_session: pl.PrivleapSession,
                     stdout_done = True
                 else:
                     if not send_msg_safe(comm_session,
-                        pl.PrivleapCommServerResultStdoutMsg(action_name,
-                            stdio_buf)):
+                        pl.PrivleapCommServerResultStdoutMsg(stdio_buf)):
                         return
             if action_process.stderr in ready_streams[0]:
                 stdio_buf = action_process.stderr.read(1024)
@@ -319,8 +326,7 @@ def send_action_results(comm_session: pl.PrivleapSession,
                     stderr_done = True
                 else:
                     if not send_msg_safe(comm_session,
-                        pl.PrivleapCommServerResultStderrMsg(action_name,
-                            stdio_buf)):
+                        pl.PrivleapCommServerResultStderrMsg(stdio_buf)):
                         return
 
         action_process.wait()
@@ -335,7 +341,7 @@ def send_action_results(comm_session: pl.PrivleapSession,
     logging.info("Action '%s' completed", action_name)
 
     send_msg_safe(comm_session, pl.PrivleapCommServerResultExitcodeMsg(
-        action_name, str(action_process.returncode)))
+        action_process.returncode))
 
 def handle_comm_session(comm_socket: pl.PrivleapSocket) -> None:
     """
@@ -370,14 +376,13 @@ def handle_comm_session(comm_socket: pl.PrivleapSocket) -> None:
         except Exception as e:
             logging.error("Action '%s' authorized, but trigger failed!",
                 desired_action.action_name, exc_info = e)
-            send_msg_safe(comm_session, pl.PrivleapCommServerTriggerErrorMsg(
-                desired_action.action_name))
+            send_msg_safe(comm_session, pl.PrivleapCommServerTriggerErrorMsg())
             return
 
         logging.info("Triggered action '%s'", desired_action.action_name)
 
         if not send_msg_safe(comm_session,
-            pl.PrivleapCommServerTriggerMsg(desired_action.action_name)):
+            pl.PrivleapCommServerTriggerMsg()):
             # Client already disconnected. At this point the action is
             # already running, and there's not any point in waiting for the
             # process's stdout and stderr, so the thread can end here.
@@ -420,6 +425,7 @@ def verify_not_running_twice() -> None:
         # the process doesn't exist
         try:
             os.kill(old_pid, 0)
+            # If no exception, the old privleapd process is still running.
             logging.critical("Cannot run two privleapd processes at the same "
                 "time!")
             sys.exit(1)
@@ -562,6 +568,11 @@ def main() -> NoReturn:
     Main function.
     """
 
+    if len(sys.argv) > 2:
+        logging.critical("Too many arguments passed!")
+        sys.exit(1)
+    if len(sys.argv) == 2 and sys.argv[1] == "--test":
+        PrivleapdGlobal.in_test_mode = True
     logging.basicConfig(format = "%(funcName)s: %(levelname)s: %(message)s",
         level = logging.INFO)
     ensure_running_as_root()

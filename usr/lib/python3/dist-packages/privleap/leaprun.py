@@ -3,9 +3,13 @@
 # Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
 # See the file COPYING for copying conditions.
 
-# pylint: disable=broad-exception-caught
+# pylint: disable=broad-exception-caught,duplicate-code
 # Rationale:
 #   broad-exception-caught: except blocks are general error handlers.
+#   duplicate-code: This is being triggered because of generic_error and
+#     unexpected_error_msg, which are very similar in leapctl and leaprun but
+#     can't be reasonably broken out of either due to the fact that they access
+#     incompatible variants of the cleanup_and_exit function.
 
 """leaprun.py - privleap client for running actions."""
 
@@ -165,8 +169,7 @@ def handle_response() -> NoReturn:
             elif isinstance(comm_msg, pl.PrivleapCommServerResultExitcodeMsg):
                 # noinspection PyUnboundLocalVariable
                 assert comm_msg.exit_code is not None
-                exit_code = int(comm_msg.exit_code)
-                cleanup_and_exit(exit_code)
+                cleanup_and_exit(comm_msg.exit_code)
             else:
                 # noinspection PyUnboundLocalVariable
                 unexpected_msg_error(comm_msg)

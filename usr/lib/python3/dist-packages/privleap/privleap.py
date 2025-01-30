@@ -185,14 +185,8 @@ class PrivleapCommServerTriggerMsg(PrivleapMsg):
 
     name = "TRIGGER"
 
-    def __init__(self, action_name: str):
-        if not PrivleapCommon.validate_id(action_name,
-            PrivleapValidateType.SIGNAL_NAME):
-            raise ValueError("Specified action name is invalid.")
-        self.action_name: str = action_name
-
     def serialize(self) -> bytes:
-        return f"{self.name} {self.action_name}".encode("utf-8")
+        return self.name.encode("utf-8")
 
 class PrivleapCommServerTriggerErrorMsg(PrivleapMsg):
     """
@@ -206,14 +200,8 @@ class PrivleapCommServerTriggerErrorMsg(PrivleapMsg):
 
     name = "TRIGGER_ERROR"
 
-    def __init__(self, action_name: str):
-        if not PrivleapCommon.validate_id(action_name,
-            PrivleapValidateType.SIGNAL_NAME):
-            raise ValueError("Specified action name is invalid.")
-        self.action_name: str = action_name
-
     def serialize(self) -> bytes:
-        return f"{self.name} {self.action_name}".encode("utf-8")
+        return self.name.encode("utf-8")
 
 class PrivleapCommServerResultStdoutMsg(PrivleapMsg):
     """
@@ -226,15 +214,11 @@ class PrivleapCommServerResultStdoutMsg(PrivleapMsg):
 
     name = "RESULT_STDOUT"
 
-    def __init__(self, action_name: str, stdout_bytes: bytes):
-        if not PrivleapCommon.validate_id(action_name,
-            PrivleapValidateType.SIGNAL_NAME):
-            raise ValueError("Specified action name is invalid.")
-        self.action_name: str = action_name
+    def __init__(self, stdout_bytes: bytes):
         self.stdout_bytes: bytes = stdout_bytes
 
     def serialize(self) -> bytes:
-        return f"{self.name} {self.action_name} ".encode("utf-8") \
+        return f"{self.name} ".encode("utf-8") \
             + self.stdout_bytes
 
 class PrivleapCommServerResultStderrMsg(PrivleapMsg):
@@ -247,15 +231,11 @@ class PrivleapCommServerResultStderrMsg(PrivleapMsg):
 
     name = "RESULT_STDERR"
 
-    def __init__(self, action_name: str, stderr_bytes: bytes):
-        if not PrivleapCommon.validate_id(action_name,
-            PrivleapValidateType.SIGNAL_NAME):
-            raise ValueError("Specified action name is invalid.")
-        self.action_name: str = action_name
+    def __init__(self, stderr_bytes: bytes):
         self.stderr_bytes: bytes = stderr_bytes
 
     def serialize(self) -> bytes:
-        return f"{self.name} {self.action_name} ".encode("utf-8") \
+        return f"{self.name} ".encode("utf-8") \
             + self.stderr_bytes
 
 class PrivleapCommServerResultExitcodeMsg(PrivleapMsg):
@@ -270,16 +250,11 @@ class PrivleapCommServerResultExitcodeMsg(PrivleapMsg):
 
     name = "RESULT_EXITCODE"
 
-    def __init__(self, action_name: str, exit_code: str):
-        if not PrivleapCommon.validate_id(
-            action_name, PrivleapValidateType.SIGNAL_NAME):
-            raise ValueError("Specified action name is invalid.")
-        self.action_name: str = action_name
-        # TODO: Can this be made an int instead?
-        self.exit_code: str = exit_code
+    def __init__(self, exit_code: int):
+        self.exit_code: int = exit_code
 
     def serialize(self) -> bytes:
-        return f"{self.name} {self.action_name} {self.exit_code}".encode(
+        return f"{self.name} {str(self.exit_code)}".encode(
             "utf-8")
 
 class PrivleapCommServerUnauthorizedMsg(PrivleapMsg):
@@ -449,6 +424,11 @@ class PrivleapSession:
             max_loops -= 1
 
         msg_len: int = int.from_bytes(recv_buf, byteorder='big')
+
+        if self.is_server_side:
+            if msg_len > 4096:
+                raise ValueError("Received message is too long")
+
         recv_buf = b""
 
         while len(recv_buf) != msg_len:
@@ -644,28 +624,27 @@ class PrivleapSession:
         # Client-side comm socket, we're receiving, so expect server comm
         # messages
         if msg_type_str == "TRIGGER":
-            param_list, _ = self.__parse_msg_parameters(
-                recv_buf, str_count = 1, blob_at_end = False)
-            return PrivleapCommServerTriggerMsg(param_list[0])
+            self.__parse_msg_parameters(
+                recv_buf, str_count = 0, blob_at_end = False)
+            return PrivleapCommServerTriggerMsg()
         if msg_type_str == "TRIGGER_ERROR":
-            param_list, _ = self.__parse_msg_parameters(
-                recv_buf, str_count = 1, blob_at_end = False)
-            return PrivleapCommServerTriggerErrorMsg(param_list[0])
+            self.__parse_msg_parameters(
+                recv_buf, str_count = 0, blob_at_end = False)
+            return PrivleapCommServerTriggerErrorMsg()
         if msg_type_str == "RESULT_STDOUT":
-            param_list, blob = self.__parse_msg_parameters(
-                recv_buf, str_count = 1, blob_at_end = True)
+            _, blob = self.__parse_msg_parameters(
+                recv_buf, str_count = 0, blob_at_end = True)
             assert blob is not None
-            return PrivleapCommServerResultStdoutMsg(param_list[0], blob)
+            return PrivleapCommServerResultStdoutMsg(blob)
         if msg_type_str == "RESULT_STDERR":
-            param_list, blob = self.__parse_msg_parameters(
-                recv_buf, str_count = 1, blob_at_end = True)
+            _, blob = self.__parse_msg_parameters(
+                recv_buf, str_count = 0, blob_at_end = True)
             assert blob is not None
-            return PrivleapCommServerResultStderrMsg(param_list[0], blob)
+            return PrivleapCommServerResultStderrMsg(blob)
         if msg_type_str == "RESULT_EXITCODE":
             param_list, _ = self.__parse_msg_parameters(
-                recv_buf, str_count = 2, blob_at_end = False)
-            return PrivleapCommServerResultExitcodeMsg(
-                param_list[0], param_list[1])
+                recv_buf, str_count = 1, blob_at_end = False)
+            return PrivleapCommServerResultExitcodeMsg(int(param_list[0]))
         if msg_type_str == "UNAUTHORIZED":
             self.__parse_msg_parameters(
                 recv_buf, str_count = 0, blob_at_end = False)

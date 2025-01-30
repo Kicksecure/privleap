@@ -3,9 +3,13 @@
 # Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
 # See the file COPYING for copying conditions.
 
-# pylint: disable=broad-exception-caught
+# pylint: disable=broad-exception-caught,duplicate-code
 # Rationale:
 #   broad-exception-caught: except blocks are general error handlers.
+#   duplicate-code: This is being triggered because of generic_error and
+#     unexpected_error_msg, which are very similar in leapctl and leaprun but
+#     can't be reasonably broken out of either due to the fact that they access
+#     incompatible variants of the cleanup_and_exit function.
 
 """leapctl.py - privleapd client for controlling available comm sockets."""
 

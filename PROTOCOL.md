@@ -108,27 +108,27 @@ socket:
 `privleapd` can send the following messages, which clients must be able to
 understand:
 
-* `TRIGGER <action_name>` - Indicates that the action specified by
-  `<action_name>` has been triggered. `privleapd` will send `TRIGGER` after
-  *beginning* execution of the code specified in the action, with no respect to
-  whether the action has completed or yet. If a client is satisfied that the
-  action has started execution, it can disconnect from `privleapd` immediately,
-  otherwise it should wait to disconnect until receiving a `RESULT_EXITCODE`
-  message.
-* `TRIGGER_ERROR <action_name>` - Indicates that the action specified by
-  `<action_name>` was authorized, but launching it failed. This is usually due
-  to invalid or faulty configuration. Note that `TRIGGER_ERROR` is reserved for
+* `TRIGGER` - Indicates that the action requested by the previous `SIGNAL`
+  message has been triggered. `privleapd` will send `TRIGGER` after *beginning*
+  execution of the code specified in the action, with no respect to whether the
+  action has completed or yet. If a client is satisfied that the action has
+  started execution, it can disconnect from `privleapd` immediately, otherwise
+  it should wait to disconnect until receiving a `RESULT_EXITCODE` message.
+* `TRIGGER_ERROR` - Indicates that the action requested by the previous `SIGNAL`
+  message was authorized, but launching it failed. This is usually due to
+  invalid or faulty configuration. Note that `TRIGGER_ERROR` is reserved for
   actual problems *starting* the action. If the action starts successfully but
-  exits non-zero, `privleapd` will still consider this a success. The client
-  can use the value accompanying the `RESULT_EXITCODE` message to determine whether the action actually succeeded or not.
-* `RESULT_STDOUT <action_name> <result_stdout_text>` - Indicates that the
-  action specified by `<action_name>` wrote the given block of data to STDOUT.
+  exits non-zero, `privleapd` will still consider this a success. The client can
+  use the value accompanying the `RESULT_EXITCODE` message to determine whether
+  the action actually succeeded or not.
+* `RESULT_STDOUT <result_stdout_text>` - Indicates that the action requested by
+  the previous `SIGNAL` message wrote the given block of data to STDOUT.
   `<result_stdout_text>` is arbitrary binary data.
-* `RESULT_STDERR <action_name> <result_stderr_text>` - Indicates that the
-  action specified by `<action_name>` wrote the given block of data to STDERR.
+* `RESULT_STDERR <result_stderr_text>` - Indicates that the action requested by
+  the previous `SIGNAL` message wrote the given block of data to STDERR.
   `<result_stderr_text>` is arbitrary binary data.
-* `RESULT_EXITCODE <action_name> <exit_code>` - Indicates that the action
-  specified by `<action_name>` has completed execution, and that it exited with
+* `RESULT_EXITCODE <exit_code>` - Indicates that the action requested by the
+  previous `SIGNAL` message has completed execution, and that it exited with
   code `<exit_code>`. `<exit_code>` is a string representing a decimal integer
   between 0 and 255.
 * `UNAUTHORIZED` - Indicates that the user attempting to trigger the specified
