@@ -1213,6 +1213,38 @@ def run_privleapd_tests() -> None:
     logging.info("privleapd passed asserts: %s, failed asserts: %s",
         privleapd_asserts_passed, privleapd_asserts_failed)
 
+def print_test_header() -> None:
+    """
+    Indicates where in the logs a test started at.
+    """
+
+    logging.info("""
+-------------------------------------
+|        BEGIN PRIVLEAP TEST        |
+-------------------------------------
+""")
+
+def print_result_summary() -> None:
+    """
+    Prints a summary of the test results via the logging mechanism.
+    """
+
+    logging.info(f"""
+-------------------------------------
+|            TEST SUMMARY           |
+-------------------------------------
+
+| Component | Asserts | Pass | Fail |
+| --------- | ------- | ---- | ---- |
+| leapctl   | {leapctl_asserts_passed + leapctl_asserts_failed:7} | {leapctl_asserts_passed:4} | {leapctl_asserts_failed:4} |
+| leaprun   | {leaprun_asserts_passed + leaprun_asserts_failed:7} | {leaprun_asserts_passed:4} | {leaprun_asserts_failed:4} |
+| privleapd | {privleapd_asserts_passed + privleapd_asserts_failed:7} | {privleapd_asserts_passed:4} | {privleapd_asserts_failed:4} |
+
+-------------------------------------
+|         END PRIVLEAP TEST         |
+-------------------------------------
+""")
+
 def main() -> NoReturn:
     """
     Main function.
@@ -1223,6 +1255,7 @@ def main() -> NoReturn:
 
     logging.basicConfig(format = "%(funcName)s: %(levelname)s: %(message)s",
         level = logging.INFO)
+    print_test_header()
     util.ensure_running_as_root()
     util.stop_privleapd_service()
     util.setup_test_account(PlTestGlobal.test_username,
@@ -1237,6 +1270,7 @@ def main() -> NoReturn:
     util.restore_old_privleap_config()
     util.stop_privleapd_subprocess()
     util.start_privleapd_service()
+    print_result_summary()
     if PlTestGlobal.all_asserts_passed:
         sys.exit(0)
     else:

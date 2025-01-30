@@ -21,6 +21,7 @@ import subprocess
 import socket
 import re
 import logging
+import time
 from pathlib import Path
 from typing import Tuple, cast, SupportsIndex, IO, NoReturn
 
@@ -41,6 +42,7 @@ class PrivleapdGlobal:
     action_list: list[pl.PrivleapAction] = []
     socket_list: list[pl.PrivleapSocket] = []
     pid_file_path: Path = Path(pl.PrivleapCommon.state_dir, "pid")
+    in_test_mode = False
 
 def send_msg_safe(session: pl.PrivleapSession, msg: pl.PrivleapMsg) -> bool:
     """
@@ -48,6 +50,10 @@ def send_msg_safe(session: pl.PrivleapSession, msg: pl.PrivleapMsg) -> bool:
       client has already closed the session.
     """
 
+    if PrivleapdGlobal.in_test_mode:
+        # Insert a bit of delay before sending replies, to allow the test suite
+        # to win race conditions reliably.
+        time.sleep(0.01)
     try:
         session.send_msg(msg)
     except Exception as e:
@@ -562,6 +568,11 @@ def main() -> NoReturn:
     Main function.
     """
 
+    if len(sys.argv) > 2:
+        logging.critical("Too many arguments passed!")
+        sys.exit(1)
+    if len(sys.argv) == 2 and sys.argv[1] == "--test":
+        PrivleapdGlobal.in_test_mode = True
     logging.basicConfig(format = "%(funcName)s: %(levelname)s: %(message)s",
         level = logging.INFO)
     ensure_running_as_root()

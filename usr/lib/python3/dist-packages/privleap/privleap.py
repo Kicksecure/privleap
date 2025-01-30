@@ -449,6 +449,11 @@ class PrivleapSession:
             max_loops -= 1
 
         msg_len: int = int.from_bytes(recv_buf, byteorder='big')
+
+        if self.is_server_side:
+            if msg_len > 4096:
+                raise ValueError("Received message is too long")
+
         recv_buf = b""
 
         while len(recv_buf) != msg_len:

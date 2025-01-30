@@ -42,7 +42,7 @@ class PlTestGlobal:
     test_home_dir: Path = Path(f"/home/{test_username}")
     privleap_state_dir: Path = Path("/run/privleapd")
     privleap_state_comm_dir: Path = Path(privleap_state_dir, "comm")
-    readline_timeout: float = 1
+    base_delay: float = 0.05
     privleapd_running: bool = False
     no_service_handling = False
     all_asserts_passed = True
@@ -214,7 +214,8 @@ def start_privleapd_subprocess(allow_error_output: bool = False) -> None:
         # Rationale:
         #   consider-using-with: "with" is not suitable for the architecture of
         #   this script in this scenario.
-        PlTestGlobal.privleapd_proc = subprocess.Popen(["/usr/bin/privleapd"],
+        PlTestGlobal.privleapd_proc = subprocess.Popen(["/usr/bin/privleapd",
+            "--test"],
             stdout = subprocess.PIPE,
             stderr = subprocess.PIPE,
             encoding = "utf-8")
@@ -228,17 +229,17 @@ def start_privleapd_subprocess(allow_error_output: bool = False) -> None:
         fcntl.F_SETFL, os.O_NONBLOCK)
     fcntl.fcntl(PlTestGlobal.privleapd_proc.stderr.fileno(),
         fcntl.F_SETFL, os.O_NONBLOCK)
-    time.sleep(PlTestGlobal.readline_timeout)
+    time.sleep(PlTestGlobal.base_delay)
     if not allow_error_output:
         early_privleapd_output: str | None = proc_try_readline(
-            PlTestGlobal.privleapd_proc, PlTestGlobal.readline_timeout,
+            PlTestGlobal.privleapd_proc, PlTestGlobal.base_delay,
             read_stderr = True)
         if early_privleapd_output is not None:
             logging.critical("privleapd returned error messages at startup!")
             while True:
                 logging.critical(early_privleapd_output)
                 early_privleapd_output = proc_try_readline(
-                    PlTestGlobal.privleapd_proc, PlTestGlobal.readline_timeout,
+                    PlTestGlobal.privleapd_proc, PlTestGlobal.base_delay,
                     read_stderr = True)
                 if early_privleapd_output is None:
                     break
@@ -256,7 +257,7 @@ def stop_privleapd_subprocess() -> None:
         _ = PlTestGlobal.privleapd_proc.communicate()
     except Exception as e:
         logging.critical("Could not kill privleapd!", exc_info = e)
-    time.sleep(0.25)
+    time.sleep(PlTestGlobal.base_delay)
     PlTestGlobal.privleapd_running = False
 
 def assert_command_result(command_data: list[str], exit_code: int,
@@ -309,7 +310,7 @@ def compare_privleapd_stdout(assert_line_list: list[str], quiet: bool = False) \
     for line in assert_line_list:
         while True:
             proc_line = proc_try_readline(PlTestGlobal.privleapd_proc,
-                PlTestGlobal.readline_timeout, read_stderr = True)
+                PlTestGlobal.base_delay, read_stderr = True)
             if proc_line is None:
                 result_good = False
                 break
@@ -320,7 +321,7 @@ def compare_privleapd_stdout(assert_line_list: list[str], quiet: bool = False) \
             break
     while True:
         proc_line = proc_try_readline(PlTestGlobal.privleapd_proc,
-            PlTestGlobal.readline_timeout, read_stderr = True)
+            PlTestGlobal.base_delay, read_stderr = True)
         if proc_line is None:
             break
         read_lines.append(proc_line)
@@ -340,7 +341,7 @@ def discard_privleapd_stderr() -> None:
         assert PlTestGlobal.privleapd_proc is not None
         while True:
             proc_line = proc_try_readline(PlTestGlobal.privleapd_proc,
-                PlTestGlobal.readline_timeout, read_stderr = True)
+                PlTestGlobal.base_delay, read_stderr = True)
             if proc_line is None:
                 break
 
@@ -621,6 +622,4 @@ Commandecho 'test-act-crash'
     ]
     send_random_garbage_lines: list[str] = [
         "get_signal_msg: ERROR: Could not get message from client!\n",
-        "Traceback (most recent call last):\n",
-        "ConnectionAbortedError: Connection unexpectedly closed\n"
     ]
