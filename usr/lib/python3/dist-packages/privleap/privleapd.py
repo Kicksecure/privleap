@@ -426,6 +426,7 @@ def verify_not_running_twice() -> None:
         # the process doesn't exist
         try:
             os.kill(old_pid, 0)
+            # If no exception, the old privleapd process is still running.
             logging.critical("Cannot run two privleapd processes at the same "
                 "time!")
             sys.exit(1)
