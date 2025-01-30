@@ -988,7 +988,7 @@ def privleapd_send_invalid_bash_signal_test(bogus: str) -> bool:
             comm_session_msg = comm_session.get_msg()
             if isinstance(comm_session_msg,
                 pl.PrivleapCommServerResultExitcodeMsg):
-                if comm_session_msg.exit_code != "127":
+                if comm_session_msg.exit_code != 127:
                     logging.error(
                         "Invalid Bash code did not exit with code 127!")
                     return False

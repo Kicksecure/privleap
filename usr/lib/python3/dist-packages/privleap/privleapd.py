@@ -318,8 +318,7 @@ def send_action_results(comm_session: pl.PrivleapSession,
                     stdout_done = True
                 else:
                     if not send_msg_safe(comm_session,
-                        pl.PrivleapCommServerResultStdoutMsg(action_name,
-                            stdio_buf)):
+                        pl.PrivleapCommServerResultStdoutMsg(stdio_buf)):
                         return
             if action_process.stderr in ready_streams[0]:
                 stdio_buf = action_process.stderr.read(1024)
@@ -327,8 +326,7 @@ def send_action_results(comm_session: pl.PrivleapSession,
                     stderr_done = True
                 else:
                     if not send_msg_safe(comm_session,
-                        pl.PrivleapCommServerResultStderrMsg(action_name,
-                            stdio_buf)):
+                        pl.PrivleapCommServerResultStderrMsg(stdio_buf)):
                         return
 
         action_process.wait()
@@ -343,7 +341,7 @@ def send_action_results(comm_session: pl.PrivleapSession,
     logging.info("Action '%s' completed", action_name)
 
     send_msg_safe(comm_session, pl.PrivleapCommServerResultExitcodeMsg(
-        action_name, str(action_process.returncode)))
+        action_process.returncode))
 
 def handle_comm_session(comm_socket: pl.PrivleapSocket) -> None:
     """
@@ -378,14 +376,13 @@ def handle_comm_session(comm_socket: pl.PrivleapSocket) -> None:
         except Exception as e:
             logging.error("Action '%s' authorized, but trigger failed!",
                 desired_action.action_name, exc_info = e)
-            send_msg_safe(comm_session, pl.PrivleapCommServerTriggerErrorMsg(
-                desired_action.action_name))
+            send_msg_safe(comm_session, pl.PrivleapCommServerTriggerErrorMsg())
             return
 
         logging.info("Triggered action '%s'", desired_action.action_name)
 
         if not send_msg_safe(comm_session,
-            pl.PrivleapCommServerTriggerMsg(desired_action.action_name)):
+            pl.PrivleapCommServerTriggerMsg()):
             # Client already disconnected. At this point the action is
             # already running, and there's not any point in waiting for the
             # process's stdout and stderr, so the thread can end here.

@@ -169,8 +169,7 @@ def handle_response() -> NoReturn:
             elif isinstance(comm_msg, pl.PrivleapCommServerResultExitcodeMsg):
                 # noinspection PyUnboundLocalVariable
                 assert comm_msg.exit_code is not None
-                exit_code = int(comm_msg.exit_code)
-                cleanup_and_exit(exit_code)
+                cleanup_and_exit(comm_msg.exit_code)
             else:
                 # noinspection PyUnboundLocalVariable
                 unexpected_msg_error(comm_msg)
