@@ -198,6 +198,7 @@ def run_action(desired_action: pl.PrivleapAction) -> subprocess.Popen[bytes]:
     action_env: dict[str, str] = os.environ.copy()
     action_env["HOME"] = user_info.pw_dir
     action_env["LOGNAME"] = user_info.pw_name
+    action_env["SHELL"] = "/usr/bin/bash"
     action_env["PWD"] = user_info.pw_dir
     action_env["USER"] = user_info.pw_name
     assert desired_action.action_command is not None
@@ -208,7 +209,8 @@ def run_action(desired_action: pl.PrivleapAction) -> subprocess.Popen[bytes]:
         stderr = subprocess.PIPE,
         user = desired_action.target_user,
         group = desired_action.target_group,
-        env = action_env)
+        env = action_env,
+        cwd = user_info.pw_dir)
     return action_process
 
 def get_signal_msg(comm_session: pl.PrivleapSession) \
