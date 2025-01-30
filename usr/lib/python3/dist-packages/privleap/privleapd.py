@@ -67,8 +67,8 @@ def handle_control_create_msg(control_session: pl.PrivleapSession,
     Handles a CREATE control message from the client.
     """
 
-    # The PrivleapControlClientCreateMsg constructor validates the
-    # username for us, so we don't have to do it again here.
+    # The PrivleapControlClientCreateMsg constructor ensures the username is
+    # valid, but doesn't check for its existence on the system.
     assert control_msg.user_name is not None
     for sock in PrivleapdGlobal.socket_list:
         if sock.user_name == control_msg.user_name:
@@ -108,8 +108,8 @@ def handle_control_destroy_msg(control_session: pl.PrivleapSession,
     Handles a DESTROY control message from the client.
     """
 
-    # The PrivleapControlClientDestroyMsg constructor validates the
-    # username for us, so we don't have to do it again here.
+    # The PrivleapControlClientDestroyMsg constructor ensures the username is
+    # valid, but doesn't check for its existence on the system.
     assert control_msg.user_name is not None
     remove_sock_idx: int | None = None
     for sock_idx, sock in enumerate(PrivleapdGlobal.socket_list):
