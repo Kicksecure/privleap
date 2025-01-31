@@ -62,7 +62,7 @@ def generic_error(error_msg: str) -> NoReturn:
     Prints an error, then cleans up and exits.
     """
 
-    print("ERROR: " + error_msg, file=sys.stderr)
+    print(f"ERROR: {error_msg}", file=sys.stderr)
     cleanup_and_exit(1)
 
 def unexpected_msg_error(control_msg: pl.PrivleapMsg) -> NoReturn:
@@ -95,7 +95,7 @@ def normalize_username(user_id: str) -> str:
 
     if not pl.PrivleapCommon.validate_id(user_name,
         pl.PrivleapValidateType.USER_GROUP_NAME):
-        generic_error("User name '" + user_name + "' is invalid!")
+        generic_error(f"User name '{user_name}' is invalid!")
 
     user_list: list[str] = [pw.pw_name for pw in pwd.getpwall()]
     if not user_name in user_list:
@@ -136,16 +136,14 @@ def handle_create_request(user_name: str) -> NoReturn:
 
     # noinspection PyUnboundLocalVariable
     if isinstance(control_msg, pl.PrivleapControlServerOkMsg):
-        print("Comm socket created for user '" + user_name + "'.")
+        print(f"Comm socket created for user '{user_name}'.")
         cleanup_and_exit(0)
     elif isinstance(control_msg, pl.PrivleapControlServerControlErrorMsg):
         generic_error(
             "privleapd encountered an error while creating a comm socket "
-            "for user '"
-            + user_name
-            + "'!")
+            f"for user '{user_name}'!")
     elif isinstance(control_msg, pl.PrivleapControlServerExistsMsg):
-        print("Comm socket already exists for user '" + user_name + "'.")
+        print(f"Comm socket already exists for user '{user_name}'.")
         cleanup_and_exit(0)
     else:
         unexpected_msg_error(control_msg)
@@ -173,16 +171,14 @@ def handle_destroy_request(user_name: str) -> NoReturn:
 
     # noinspection PyUnboundLocalVariable
     if isinstance(control_msg, pl.PrivleapControlServerOkMsg):
-        print("Comm socket destroyed for user '" + user_name + "'.")
+        print(f"Comm socket destroyed for user '{user_name}'.")
         cleanup_and_exit(0)
     elif isinstance(control_msg, pl.PrivleapControlServerControlErrorMsg):
         generic_error(
             "privleapd encountered an error while destroying a comm "
-            "socket for user '"
-            + user_name
-            + "'!")
+            f"socket for user '{user_name}'!")
     elif isinstance(control_msg, pl.PrivleapControlServerNouserMsg):
-        print("Comm socket does not exist for user '" + user_name + "'.")
+        print(f"Comm socket does not exist for user '{user_name}'.")
         cleanup_and_exit(0)
     else:
         unexpected_msg_error(control_msg)

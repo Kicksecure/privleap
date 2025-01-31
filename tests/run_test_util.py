@@ -423,6 +423,19 @@ Command=echo 'stdout00'; 1>&2 echo 'stderr00'; echo 'stdout01'; 1>&2 echo 'stder
 
 [test-act-invalid-bash]
 Command=ahem, this will not work
+
+[test-act-target-user]
+Command=id
+TargetUser={PlTestGlobal.test_username}
+
+[test-act-target-group]
+Command=id
+TargetGroup={PlTestGlobal.test_username}
+
+[test-act-target-user-and-group]
+Command=id
+TargetUser={PlTestGlobal.test_username}
+TargetGroup=root
 """
     invalid_filename_test_config_file: str = """[test-act-invalid]
 Command=echo 'test-act-invalid'
@@ -490,8 +503,27 @@ Commandecho 'test-act-crash'
     test_act_grouprestrict_userpermit_unauthorized: bytes \
         = (b"ERROR: You are unauthorized to run action "
            + b"'test-act-grouprestrict-userpermit'.\n")
+    test_act_target_user: bytes \
+        = (b"uid=1002("
+           + PlTestGlobal.test_username_bytes
+           + b") gid=1002("
+           + PlTestGlobal.test_username_bytes
+           + b") groups=1002("
+           + PlTestGlobal.test_username_bytes
+           + b"),0(root)\n")
+    test_act_target_group: bytes \
+        = (b"uid=0(root) gid=1002("
+           + PlTestGlobal.test_username_bytes
+           + b") groups=1002("
+           + PlTestGlobal.test_username_bytes
+           + b"),0(root)\n")
+    test_act_target_user_and_group: bytes \
+        = (b"uid=1002("
+           + PlTestGlobal.test_username_bytes
+           + b") gid=0(root) groups=0(root)\n")
+    # noinspection SpellCheckingInspection
     bad_config_file_lines: list[str] = [
-        "parse_config_files: CRITICAL: Failed to parse config file "
+        "parse_config_files: CRITICAL: Failed to load config file "
         + "'/etc/privleap/conf.d/crash.conf'!\n",
         "Traceback (most recent call last):\n",
         "ValueError: Invalid config line 'Commandecho 'test-act-crash''\n"
@@ -593,23 +625,21 @@ Commandecho 'test-act-crash'
         "Traceback (most recent call last):\n",
         "ValueError: Invalid message type 'BOB' for socket\n"
     ]
-    send_nonexistent_signal_and_bail_lines: list[str] = [
-        "lookup_desired_action: WARNING: Could not find action 'nonexistent'!\n",
-        "send_msg_safe: ERROR: Could not send 'UNAUTHORIZED'\n",
-        "BrokenPipeError: [Errno 32] Broken pipe\n"
+    send_nonexistent_signal_and_bail_lines_part1: list[str] = [
+        "auth_signal_request: WARNING: Could not find action 'nonexistent'\n",
     ]
-    send_userrestrict_signal_and_bail_lines: list[str] = [
-        "authenticate_user: WARNING: User is not authorized to run action "
-        + "'test-act-userrestrict'!\n",
+    unauthorized_broken_pipe_lines: list[str] = [
         "send_msg_safe: ERROR: Could not send 'UNAUTHORIZED'\n",
         "Traceback (most recent call last):\n",
         "BrokenPipeError: [Errno 32] Broken pipe\n"
     ]
-    send_grouprestrict_signal_and_bail_lines: list[str] = [
-        "authenticate_user: WARNING: User is not in a group authorized to run "
-        + "action 'test-act-grouprestrict'!\n",
-        "send_msg_safe: ERROR: Could not send 'UNAUTHORIZED'\n",
-        "BrokenPipeError: [Errno 32] Broken pipe\n"
+    send_userrestrict_signal_and_bail_lines_part1: list[str] = [
+        "auth_signal_request: WARNING: User is not authorized to run action "
+        + "'test-act-userrestrict'\n",
+    ]
+    send_grouprestrict_signal_and_bail_lines_part1: list[str] = [
+        "auth_signal_request: WARNING: User is not in a group authorized to run "
+        + "action 'test-act-grouprestrict'\n",
     ]
     send_invalid_bash_signal_lines: list[str] = [
         "handle_comm_session: INFO: Triggered action 'test-act-invalid-bash'\n",

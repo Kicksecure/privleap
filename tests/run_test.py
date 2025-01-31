@@ -28,6 +28,7 @@ import logging
 import subprocess
 import shutil
 import socket
+import time
 from pathlib import Path
 from typing import NoReturn, Tuple, IO
 from collections.abc import Callable
@@ -445,6 +446,26 @@ def run_leaprun_tests() -> None:
         "test-act-grouprestrict-userpermit"],
         exit_code = 1,
         stderr_data = PlTestData.test_act_grouprestrict_userpermit_unauthorized)
+    # ---
+    leaprun_assert_command(["sudo", "-u", PlTestGlobal.test_username, "leaprun",
+        "test-act-target-user"],
+        exit_code = 0,
+        stdout_data = PlTestData.test_act_target_user)
+    # ---
+    leaprun_assert_command(["leapctl", "--create", "root"],
+        exit_code = 0,
+        stdout_data = PlTestData.root_socket_created)
+    leaprun_assert_command(["leaprun", "test-act-target-group"],
+        exit_code = 0,
+        stdout_data = PlTestData.test_act_target_group)
+    leaprun_assert_command(["leapctl", "--destroy", "root"],
+        exit_code = 0,
+        stdout_data = PlTestData.root_socket_destroyed)
+    # ---
+    leaprun_assert_command(["sudo", "-u", PlTestGlobal.test_username, "leaprun",
+        "test-act-target-user-and-group"],
+        exit_code = 0,
+        stdout_data = PlTestData.test_act_target_user_and_group)
     # ---
     leaprun_assert_command(["sudo", "-u", PlTestGlobal.test_username, "leaprun",
         "test-act-free"],
@@ -916,9 +937,20 @@ def privleapd_send_nonexistent_signal_and_bail_test(bogus: str) -> bool:
             PlTestGlobal.test_username)
         comm_session.send_msg(pl.PrivleapCommClientSignalMsg("nonexistent"))
         comm_session.close_session()
+        part1_passed: bool = False
+        part2_passed: bool = False
         if util.compare_privleapd_stdout(
-            PlTestData.send_nonexistent_signal_and_bail_lines,
+            PlTestData.send_nonexistent_signal_and_bail_lines_part1,
             quiet = i != 19):
+            part1_passed = True
+        # privleapd waits about 3 seconds before sending the UNAUTHORIZED
+        # message for security reasons
+        time.sleep(3)
+        if util.compare_privleapd_stdout(
+            PlTestData.unauthorized_broken_pipe_lines,
+            quiet = i != 19):
+            part2_passed = True
+        if part1_passed and part2_passed:
             return True
     return False
 
@@ -940,9 +972,20 @@ def privleapd_send_userrestrict_signal_and_bail_test(bogus: str) -> bool:
         comm_session.send_msg(pl.PrivleapCommClientSignalMsg(
             "test-act-userrestrict"))
         comm_session.close_session()
+        part1_passed: bool = False
+        part2_passed: bool = False
         if util.compare_privleapd_stdout(
-            PlTestData.send_userrestrict_signal_and_bail_lines,
+            PlTestData.send_userrestrict_signal_and_bail_lines_part1,
             quiet = i != 19):
+            part1_passed = True
+        # privleapd waits about 3 seconds before sending the UNAUTHORIZED
+        # message for security reasons
+        time.sleep(3)
+        if util.compare_privleapd_stdout(
+            PlTestData.unauthorized_broken_pipe_lines,
+            quiet = i != 19):
+            part2_passed = True
+        if part1_passed and part2_passed:
             return True
     return False
 
@@ -964,9 +1007,20 @@ def privleapd_send_grouprestrict_signal_and_bail_test(bogus: str) -> bool:
         comm_session.send_msg(pl.PrivleapCommClientSignalMsg(
             "test-act-grouprestrict"))
         comm_session.close_session()
+        part1_passed: bool = False
+        part2_passed: bool = False
         if util.compare_privleapd_stdout(
-            PlTestData.send_grouprestrict_signal_and_bail_lines,
+            PlTestData.send_grouprestrict_signal_and_bail_lines_part1,
             quiet = i != 19):
+            part1_passed = True
+        # privleapd waits about 3 seconds before sending the UNAUTHORIZED
+        # message for security reasons
+        time.sleep(3)
+        if util.compare_privleapd_stdout(
+            PlTestData.unauthorized_broken_pipe_lines,
+            quiet = i != 19):
+            part2_passed = True
+        if part1_passed and part2_passed:
             return True
     return False
 
@@ -1245,8 +1299,8 @@ def print_result_summary() -> None:
 |         END PRIVLEAP TEST         |
 -------------------------------------
 """, leapctl_asserts_failed + leapctl_asserts_passed,
-    leaprun_asserts_passed,
-    leaprun_asserts_failed,
+    leapctl_asserts_passed,
+    leapctl_asserts_failed,
     leaprun_asserts_failed + leaprun_asserts_passed,
     leaprun_asserts_passed,
     leaprun_asserts_failed,
