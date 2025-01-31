@@ -73,6 +73,10 @@ own privleap client or server, this should give you the information you need.
 
 The recommended way to run privleap's regression tests is with autopkgtest. You
 will need a Debian 12 machine to build the privleap package and run the tests.
+Note that running the tests directly on a VM or bare metal hardware is not
+supported, as the test results may vary depending on the environment the tests
+are run in. autopkgtest ensures a consistent environment to prevent this from
+being a problem.
 
 * Install `mmdebstrap`, `debhelper`, `python3`, and `autopkgtest` on
   your machine.
