@@ -1,3 +1,22 @@
+commit 1d52d0e33cb5bd850e06c7cb211979379060beaa
+Merge: ec31cc1 6b87a13
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Fri Jan 31 14:45:47 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit 6b87a132d480c695874fe7e3c9e62aae30098f13
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Thu Jan 30 23:19:24 2025 -0600
+
+    More readability and security improvements, remove obsolete test plan file
+
+commit ec31cc180f4d9787779a0ad27f0168040652a76f
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Thu Jan 30 16:43:51 2025 +0000
+
+    bumped changelog version
+
 commit b053c19918f936036c5c0d969f6857bedc4cbb5c
 Merge: 5cbeeb9 28a4f89
 Author: Patrick Schleizer <adrelanos@whonix.org>
