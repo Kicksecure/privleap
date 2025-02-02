@@ -420,6 +420,11 @@ Command=echo 'test-act-grouppermit-userpermit'
 AuthorizedUser={PlTestGlobal.test_username}
 AuthorizedGroup={PlTestGlobal.test_username}
 
+# Not all groups have a corresponding username, this tests that edge case
+[test-act-sudopermit]
+Command=echo 'test-act-sudopermit'
+AuthorizedGroup=sudo
+
 [test-act-exit240]
 Command=echo 'test-act-exit240'; exit 240
 

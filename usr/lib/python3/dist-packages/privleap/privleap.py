@@ -835,7 +835,7 @@ class PrivleapAction:
             "target_group": target_group }.items():
             if value is not None:
                 orig_value = value
-                value = PrivleapCommon.normalize_user_id(value)
+                value = PrivleapCommon.normalize_group_id(value)
                 if value is None:
                     raise ValueError(f"Group '{orig_value}' specified by field "
                         f"'{key}' does not exist!")

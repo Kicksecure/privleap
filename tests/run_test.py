@@ -545,6 +545,11 @@ def run_leaprun_tests() -> None:
         stdout_data = b"test-act-grouppermit-userpermit\n")
     # ---
     leaprun_assert_command(["sudo", "-u", PlTestGlobal.test_username, "leaprun",
+        "test-act-sudopermit"],
+        exit_code = 0,
+        stdout_data = b"test-act-sudopermit\n")
+    # ---
+    leaprun_assert_command(["sudo", "-u", PlTestGlobal.test_username, "leaprun",
         "test-act-exit240"],
         exit_code = 240,
         stdout_data = b"test-act-exit240\n")
