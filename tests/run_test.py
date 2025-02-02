@@ -458,6 +458,10 @@ def run_leaprun_tests() -> None:
     leaprun_assert_command(["leaprun", "test-act-target-group"],
         exit_code = 0,
         stdout_data = PlTestData.test_act_target_group)
+    # ---
+    leaprun_assert_command(["leaprun", "test-act-userrestrict"],
+        exit_code = 0,
+        stdout_data = b"test-act-userrestrict\n")
     leaprun_assert_command(["leapctl", "--destroy", "root"],
         exit_code = 0,
         stdout_data = PlTestData.root_socket_destroyed)

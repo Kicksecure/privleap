@@ -307,6 +307,10 @@ def authorize_user(action: pl.PrivleapAction,
         # User doesn't exist? This should never happen but you never know...
         return PrivleapdAuthStatus.USER_MISSING
 
+    if pwd.getpwnam(comm_session.user_name).pw_uid == 0:
+        # Root account, automatically grant access to everything
+        return PrivleapdAuthStatus.AUTHORIZED
+
     if action.auth_user is not None:
         # Action exists but can only be run by certain users.
         if action.auth_user != comm_session.user_name:
