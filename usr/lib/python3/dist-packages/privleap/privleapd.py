@@ -80,33 +80,35 @@ def handle_control_create_msg(control_session: pl.PrivleapSession,
     """
 
     assert control_msg.user_name is not None
-    if not pl.PrivleapCommon.ensure_user_exists(control_msg.user_name):
+    user_name: str | None = pl.PrivleapCommon.normalize_user_id(
+        control_msg.user_name)
+    if user_name is None:
         logging.warning("User '%s' does not exist", control_msg.user_name)
         send_msg_safe(
             control_session, pl.PrivleapControlServerControlErrorMsg())
         return
 
     for sock in PrivleapdGlobal.socket_list:
-        if sock.user_name == control_msg.user_name:
+        if sock.user_name == user_name:
             # User already has an open socket
             logging.info("Handled CREATE message for user '%s', socket already "
-                "exists", control_msg.user_name)
+                "exists", user_name)
             send_msg_safe(
                 control_session, pl.PrivleapControlServerExistsMsg())
             return
 
     try:
         comm_socket: pl.PrivleapSocket = pl.PrivleapSocket(
-            pl.PrivleapSocketType.COMMUNICATION, control_msg.user_name)
+            pl.PrivleapSocketType.COMMUNICATION, user_name)
         PrivleapdGlobal.socket_list.append(comm_socket)
         logging.info("Handled CREATE message for user '%s', socket created",
-            control_msg.user_name)
+            user_name)
         send_msg_safe(
             control_session, pl.PrivleapControlServerOkMsg())
         return
     except Exception as e:
         logging.error("Failed to create socket for user '%s'!",
-            control_msg.user_name, exc_info = e)
+            user_name, exc_info = e)
         send_msg_safe(
             control_session, pl.PrivleapControlServerControlErrorMsg())
         return
@@ -117,26 +119,30 @@ def handle_control_destroy_msg(control_session: pl.PrivleapSession,
     Handles a DESTROY control message from the client.
     """
 
-    # We intentionally do not check that the user exists here, so that if a user
-    # has a comm socket in existence, but also has been deleted from the system,
-    # the comm socket can still be cleaned up.
+    # We intentionally do not require that the user exists here, so that if a
+    # user has a comm socket in existence, but also has been deleted from the
+    # system, the comm socket can still be cleaned up.
     #
     # We don't have to validate the username since the
     # PrivleapControlClientDestroyMsg constructor does this for us already.
     assert control_msg.user_name is not None
     remove_sock_idx: int | None = None
 
-    if control_msg.user_name in PrivleapdGlobal.persistent_user_list:
+    user_name: str | None = pl.PrivleapCommon.normalize_user_id(
+        control_msg.user_name)
+    if user_name is None:
+        user_name = control_msg.user_name
+    if user_name in PrivleapdGlobal.persistent_user_list:
         logging.info("Handled DESTROY message for user '%s', user is "
-            "persistent, so socket not destroyed", control_msg.user_name)
+            "persistent, so socket not destroyed", user_name)
         send_msg_safe(
             control_session, pl.PrivleapControlServerPersistentUserMsg())
         return
 
     for sock_idx, sock in enumerate(PrivleapdGlobal.socket_list):
-        if sock.user_name == control_msg.user_name:
+        if sock.user_name == user_name:
             socket_path: Path = Path(pl.PrivleapCommon.comm_dir,
-                control_msg.user_name)
+                user_name)
             if socket_path.exists():
                 try:
                     socket_path.unlink()
@@ -157,14 +163,14 @@ def handle_control_destroy_msg(control_session: pl.PrivleapSession,
         PrivleapdGlobal.socket_list.pop(cast(SupportsIndex,
             remove_sock_idx))
         logging.info("Handled DESTROY message for user '%s', socket destroyed",
-            control_msg.user_name)
+            user_name)
         send_msg_safe(
             control_session, pl.PrivleapControlServerOkMsg())
         return
 
     # remove_sock_idx is None.
     logging.info("Handled DESTROY message for user '%s', socket did not exist",
-        control_msg.user_name)
+        user_name)
     send_msg_safe(
         control_session, pl.PrivleapControlServerNouserMsg())
     return
@@ -312,26 +318,27 @@ def authorize_user(action: pl.PrivleapAction,
     assert action.action_name is not None
     assert comm_session.user_name is not None
 
-    if not pl.PrivleapCommon.ensure_user_exists(comm_session.user_name):
+    user_name = pl.PrivleapCommon.normalize_user_id(comm_session.user_name)
+    if user_name is None:
         # User doesn't exist? This should never happen but you never know...
         return PrivleapdAuthStatus.USER_MISSING
 
-    if pwd.getpwnam(comm_session.user_name).pw_uid == 0:
+    if pwd.getpwnam(user_name).pw_uid == 0:
         # Root account, automatically grant access to everything
         return PrivleapdAuthStatus.AUTHORIZED
 
     if action.auth_user is not None:
         # Action exists but can only be run by certain users.
-        if action.auth_user != comm_session.user_name:
+        if action.auth_user != user_name:
             return PrivleapdAuthStatus.USER_UNAUTHORIZED
 
     if action.auth_group is not None:
         # Action exists but can only be run by certain groups.
         # We need to get the list of groups this user is a member of to
         # determine whether they are authorized or not.
-        user_gid: int = pwd.getpwnam(comm_session.user_name).pw_gid
+        user_gid: int = pwd.getpwnam(user_name).pw_gid
         group_list: list[str] = [grp.getgrgid(gid).gr_name \
-            for gid in os.getgrouplist(comm_session.user_name, user_gid)]
+            for gid in os.getgrouplist(user_name, user_gid)]
         found_matching_group: bool = False
         for group in group_list:
             if group == action.auth_group:
@@ -577,19 +584,21 @@ def parse_config_files() -> None:
             continue
 
         try:
-            with (open(str(config_file), "r", encoding = "utf-8") as f):
+            with open(str(config_file), "r", encoding = "utf-8") as f:
                 action_arr: list[pl.PrivleapAction]
                 persistent_user_arr: list[str]
                 action_arr, persistent_user_arr \
                     = pl.PrivleapCommon.parse_config_file(f.read())
-            for item in action_arr:
-                if item not in PrivleapdGlobal.action_list:
-                    PrivleapdGlobal.action_list.append(item)
+            for action_item in action_arr:
+                if action_item not in PrivleapdGlobal.action_list:
+                    PrivleapdGlobal.action_list.append(action_item)
                 else:
-                    raise ValueError(f"Duplicate action '{item}' found!")
-            for item in persistent_user_arr:
-                if item not in PrivleapdGlobal.persistent_user_list:
-                    PrivleapdGlobal.persistent_user_list.append(item)
+                    raise ValueError(f"Duplicate action '{action_item}' found!")
+            for persistent_user_item in persistent_user_arr:
+                if persistent_user_item not in \
+                    PrivleapdGlobal.persistent_user_list:
+                    PrivleapdGlobal.persistent_user_list.append(
+                        persistent_user_item)
                 # It isn't an error for duplicate persistent users to be
                 # defined, we just skip over the duplicates.
         except Exception as e:
