@@ -180,6 +180,12 @@ def handle_destroy_request(user_name: str) -> NoReturn:
     elif isinstance(control_msg, pl.PrivleapControlServerNouserMsg):
         print(f"Comm socket does not exist for user '{user_name}'.")
         cleanup_and_exit(0)
+    elif isinstance(control_msg, pl.PrivleapControlServerPersistentUserMsg):
+        print(f"Cannot destroy socket for persistent user '{user_name}'.")
+        # It is not an error to try to destroy a socket for a persistent user,
+        # since this may legitimately happen if someone logs in as a user that
+        # happens to be persistent in privleap's config, and then logs out.
+        cleanup_and_exit(0)
     else:
         unexpected_msg_error(control_msg)
 

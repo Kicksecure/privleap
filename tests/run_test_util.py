@@ -381,6 +381,9 @@ class PlTestData:
     primary_test_config_file: str = f"""[test-act-free]
 Command=echo 'test-act-free'
 
+[persistent-users]
+User=sys
+
 [test-act-userrestrict]
 Command=echo 'test-act-userrestrict'
 AuthorizedUser=sys
@@ -402,6 +405,10 @@ AuthorizedGroup=sys
 [test-act-userpermit]
 Command=echo 'test-act-userpermit'
 AuthorizedUser={PlTestGlobal.test_username}
+
+[persistent-users]
+User=bin
+User=uucp
 
 [test-act-grouppermit]
 Command=echo 'test-act-grouppermit'
@@ -436,6 +443,9 @@ TargetGroup={PlTestGlobal.test_username}
 Command=id
 TargetUser={PlTestGlobal.test_username}
 TargetGroup=root
+
+[persistent-users]
+User=messagebus
 """
     invalid_filename_test_config_file: str = """[test-act-invalid]
 Command=echo 'test-act-invalid'

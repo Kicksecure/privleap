@@ -282,6 +282,10 @@ def run_leapctl_tests() -> None:
         exit_code = 0,
         stdout_data = PlTestData.root_socket_destroyed)
     # ---
+    leapctl_assert_command(["leapctl", "--destroy", "sys"],
+        exit_code = 0,
+        stdout_data = b"Cannot destroy socket for persistent user 'sys'.\n")
+    # ---
     util.stop_privleapd_subprocess()
     leapctl_assert_function(leapctl_server_error_test, "",
         "Test leapctl against fake server that always errors out")
@@ -545,6 +549,25 @@ def write_bad_config_file(bogus: str) -> bool:
             return True
     except Exception:
         return False
+
+def privleapd_check_persistent_users_test(bogus: str) -> bool:
+    """
+    Ensures all persistent users configured in privleapd's test configuration
+      have comm sockets created automatically.
+    """
+
+    if bogus != "":
+        return False
+    # This is duplicated from data in primary_test_config_file in
+    # run_test_util.py, since part of the test in that config file is to ensure
+    # the config parser can handle multiple [persistent-users] sections, making
+    # it difficult to store the list of persistent users in a central location
+    # that everything else uses.
+    persistent_user_list: list[str] = ["sys", "bin", "uucp", "messagebus"]
+    for user in persistent_user_list:
+        if not Path("/run/privleapd/comm", user).exists():
+            return False
+    return True
 
 def privleapd_bad_config_file_test(bogus: str) -> bool:
     """
@@ -1145,6 +1168,9 @@ def run_privleapd_tests() -> None:
 
     # ---
     util.start_privleapd_subprocess()
+    privleapd_assert_function(privleapd_check_persistent_users_test, "",
+        "Ensure all configured persistent users have comm sockets")
+    # ---
     privleapd_assert_command(["/usr/bin/privleapd"],
         exit_code = 1,
         stderr_data = PlTestData.privleapd_verify_not_running_twice_fail)

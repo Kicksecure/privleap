@@ -79,6 +79,10 @@ clients must be able to understand:
   username specified in the message already has a communication socket open.
 * `NOUSER` - The first client-sent message was a `DESTROY` message, but the
   username specified in the message has no communication socket open.
+* `PERSISTENT_USER` - The first client-sent message was a `DESTROY` message, but
+  the username specified in the message is a "persistent user" and cannot have
+  their socket destroyed. (See /etc/privleapd/conf.d/README for more information
+  on persistent users.)
 
 Regardless of the reply, `privleapd` will close the session immediately after
 sending one of the above messages, and will ignore all but the first message

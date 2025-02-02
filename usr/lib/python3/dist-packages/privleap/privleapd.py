@@ -41,6 +41,7 @@ class PrivleapdGlobal:
 
     config_dir: Path = Path("/etc/privleap/conf.d")
     action_list: list[pl.PrivleapAction] = []
+    persistent_user_list: list[str] = []
     socket_list: list[pl.PrivleapSocket] = []
     pid_file_path: Path = Path(pl.PrivleapCommon.state_dir, "pid")
     in_test_mode = False
@@ -124,6 +125,14 @@ def handle_control_destroy_msg(control_session: pl.PrivleapSession,
     # PrivleapControlClientDestroyMsg constructor does this for us already.
     assert control_msg.user_name is not None
     remove_sock_idx: int | None = None
+
+    if control_msg.user_name in PrivleapdGlobal.persistent_user_list:
+        logging.info("Handled DESTROY message for user '%s', user is "
+            "persistent, so socket not destroyed", control_msg.user_name)
+        send_msg_safe(
+            control_session, pl.PrivleapControlServerPersistentUserMsg())
+        return
+
     for sock_idx, sock in enumerate(PrivleapdGlobal.socket_list):
         if sock.user_name == control_msg.user_name:
             socket_path: Path = Path(pl.PrivleapCommon.comm_dir,
@@ -568,10 +577,21 @@ def parse_config_files() -> None:
             continue
 
         try:
-            with open(str(config_file), "r", encoding = "utf-8") as f:
-                action_arr: list[pl.PrivleapAction] \
+            with (open(str(config_file), "r", encoding = "utf-8") as f):
+                action_arr: list[pl.PrivleapAction]
+                persistent_user_arr: list[str]
+                action_arr, persistent_user_arr \
                     = pl.PrivleapCommon.parse_config_file(f.read())
-            PrivleapdGlobal.action_list.extend(action_arr)
+            for item in action_arr:
+                if item not in PrivleapdGlobal.action_list:
+                    PrivleapdGlobal.action_list.append(item)
+                else:
+                    raise ValueError(f"Duplicate action '{item}' found!")
+            for item in persistent_user_arr:
+                if item not in PrivleapdGlobal.persistent_user_list:
+                    PrivleapdGlobal.persistent_user_list.append(item)
+                # It isn't an error for duplicate persistent users to be
+                # defined, we just skip over the duplicates.
         except Exception as e:
             logging.critical("Failed to load config file '%s'!",
                 str(config_file), exc_info = e)
@@ -626,6 +646,30 @@ def open_control_socket() -> None:
 
     PrivleapdGlobal.socket_list.append(control_socket)
 
+def open_persistent_comm_sockets() -> None:
+    """
+    Opens comm sockets for persistent users. Privleapd will treat these sockets
+      like normal sockets, but opens them without needing a privileged client to
+      request their creation, and does NOT allow a privileged client to destroy
+      them.
+    """
+    for user_name in PrivleapdGlobal.persistent_user_list:
+        try:
+            comm_socket: pl.PrivleapSocket = pl.PrivleapSocket(
+                pl.PrivleapSocketType.COMMUNICATION, user_name)
+            PrivleapdGlobal.socket_list.append(comm_socket)
+            # We intentionally don't log the creation of persistent user sockets
+            # since for one, doing so would needlessly clutter the system logs
+            # (the list of persistent users can be determined by just looking
+            # at privleap's config), and for two, privleap doesn't output log
+            # information during early startup unless something is wrong. The
+            # test suite depends on this behavior, so it's not something we want
+            # to break unless necessary.
+        except Exception as e:
+            logging.error("Failed to create persistent socket for user '%s'!",
+                user_name, exc_info = e)
+            return
+
 def main_loop() -> NoReturn:
     """
     Main processing loop of privleapd. This loop will watch for and accept
@@ -677,6 +721,7 @@ def main() -> NoReturn:
     parse_config_files()
     populate_state_dir()
     open_control_socket()
+    open_persistent_comm_sockets()
     main_loop()
 
 if __name__ == "__main__":
