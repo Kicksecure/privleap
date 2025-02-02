@@ -130,9 +130,9 @@ def handle_response() -> NoReturn:
     assert LeaprunGlobal.signal_name is not None
     try:
         comm_msg: pl.PrivleapMsg \
-                  | pl.PrivleapCommServerResultStdoutMsg \
-                  | pl.PrivleapCommServerResultStderrMsg \
-                  | pl.PrivleapCommServerResultExitcodeMsg \
+            | pl.PrivleapCommServerResultStdoutMsg \
+            | pl.PrivleapCommServerResultStderrMsg \
+            | pl.PrivleapCommServerResultExitcodeMsg \
             = LeaprunGlobal.comm_session.get_msg()
     except Exception:
         generic_error("privleapd didn't return a valid response!")
@@ -152,8 +152,6 @@ def handle_response() -> NoReturn:
                     ("Action triggered, but privleapd closed the connection "
                      "before sending all output!"))
 
-            # Useless asserts needed to get PyCharm to understand what's
-            # happening here
             # noinspection PyUnboundLocalVariable
             if isinstance(comm_msg, pl.PrivleapCommServerResultStdoutMsg):
                 # noinspection PyUnboundLocalVariable

@@ -138,6 +138,37 @@ def leapctl_assert_function(target_function: Callable[[str], bool],
         leapctl_asserts_failed += 1
         PlTestGlobal.all_asserts_passed = False
 
+def leapctl_create_deleteme_user(bogus: str) -> bool:
+    """
+    Creates a user account for testing deleting a comm socket for a user that
+      doesn't exist anymore.
+    """
+
+    if bogus != "":
+        return False
+    try:
+        subprocess.run(["useradd", "-m", "deleteme"],
+            check = True)
+    except Exception:
+        return False
+    return True
+
+def leapctl_delete_deleteme_user(bogus: str) -> bool:
+    """
+    Deletes a user account for testing deleting a comm socket for a user that
+      doesn't exist anymore.
+    """
+
+    if bogus != "":
+        return False
+    try:
+        subprocess.run(["deluser", "deleteme"],
+            check = True)
+    except Exception:
+        return False
+    return True
+
+
 def leapctl_server_error_test(bogus: str) -> bool:
     """
     Tests leapctl against a fake server that always errors out regardless of
@@ -206,8 +237,8 @@ def run_leapctl_tests() -> None:
         stderr_data = PlTestData.specified_user_missing)
     # ---
     leapctl_assert_command(["leapctl", "--destroy", "nonexistent"],
-        exit_code = 1,
-        stderr_data = PlTestData.specified_user_missing)
+        exit_code = 0,
+        stdout_data = PlTestData.nonexistent_socket_missing)
     # ---
     leapctl_assert_command(["leapctl", "--create", "_apt"],
         exit_code = 0,
@@ -272,6 +303,13 @@ def run_leapctl_tests() -> None:
         exit_code = 0,
         stdout_data = PlTestData.root_socket_destroyed)
     # ---
+    leapctl_assert_command(["leapctl", "--create", "1"],
+        exit_code = 0,
+        stdout_data = b"Comm socket created for user 'daemon'.\n")
+    leapctl_assert_command(["leapctl", "--destroy", "1"],
+        exit_code = 0,
+        stdout_data = b"Comm socket destroyed for user 'daemon'.\n")
+    # ---
     leapctl_assert_command(["leapctl", "--create", "root"],
         exit_code = 0,
         stdout_data = PlTestData.root_socket_created)
@@ -285,6 +323,17 @@ def run_leapctl_tests() -> None:
     leapctl_assert_command(["leapctl", "--destroy", "sys"],
         exit_code = 0,
         stdout_data = b"Cannot destroy socket for persistent user 'sys'.\n")
+    # ---
+    leapctl_assert_function(leapctl_create_deleteme_user, "",
+        "Create user for deleted user socket destroy test")
+    leapctl_assert_command(["leapctl", "--create", "deleteme"],
+        exit_code = 0,
+        stdout_data = b"Comm socket created for user 'deleteme'.\n")
+    leapctl_assert_function(leapctl_delete_deleteme_user, "",
+        "Delete user for deleted user socket destroy test")
+    leapctl_assert_command(["leapctl", "--destroy", "deleteme"],
+        exit_code = 0,
+        stdout_data = b"Comm socket destroyed for user 'deleteme'.\n")
     # ---
     util.stop_privleapd_subprocess()
     leapctl_assert_function(leapctl_server_error_test, "",

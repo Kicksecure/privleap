@@ -174,9 +174,16 @@ def main() -> NoReturn:
         print_usage()
 
     assert control_user is not None
+    orig_control_user = control_user
     control_user = pl.PrivleapCommon.normalize_user_id(control_user)
+    # Allow a username that doesn't exist to be passed when using --destroy, so
+    # if a user is deleted before their comm socket is destroyed, the socket can
+    # be destroyed anyway.
     if control_user is None:
-        generic_error("Specified user does not exist.")
+        if control_action != "--destroy":
+            generic_error("Specified user does not exist.")
+        else:
+            control_user = orig_control_user
 
     start_control_session()
 

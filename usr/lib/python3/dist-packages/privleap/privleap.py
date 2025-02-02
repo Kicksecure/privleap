@@ -3,10 +3,12 @@
 # Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
 # See the file COPYING for copying conditions.
 
-# pylint: disable=too-few-public-methods
+# pylint: disable=too-few-public-methods,  too-many-lines
 # Rationale:
 #   too-few-public-methods: privleap's message handling design uses lots of
 #     small classes
+#   too-many-lines: Library is prohibitively difficult to split into pieces due
+#     to circular class references.
 
 """
 privleap.py - Backend library for privleap clients and servers.
@@ -18,10 +20,10 @@ import stat
 import pwd
 import grp
 import re
-from enum import Enum
 from io import StringIO
 from pathlib import Path
 from typing import Tuple
+from enum import Enum
 
 class PrivleapSocketType(Enum):
     """
@@ -967,8 +969,8 @@ class PrivleapCommon:
                         if config_val not in user_output_list:
                             user_output_list.append(config_val)
                     else:
-                        raise ValueError(f"User '{orig_config_val}' does not "
-                            "exist!")
+                        raise ValueError("Requested persistent user "
+                            f"'{orig_config_val}' does not exist!")
                 else:
                     raise ValueError(f"Unrecognized key '{config_key}' found")
             else:

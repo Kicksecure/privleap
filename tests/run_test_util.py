@@ -382,7 +382,8 @@ class PlTestData:
 Command=echo 'test-act-free'
 
 [persistent-users]
-User=sys
+# UID 3 = sys
+User=3
 
 [test-act-userrestrict]
 Command=echo 'test-act-userrestrict'
@@ -463,6 +464,8 @@ Commandecho 'test-act-crash'
         = b"ERROR: privleapd didn't return a valid response!\n"
     specified_user_missing: bytes \
         = b"ERROR: Specified user does not exist.\n"
+    nonexistent_socket_missing: bytes \
+        = b"Comm socket does not exist for user 'nonexistent'.\n"
     apt_socket_created: bytes \
         = b"Comm socket created for user '_apt'.\n"
     apt_socket_destroyed: bytes \
@@ -644,12 +647,12 @@ Commandecho 'test-act-crash'
         "BrokenPipeError: [Errno 32] Broken pipe\n"
     ]
     send_userrestrict_signal_and_bail_lines_part1: list[str] = [
-        "auth_signal_request: WARNING: User is not authorized to run action "
-        + "'test-act-userrestrict'\n",
+        f"auth_signal_request: WARNING: User '{PlTestGlobal.test_username}' is "
+        + "not authorized to run action 'test-act-userrestrict'\n",
     ]
     send_grouprestrict_signal_and_bail_lines_part1: list[str] = [
-        "auth_signal_request: WARNING: User is not in a group authorized to run "
-        + "action 'test-act-grouprestrict'\n",
+        f"auth_signal_request: WARNING: User '{PlTestGlobal.test_username}' is "
+        + "not in a group authorized to run action 'test-act-grouprestrict'\n",
     ]
     send_invalid_bash_signal_lines: list[str] = [
         "handle_comm_session: INFO: Triggered action 'test-act-invalid-bash'\n",
