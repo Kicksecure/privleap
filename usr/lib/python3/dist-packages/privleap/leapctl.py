@@ -14,8 +14,6 @@
 """leapctl.py - privleapd client for controlling available comm sockets."""
 
 import sys
-import re
-import pwd
 from typing import NoReturn
 
 # import privleap as pl
@@ -74,34 +72,6 @@ def unexpected_msg_error(control_msg: pl.PrivleapMsg) -> NoReturn:
         file=sys.stderr)
     print(control_msg.serialize(), file=sys.stderr)
     cleanup_and_exit(1)
-
-def normalize_username(user_id: str) -> str:
-    """
-    Normalizes and validates the user identity. This will convert a UID to a
-      username if needed.
-    """
-
-    uid_regex: re.Pattern[str] = re.compile(r"\d+")
-    user_name: str | None = None
-    if uid_regex.match(user_id):
-        user_uid: int = int(user_id)
-        try:
-            user_info: pwd.struct_passwd = pwd.getpwuid(user_uid)
-            user_name = user_info.pw_name
-        except Exception:
-            generic_error("Specified user does not exist.")
-    else:
-        user_name = user_id
-
-    if not pl.PrivleapCommon.validate_id(user_name,
-        pl.PrivleapValidateType.USER_GROUP_NAME):
-        generic_error(f"User name '{user_name}' is invalid!")
-
-    user_list: list[str] = [pw.pw_name for pw in pwd.getpwall()]
-    if not user_name in user_list:
-        generic_error("Specified user does not exist.")
-
-    return user_name
 
 def start_control_session() -> None:
     """
@@ -180,6 +150,12 @@ def handle_destroy_request(user_name: str) -> NoReturn:
     elif isinstance(control_msg, pl.PrivleapControlServerNouserMsg):
         print(f"Comm socket does not exist for user '{user_name}'.")
         cleanup_and_exit(0)
+    elif isinstance(control_msg, pl.PrivleapControlServerPersistentUserMsg):
+        print(f"Cannot destroy socket for persistent user '{user_name}'.")
+        # It is not an error to try to destroy a socket for a persistent user,
+        # since this may legitimately happen if someone logs in as a user that
+        # happens to be persistent in privleap's config, and then logs out.
+        cleanup_and_exit(0)
     else:
         unexpected_msg_error(control_msg)
 
@@ -192,12 +168,22 @@ def main() -> NoReturn:
         print_usage()
 
     control_action: str = sys.argv[1]
-    control_user: str = sys.argv[2]
+    control_user: str | None = sys.argv[2]
 
     if control_action not in ("--create", "--destroy"):
         print_usage()
 
-    control_user = normalize_username(control_user)
+    assert control_user is not None
+    orig_control_user = control_user
+    control_user = pl.PrivleapCommon.normalize_user_id(control_user)
+    # Allow a username that doesn't exist to be passed when using --destroy, so
+    # if a user is deleted before their comm socket is destroyed, the socket can
+    # be destroyed anyway.
+    if control_user is None:
+        if control_action != "--destroy":
+            generic_error("Specified user does not exist.")
+        else:
+            control_user = orig_control_user
 
     start_control_session()
 

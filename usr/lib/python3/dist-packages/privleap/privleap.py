@@ -3,10 +3,12 @@
 # Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
 # See the file COPYING for copying conditions.
 
-# pylint: disable=too-few-public-methods
+# pylint: disable=too-few-public-methods,  too-many-lines
 # Rationale:
 #   too-few-public-methods: privleap's message handling design uses lots of
 #     small classes
+#   too-many-lines: Library is prohibitively difficult to split into pieces due
+#     to circular class references.
 
 """
 privleap.py - Backend library for privleap clients and servers.
@@ -18,10 +20,10 @@ import stat
 import pwd
 import grp
 import re
-from enum import Enum
 from io import StringIO
 from pathlib import Path
 from typing import Tuple
+from enum import Enum
 
 class PrivleapSocketType(Enum):
     """
@@ -38,8 +40,9 @@ class PrivleapValidateType(Enum):
     """
 
     USER_GROUP_NAME = 1
-    CONFIG_FILE = 2
-    SIGNAL_NAME = 3
+    USER_GROUP_UID = 2
+    CONFIG_FILE = 3
+    SIGNAL_NAME = 4
 
 class PrivleapMsg:
     """
@@ -53,7 +56,7 @@ class PrivleapMsg:
         Outputs raw bytes for message.
         """
 
-        return b""
+        return self.name.encode("utf-8")
 
 class PrivleapControlClientCreateMsg(PrivleapMsg):
     """
@@ -108,9 +111,6 @@ class PrivleapControlServerOkMsg(PrivleapMsg):
 
     name = "OK"
 
-    def serialize(self) -> bytes:
-        return self.name.encode("utf-8")
-
 class PrivleapControlServerControlErrorMsg(PrivleapMsg):
     """
     Privleap message.
@@ -121,9 +121,6 @@ class PrivleapControlServerControlErrorMsg(PrivleapMsg):
     """
 
     name = "CONTROL_ERROR"
-
-    def serialize(self) -> bytes:
-        return self.name.encode("utf-8")
 
 class PrivleapControlServerExistsMsg(PrivleapMsg):
     """
@@ -137,9 +134,6 @@ class PrivleapControlServerExistsMsg(PrivleapMsg):
 
     name = "EXISTS"
 
-    def serialize(self) -> bytes:
-        return self.name.encode("utf-8")
-
 class PrivleapControlServerNouserMsg(PrivleapMsg):
     """
     Privleap message.
@@ -152,8 +146,18 @@ class PrivleapControlServerNouserMsg(PrivleapMsg):
 
     name = "NOUSER"
 
-    def serialize(self) -> bytes:
-        return self.name.encode("utf-8")
+class PrivleapControlServerPersistentUserMsg(PrivleapMsg):
+    """
+    Privleap message.
+
+    Sent from server to client.
+
+    Indicates that the requested destruction operation specified a user that
+      is configured as persistent, and thus cannot have their comm socket
+      destroyed.
+    """
+
+    name = "PERSISTENT_USER"
 
 class PrivleapCommClientSignalMsg(PrivleapMsg):
     """
@@ -186,9 +190,6 @@ class PrivleapCommServerTriggerMsg(PrivleapMsg):
 
     name = "TRIGGER"
 
-    def serialize(self) -> bytes:
-        return self.name.encode("utf-8")
-
 class PrivleapCommServerTriggerErrorMsg(PrivleapMsg):
     """
     Privleap message.
@@ -200,9 +201,6 @@ class PrivleapCommServerTriggerErrorMsg(PrivleapMsg):
     """
 
     name = "TRIGGER_ERROR"
-
-    def serialize(self) -> bytes:
-        return self.name.encode("utf-8")
 
 class PrivleapCommServerResultStdoutMsg(PrivleapMsg):
     """
@@ -271,9 +269,6 @@ class PrivleapCommServerUnauthorizedMsg(PrivleapMsg):
 
     name = "UNAUTHORIZED"
 
-    def serialize(self) -> bytes:
-        return self.name.encode("utf-8")
-
 class PrivleapSession:
     """
     A connection between a privleap server and client. Used to pass privleap
@@ -306,8 +301,11 @@ class PrivleapSession:
                 if session_info is None:
                     raise ValueError("session_info cannot be type 'None' if "
                         "creating a comm session.")
-                if not PrivleapCommon.ensure_user_exists(session_info):
-                    raise ValueError(f"User '{session_info}' does not exist.")
+                orig_session_info: str = session_info
+                session_info = PrivleapCommon.normalize_user_id(session_info)
+                if session_info is None:
+                    raise ValueError(f"User '{orig_session_info}' does not "
+                        "exist.")
 
                 self.user_name = session_info
                 socket_path = Path(PrivleapCommon.comm_dir, self.user_name)
@@ -322,9 +320,11 @@ class PrivleapSession:
             self.backend_socket.settimeout(0.1)
 
         elif isinstance(session_info, socket.socket):
-            if user_name is not None \
-                and not PrivleapCommon.ensure_user_exists(user_name):
-                raise ValueError(f"User '{user_name}' does not exist.")
+            if user_name is not None:
+                orig_user_name: str = user_name
+                user_name = PrivleapCommon.normalize_user_id(user_name)
+                if user_name is None:
+                    raise ValueError(f"User '{orig_user_name}' does not exist.")
 
             self.backend_socket = session_info
             self.user_name = user_name
@@ -599,6 +599,10 @@ class PrivleapSession:
                 self.__parse_msg_parameters(
                     recv_buf, str_count = 0, blob_at_end = False)
                 return PrivleapControlServerNouserMsg()
+            if msg_type_str == "PERSISTENT_USER":
+                self.__parse_msg_parameters(
+                    recv_buf, str_count = 0, blob_at_end = False)
+                return PrivleapControlServerPersistentUserMsg()
             raise ValueError(
                 f"Invalid message type '{msg_type_str}' for socket")
 
@@ -681,7 +685,8 @@ class PrivleapSession:
             if msg_obj_type not in (PrivleapControlServerOkMsg,
                 PrivleapControlServerControlErrorMsg,
                 PrivleapControlServerExistsMsg,
-                PrivleapControlServerNouserMsg):
+                PrivleapControlServerNouserMsg,
+                PrivleapControlServerPersistentUserMsg):
                 raise ValueError("Invalid message type for socket.")
         elif self.is_control_session and not self.is_server_side:
             if msg_obj_type not in (PrivleapControlClientCreateMsg,
@@ -741,8 +746,10 @@ class PrivleapSocket:
                 raise ValueError("user_name must be provided when using "
                     "PrivleapSocketType.COMMUNICATION")
 
-            if not PrivleapCommon.ensure_user_exists(user_name):
-                raise ValueError(f"User '{user_name}' does not exist.")
+            orig_user_name: str = user_name
+            user_name = PrivleapCommon.normalize_user_id(user_name)
+            if user_name is None:
+                raise ValueError(f"User '{orig_user_name}' does not exist.")
 
             try:
                 user_info: pwd.struct_passwd = pwd.getpwnam(user_name)
@@ -786,7 +793,7 @@ class PrivleapAction:
     A single action defined by privleap's configuration.
     """
 
-    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-arguments, too_many_branches
     # Rationale:
     #   too-many-arguments: This constructor loads configuration data, it's far
     #     easier to do all data assignment and validation at once (and arguably
@@ -794,15 +801,15 @@ class PrivleapAction:
     def __init__(self,
         action_name: str | None = None,
         action_command: str | None = None,
-        auth_user: str | None = None,
-        auth_group: str | None = None,
+        auth_users: list[str] | None = None,
+        auth_groups: list[str] | None = None,
         target_user: str | None = None,
         target_group: str | None = None):
 
         self.action_name: str | None = None
         self.action_command: str | None = None
-        self.auth_user: str | None = None
-        self.auth_group: str | None = None
+        self.auth_users: list[str] = []
+        self.auth_groups: list[str] = []
         self.target_user: str | None = None
         self.target_group: str | None = None
 
@@ -815,24 +822,43 @@ class PrivleapAction:
             action_name, PrivleapValidateType.SIGNAL_NAME):
             raise ValueError(f"Action name '{action_name}' is invalid")
 
-        for key, value in { "auth_user": auth_user,
-            "target_user": target_user}.items():
-            if value is not None and not PrivleapCommon.ensure_user_exists(
-                value):
-                raise ValueError(f"User '{value}' specified by field '{key}' "
-                    "does not exist!")
+        if auth_users is not None:
+            for raw_auth_user in auth_users:
+                auth_user: str | None = PrivleapCommon.normalize_user_id(
+                    raw_auth_user)
+                if auth_user is None:
+                    raise ValueError(f"User '{raw_auth_user}' specified by "
+                        f"field 'AuthorizedUsers' of action '{action_name}' "
+                        "does not exist!")
+                self.auth_users.append(auth_user)
 
-        for key, value in {"auth_group": auth_group,
-            "target_group": target_group }.items():
-            if value is not None and not PrivleapCommon.ensure_group_exists(
-                value):
-                raise ValueError(f"Group '{value}' specified by field '{key}' "
-                    "does not exist!")
+        if auth_groups is not None:
+            for raw_auth_group in auth_groups:
+                auth_group: str | None = PrivleapCommon.normalize_group_id(
+                    raw_auth_group)
+                if auth_group is None:
+                    raise ValueError(f"Group '{raw_auth_group}' specified by "
+                        f"field 'AuthorizedGroups' of action '{action_name}' "
+                        "does not exist!")
+                self.auth_groups.append(auth_group)
+
+        if target_user is not None:
+            orig_target_user: str = target_user
+            target_user = PrivleapCommon.normalize_user_id(target_user)
+            if target_user is None:
+                raise ValueError(f"User '{orig_target_user}' specified by "
+                f"field 'TargetUser' of action '{action_name}' does not exist!")
+
+        if target_group is not None:
+            orig_target_group: str = target_group
+            target_group = PrivleapCommon.normalize_user_id(target_group)
+            if target_group is None:
+                raise ValueError(f"User '{orig_target_group}' specified by "
+                f"field 'TargetGroup' of action '{action_name}' does not "
+                "exist!")
 
         self.action_name = action_name
         self.action_command = action_command
-        self.auth_user = auth_user
-        self.auth_group = auth_group
         self.target_user = target_user
         self.target_group = target_group
 
@@ -848,6 +874,8 @@ class PrivleapCommon:
         = re.compile(r"[-A-Za-z0-9_./]+\.conf\Z")
     user_name_regex: re.Pattern[str] \
         = re.compile(r"[a-z_][-a-z0-9_]*\$?\Z")
+    uid_regex: re.Pattern[str] \
+        = re.compile(r"[0-9]+")
     signal_name_regex: re.Pattern[str] \
         = re.compile(r"[-A-Za-z0-9_.]+\Z")
 
@@ -865,6 +893,9 @@ class PrivleapCommon:
         if validate_type is PrivleapValidateType.USER_GROUP_NAME:
             if PrivleapCommon.user_name_regex.match(id_string):
                 return True
+        elif validate_type is PrivleapValidateType.USER_GROUP_UID:
+            if PrivleapCommon.uid_regex.match(id_string):
+                return True
         elif validate_type is PrivleapValidateType.CONFIG_FILE:
             if PrivleapCommon.config_file_regex.match(id_string):
                 return True
@@ -875,26 +906,29 @@ class PrivleapCommon:
         return False
 
     @staticmethod
-    # pylint: disable=too-many-locals, too-many-branches
+    # pylint: disable=too-many-locals, too-many-branches, too-many-statements
     # Rationale:
-    #   too-many-locals, too-many-branches: This parses configuration data,
-    #     splitting it up would be unreasonable and make it more difficult to
-    #     read. Each section of the config file has quite a bit of data, so
-    #     parsing is non-trivial.
-    def parse_config_file(config_data: str) -> list[PrivleapAction]:
+    #   too-many-locals, too-many-branches, too-many-statements: This method
+    #     parses configuration data, splitting it up would be unreasonable and
+    #     make it more difficult to read. Each section of the config file has
+    #     quite a bit of data, so parsing is non-trivial.
+    def parse_config_file(config_data: str) \
+        -> Tuple[list[PrivleapAction], list[str]]:
         """
         Parses the data from a privleap configuration file and returns all
         privleap actions defined therein.
         """
 
-        output_list: list[PrivleapAction] = []
+        action_output_list: list[PrivleapAction] = []
+        user_output_list: list[str] = []
+        in_persistent_users_section = False
         conf_stream: StringIO = StringIO(config_data)
         detect_comment_regex: re.Pattern[str] = re.compile(r"\s*#")
         detect_header_regex: re.Pattern[str] = re.compile(r"\[.*]\Z")
         current_action_name: str | None = None
         current_action_command: str | None = None
-        current_auth_user: str | None = None
-        current_auth_group: str | None = None
+        current_auth_users: list[str] = []
+        current_auth_groups: list[str] = []
         current_target_user: str | None = None
         current_target_group: str | None = None
         first_header_parsed: bool = False
@@ -908,24 +942,31 @@ class PrivleapCommon:
 
             if detect_header_regex.match(line):
                 if first_header_parsed:
-                    output_list.append(PrivleapAction(current_action_name,
-                        current_action_command,
-                        current_auth_user,
-                        current_auth_group,
-                        current_target_user,
-                        current_target_group))
-                    # We don't need to nullify current_action_name since we set
-                    # its value below.
-                    # current_action_name = None
-                    current_action_command = None
-                    current_auth_user = None
-                    current_auth_group = None
-                    current_target_user = None
-                    current_target_group = None
+                    if not in_persistent_users_section:
+                        action_output_list.append(PrivleapAction(
+                            current_action_name,
+                            current_action_command,
+                            current_auth_users,
+                            current_auth_groups,
+                            current_target_user,
+                            current_target_group))
+                        # We don't need to nullify current_action_name since we
+                        # set its value below.
+                        # current_action_name = None
+                        current_action_command = None
+                        current_auth_users = []
+                        current_auth_groups = []
+                        current_target_user = None
+                        current_target_group = None
                 else:
                     first_header_parsed = True
 
-                current_action_name = line[1:len(line)-1]
+                current_header_name: str = line[1:len(line)-1]
+                if current_header_name != "persistent-users":
+                    current_action_name = current_header_name
+                    in_persistent_users_section = False
+                else:
+                    in_persistent_users_section = True
                 continue
 
             line_parts: list[str] = line.split('=', maxsplit = 1)
@@ -933,54 +974,84 @@ class PrivleapCommon:
                 raise ValueError(f"Invalid config line '{line}'")
 
             config_key: str = line_parts[0]
-            config_val: str = line_parts[1]
-            if config_key == "Command":
-                current_action_command = config_val
-            elif config_key == "AuthorizedUser":
-                current_auth_user = config_val
-            elif config_key == "AuthorizedGroup":
-                current_auth_group = config_val
-            elif config_key == "TargetUser":
-                current_target_user = config_val
-            elif config_key == "TargetGroup":
-                current_target_group = config_val
+            config_val: str | None = line_parts[1]
+            if in_persistent_users_section:
+                if config_key == "User":
+                    assert config_val is not None
+                    orig_config_val: str = config_val
+                    config_val = PrivleapCommon.normalize_user_id(config_val)
+                    if config_val is not None:
+                        if config_val not in user_output_list:
+                            user_output_list.append(config_val)
+                    else:
+                        raise ValueError("Requested persistent user "
+                            f"'{orig_config_val}' does not exist!")
+                else:
+                    raise ValueError(f"Unrecognized key '{config_key}' found")
             else:
-                raise ValueError(f"Unrecognized key '{config_key}' found")
+                if config_key == "Command":
+                    current_action_command = config_val
+                elif config_key == "AuthorizedUsers":
+                    assert config_val is not None
+                    current_auth_users = config_val.split(",")
+                elif config_key == "AuthorizedGroups":
+                    assert config_val is not None
+                    current_auth_groups = config_val.split(",")
+                elif config_key == "TargetUser":
+                    current_target_user = config_val
+                elif config_key == "TargetGroup":
+                    current_target_group = config_val
+                else:
+                    raise ValueError(f"Unrecognized key '{config_key}' found")
 
-        # The last action in the file won't be in the list yet, add it now
-        output_list.append(PrivleapAction(current_action_name,
-            current_action_command,
-            current_auth_user,
-            current_auth_group,
-            current_target_user,
-            current_target_group))
+        # The last action in the file may not be in the list yet, add it now if
+        # needed
+        if not in_persistent_users_section:
+            action_output_list.append(PrivleapAction(current_action_name,
+                current_action_command,
+                current_auth_users,
+                current_auth_groups,
+                current_target_user,
+                current_target_group))
 
-        return output_list
+        return action_output_list, user_output_list
 
     @staticmethod
-    def ensure_user_exists(user_name: str) -> bool:
+    def normalize_user_id(user_name: str) -> str | None:
         """
-        Ensures the user with the specified name exists on the system.
+        Ensures the user with the specified name or UID exists on the system.
+          Returns None if the user doesn't exist, or the username if the user
+          does exist.
         """
 
-        if not PrivleapCommon.validate_id(user_name,
+        if PrivleapCommon.validate_id(user_name,
             PrivleapValidateType.USER_GROUP_NAME):
-            return False
-        user_list: list[str] = [pw[0] for pw in pwd.getpwall()]
-        if not user_name in user_list:
-            return False
-        return True
+            user_list: list[str] = [pw.pw_name for pw in pwd.getpwall()]
+            if user_name in user_list:
+                return user_name
+        elif PrivleapCommon.validate_id(user_name,
+            PrivleapValidateType.USER_GROUP_UID):
+            uid_list: list[str] = [str(pw.pw_uid) for  pw in pwd.getpwall()]
+            if user_name in uid_list:
+                return pwd.getpwuid(int(user_name)).pw_name
+        return None
 
     @staticmethod
-    def ensure_group_exists(group_name: str) -> bool:
+    def normalize_group_id(group_name: str) -> str | None:
         """
-        Ensures the group with the specified name exists on the system.
+        Ensures the group with the specified name or GID exists on the system.
+          Returns None if the user doesn't exist, or the username if the user
+          does exist.
         """
 
-        if not PrivleapCommon.validate_id(group_name,
+        if PrivleapCommon.validate_id(group_name,
             PrivleapValidateType.USER_GROUP_NAME):
-            return False
-        group_list: list[str] = [gr[0] for gr in grp.getgrall()]
-        if not group_name in group_list:
-            return False
-        return True
+            group_list: list[str] = [gr.gr_name for gr in grp.getgrall()]
+            if group_name in group_list:
+                return group_name
+        elif PrivleapCommon.validate_id(group_name,
+            PrivleapValidateType.USER_GROUP_UID):
+            gid_list: list[str] = [str(gr.gr_gid) for gr in grp.getgrall()]
+            if group_name in gid_list:
+                return grp.getgrgid(int(group_name)).gr_name
+        return None

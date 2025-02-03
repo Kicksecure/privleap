@@ -42,7 +42,7 @@ class PlTestGlobal:
     test_home_dir: Path = Path(f"/home/{test_username}")
     privleap_state_dir: Path = Path("/run/privleapd")
     privleap_state_comm_dir: Path = Path(privleap_state_dir, "comm")
-    base_delay: float = 0.05
+    base_delay: float = 0.1
     privleapd_running: bool = False
     no_service_handling = False
     all_asserts_passed = True
@@ -296,7 +296,7 @@ def write_privleap_test_config() -> None:
         encoding = "utf-8") as config_file:
         config_file.write(PlTestData.primary_test_config_file)
 
-def compare_privleapd_stdout(assert_line_list: list[str], quiet: bool = False) \
+def compare_privleapd_stderr(assert_line_list: list[str], quiet: bool = False) \
     -> bool:
     """
     Compares the stdout output of privleapd with a string list, testing to see
@@ -381,36 +381,62 @@ class PlTestData:
     primary_test_config_file: str = f"""[test-act-free]
 Command=echo 'test-act-free'
 
+[persistent-users]
+# UID 3 = sys
+User=3
+
 [test-act-userrestrict]
 Command=echo 'test-act-userrestrict'
-AuthorizedUser=sys
+AuthorizedUsers=sys
 
 [test-act-grouprestrict]
 Command=echo 'test-act-grouprestrict'
-AuthorizedGroup=sys
+AuthorizedGroups=sys
 
 [test-act-grouppermit-userrestrict]
 Command=echo 'test-act-grouppermit-userrestrict'
-AuthorizedUser=sys
-AuthorizedGroup={PlTestGlobal.test_username}
+AuthorizedUsers=sys
+AuthorizedGroups={PlTestGlobal.test_username}
 
 [test-act-grouprestrict-userpermit]
 Command=echo 'test-act-grouprestrict-userpermit'
-AuthorizedUser={PlTestGlobal.test_username}
-AuthorizedGroup=sys
+AuthorizedUsers={PlTestGlobal.test_username}
+AuthorizedGroups=sys
 
 [test-act-userpermit]
 Command=echo 'test-act-userpermit'
-AuthorizedUser={PlTestGlobal.test_username}
+AuthorizedUsers={PlTestGlobal.test_username}
+
+[persistent-users]
+User=bin
+User=uucp
 
 [test-act-grouppermit]
 Command=echo 'test-act-grouppermit'
-AuthorizedGroup={PlTestGlobal.test_username}
+AuthorizedGroups={PlTestGlobal.test_username}
 
 [test-act-grouppermit-userpermit]
 Command=echo 'test-act-grouppermit-userpermit'
-AuthorizedUser={PlTestGlobal.test_username}
-AuthorizedGroup={PlTestGlobal.test_username}
+AuthorizedUsers={PlTestGlobal.test_username}
+AuthorizedGroups={PlTestGlobal.test_username}
+
+# Not all groups have a corresponding username, this tests that edge case
+[test-act-sudopermit]
+Command=echo 'test-act-sudopermit'
+AuthorizedGroups=sudo
+
+[test-act-multiuser-permit]
+Command=echo 'test-act-multiuser-permit'
+AuthorizedUsers={PlTestGlobal.test_username},3,messagebus
+
+[test-act-multigroup-permit]
+Command=echo 'test-act-multigroup-permit'
+AuthorizedGroups={PlTestGlobal.test_username},3,messagebus
+
+[test-act-multiuser-multigroup-permit]
+Command=echo 'test-act-multiuser-multigroup-permit'
+AuthorizedUsers={PlTestGlobal.test_username},sys
+AuthorizedGroups=sys,messagebus
 
 [test-act-exit240]
 Command=echo 'test-act-exit240'; exit 240
@@ -436,6 +462,9 @@ TargetGroup={PlTestGlobal.test_username}
 Command=id
 TargetUser={PlTestGlobal.test_username}
 TargetGroup=root
+
+[persistent-users]
+User=messagebus
 """
     invalid_filename_test_config_file: str = """[test-act-invalid]
 Command=echo 'test-act-invalid'
@@ -453,6 +482,8 @@ Commandecho 'test-act-crash'
         = b"ERROR: privleapd didn't return a valid response!\n"
     specified_user_missing: bytes \
         = b"ERROR: Specified user does not exist.\n"
+    nonexistent_socket_missing: bytes \
+        = b"Comm socket does not exist for user 'nonexistent'.\n"
     apt_socket_created: bytes \
         = b"Comm socket created for user '_apt'.\n"
     apt_socket_destroyed: bytes \
@@ -497,12 +528,15 @@ Commandecho 'test-act-crash'
     test_act_grouprestrict_unauthorized: bytes \
         = (b"ERROR: You are unauthorized to run action "
            + b"'test-act-grouprestrict'.\n")
-    test_act_grouppermit_userrestrict_unauthorized: bytes \
+    test_act_multiuser_permit_unauthorized: bytes \
         = (b"ERROR: You are unauthorized to run action "
-           + b"'test-act-grouppermit-userrestrict'.\n")
-    test_act_grouprestrict_userpermit_unauthorized: bytes \
+           + b"'test-act-multiuser-permit'.\n")
+    test_act_multigroup_permit_unauthorized: bytes \
         = (b"ERROR: You are unauthorized to run action "
-           + b"'test-act-grouprestrict-userpermit'.\n")
+           + b"'test-act-multigroup-permit'.\n")
+    test_act_multiuser_multigroup_permit_unauthorized: bytes \
+        = (b"ERROR: You are unauthorized to run action "
+           + b"'test-act-multiuser-multigroup-permit'.\n")
     test_act_target_user: bytes \
         = (b"uid=1002("
            + PlTestGlobal.test_username_bytes
@@ -634,12 +668,12 @@ Commandecho 'test-act-crash'
         "BrokenPipeError: [Errno 32] Broken pipe\n"
     ]
     send_userrestrict_signal_and_bail_lines_part1: list[str] = [
-        "auth_signal_request: WARNING: User is not authorized to run action "
-        + "'test-act-userrestrict'\n",
+        f"auth_signal_request: WARNING: User '{PlTestGlobal.test_username}' is "
+        + "not authorized to run action 'test-act-userrestrict'\n",
     ]
     send_grouprestrict_signal_and_bail_lines_part1: list[str] = [
-        "auth_signal_request: WARNING: User is not in a group authorized to run "
-        + "action 'test-act-grouprestrict'\n",
+        f"auth_signal_request: WARNING: User '{PlTestGlobal.test_username}' is "
+        + "not authorized to run action 'test-act-grouprestrict'\n",
     ]
     send_invalid_bash_signal_lines: list[str] = [
         "handle_comm_session: INFO: Triggered action 'test-act-invalid-bash'\n",
