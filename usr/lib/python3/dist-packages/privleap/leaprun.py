@@ -149,8 +149,8 @@ def handle_response() -> NoReturn:
                 comm_msg = LeaprunGlobal.comm_session.get_msg()
             except Exception:
                 generic_error(
-                    ("Action triggered, but privleapd closed the connection "
-                     "before sending all output!"))
+                    "Action triggered, but privleapd closed the connection "
+                     "before sending all output!")
 
             # noinspection PyUnboundLocalVariable
             if isinstance(comm_msg, pl.PrivleapCommServerResultStdoutMsg):

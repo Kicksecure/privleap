@@ -53,8 +53,7 @@ class PrivleapdAuthStatus(Enum):
 
     AUTHORIZED = 1
     USER_MISSING = 2
-    USER_UNAUTHORIZED = 3
-    GROUP_UNAUTHORIZED = 4
+    UNAUTHORIZED = 3
 
 def send_msg_safe(session: pl.PrivleapSession, msg: pl.PrivleapMsg) -> bool:
     """
@@ -332,30 +331,35 @@ def authorize_user(action: pl.PrivleapAction,
         # Root account, automatically grant access to everything
         return PrivleapdAuthStatus.AUTHORIZED
 
-    if action.auth_user is not None:
-        # Action exists but can only be run by certain users.
-        if action.auth_user != user_name:
-            return PrivleapdAuthStatus.USER_UNAUTHORIZED
+    no_auth_users: bool = False
+    no_auth_groups: bool = False
 
-    if action.auth_group is not None:
-        # Action exists but can only be run by certain groups.
+    if len(action.auth_users) != 0:
+        # Action exists but has restrictions on what users can run it.
+        if user_name in action.auth_users:
+            return PrivleapdAuthStatus.AUTHORIZED
+    else:
+        no_auth_users = True
+
+    if len(action.auth_groups) != 0:
+        # Action exists but has restrictions on what groups can run it.
         # We need to get the list of groups this user is a member of to
         # determine whether they are authorized or not.
         user_gid: int = pwd.getpwnam(user_name).pw_gid
         group_list: list[str] = [grp.getgrgid(gid).gr_name \
             for gid in os.getgrouplist(user_name, user_gid)]
-        found_matching_group: bool = False
         for group in group_list:
-            if group == action.auth_group:
-                found_matching_group = True
-                break
+            if group in action.auth_groups:
+                return PrivleapdAuthStatus.AUTHORIZED
+    else:
+        no_auth_groups = True
 
-        if not found_matching_group:
-            return PrivleapdAuthStatus.GROUP_UNAUTHORIZED
+    if no_auth_users and no_auth_groups:
+        # Action has no restrictions, grant access
+        return PrivleapdAuthStatus.AUTHORIZED
 
-    # TODO: Consider adding identity verification here in the future.
-
-    return PrivleapdAuthStatus.AUTHORIZED
+    # Action had restrictions that could not be met, deny access
+    return PrivleapdAuthStatus.UNAUTHORIZED
 
 def send_action_results(comm_session: pl.PrivleapSession,
     action_name: str,
@@ -446,13 +450,9 @@ def auth_signal_request(comm_msg: pl.PrivleapCommClientSignalMsg,
                 logging.warning(
                     "User '%s' does not exist, cannot run action '%s'",
                     comm_session.user_name, desired_action.action_name)
-            elif auth_result == PrivleapdAuthStatus.USER_UNAUTHORIZED:
+            elif auth_result == PrivleapdAuthStatus.UNAUTHORIZED:
                 logging.warning(
                     "User '%s' is not authorized to run action '%s'",
-                    comm_session.user_name, desired_action.action_name)
-            elif auth_result == PrivleapdAuthStatus.GROUP_UNAUTHORIZED:
-                logging.warning(
-                    "User '%s' is not in a group authorized to run action '%s'",
                     comm_session.user_name, desired_action.action_name)
         auth_end_time: float = auth_start_time + 3
         auth_fail_sleep_time: float = auth_end_time - auth_start_time

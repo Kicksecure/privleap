@@ -793,7 +793,7 @@ class PrivleapAction:
     A single action defined by privleap's configuration.
     """
 
-    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-arguments, too_many_branches
     # Rationale:
     #   too-many-arguments: This constructor loads configuration data, it's far
     #     easier to do all data assignment and validation at once (and arguably
@@ -801,15 +801,15 @@ class PrivleapAction:
     def __init__(self,
         action_name: str | None = None,
         action_command: str | None = None,
-        auth_user: str | None = None,
-        auth_group: str | None = None,
+        auth_users: list[str] | None = None,
+        auth_groups: list[str] | None = None,
         target_user: str | None = None,
         target_group: str | None = None):
 
         self.action_name: str | None = None
         self.action_command: str | None = None
-        self.auth_user: str | None = None
-        self.auth_group: str | None = None
+        self.auth_users: list[str] = []
+        self.auth_groups: list[str] = []
         self.target_user: str | None = None
         self.target_group: str | None = None
 
@@ -822,28 +822,43 @@ class PrivleapAction:
             action_name, PrivleapValidateType.SIGNAL_NAME):
             raise ValueError(f"Action name '{action_name}' is invalid")
 
-        for key, value in { "auth_user": auth_user,
-            "target_user": target_user}.items():
-            if value is not None:
-                orig_value: str = value
-                value = PrivleapCommon.normalize_user_id(value)
-                if value is None:
-                    raise ValueError(f"User '{orig_value}' specified by field "
-                        f"'{key}' does not exist!")
+        if auth_users is not None:
+            for raw_auth_user in auth_users:
+                auth_user: str | None = PrivleapCommon.normalize_user_id(
+                    raw_auth_user)
+                if auth_user is None:
+                    raise ValueError(f"User '{raw_auth_user}' specified by "
+                        f"field 'AuthorizedUsers' of action '{action_name}' "
+                        "does not exist!")
+                self.auth_users.append(auth_user)
 
-        for key, value in {"auth_group": auth_group,
-            "target_group": target_group }.items():
-            if value is not None:
-                orig_value = value
-                value = PrivleapCommon.normalize_group_id(value)
-                if value is None:
-                    raise ValueError(f"Group '{orig_value}' specified by field "
-                        f"'{key}' does not exist!")
+        if auth_groups is not None:
+            for raw_auth_group in auth_groups:
+                auth_group: str | None = PrivleapCommon.normalize_group_id(
+                    raw_auth_group)
+                if auth_group is None:
+                    raise ValueError(f"Group '{raw_auth_group}' specified by "
+                        f"field 'AuthorizedGroups' of action '{action_name}' "
+                        "does not exist!")
+                self.auth_groups.append(auth_group)
+
+        if target_user is not None:
+            orig_target_user: str = target_user
+            target_user = PrivleapCommon.normalize_user_id(target_user)
+            if target_user is None:
+                raise ValueError(f"User '{orig_target_user}' specified by "
+                f"field 'TargetUser' of action '{action_name}' does not exist!")
+
+        if target_group is not None:
+            orig_target_group: str = target_group
+            target_group = PrivleapCommon.normalize_user_id(target_group)
+            if target_group is None:
+                raise ValueError(f"User '{orig_target_group}' specified by "
+                f"field 'TargetGroup' of action '{action_name}' does not "
+                "exist!")
 
         self.action_name = action_name
         self.action_command = action_command
-        self.auth_user = auth_user
-        self.auth_group = auth_group
         self.target_user = target_user
         self.target_group = target_group
 
@@ -912,8 +927,8 @@ class PrivleapCommon:
         detect_header_regex: re.Pattern[str] = re.compile(r"\[.*]\Z")
         current_action_name: str | None = None
         current_action_command: str | None = None
-        current_auth_user: str | None = None
-        current_auth_group: str | None = None
+        current_auth_users: list[str] = []
+        current_auth_groups: list[str] = []
         current_target_user: str | None = None
         current_target_group: str | None = None
         first_header_parsed: bool = False
@@ -931,16 +946,16 @@ class PrivleapCommon:
                         action_output_list.append(PrivleapAction(
                             current_action_name,
                             current_action_command,
-                            current_auth_user,
-                            current_auth_group,
+                            current_auth_users,
+                            current_auth_groups,
                             current_target_user,
                             current_target_group))
                         # We don't need to nullify current_action_name since we
                         # set its value below.
                         # current_action_name = None
                         current_action_command = None
-                        current_auth_user = None
-                        current_auth_group = None
+                        current_auth_users = []
+                        current_auth_groups = []
                         current_target_user = None
                         current_target_group = None
                 else:
@@ -976,10 +991,12 @@ class PrivleapCommon:
             else:
                 if config_key == "Command":
                     current_action_command = config_val
-                elif config_key == "AuthorizedUser":
-                    current_auth_user = config_val
-                elif config_key == "AuthorizedGroup":
-                    current_auth_group = config_val
+                elif config_key == "AuthorizedUsers":
+                    assert config_val is not None
+                    current_auth_users = config_val.split(",")
+                elif config_key == "AuthorizedGroups":
+                    assert config_val is not None
+                    current_auth_groups = config_val.split(",")
                 elif config_key == "TargetUser":
                     current_target_user = config_val
                 elif config_key == "TargetGroup":
@@ -992,8 +1009,8 @@ class PrivleapCommon:
         if not in_persistent_users_section:
             action_output_list.append(PrivleapAction(current_action_name,
                 current_action_command,
-                current_auth_user,
-                current_auth_group,
+                current_auth_users,
+                current_auth_groups,
                 current_target_user,
                 current_target_group))
 

@@ -30,17 +30,17 @@ Each configuration file is formatted as follows:
   name.
 * The following keys are recognized:
     * Command= - The Bash code to run when this action is triggered.
-    * AuthorizedUser= - The user that is permitted to trigger this action. If
-      this key is undefined, any user may trigger this action, otherwise only
-      requests for this action from this user are accepted.
-    * AuthorizedGroup= - The group that is permitted to trigger this action.
-      If this key is undefined, any group may trigger this action, otherwise
-      only requests for this action from this group are accepted. Note that if
-      you are using AuthorizedGroup, you probably do NOT want to use
-      AuthorizedUser in tandem, otherwise only the specified user will be able
-      to trigger the action. If you want all users in a group and specific users
-      outside of that group to be allowed to trigger an action, create multiple
-      actions, one for the group and one for each user.
+    * AuthorizedUsers= - Comma-separated list of users that are permitted to
+      trigger this action.
+    * AuthorizedGroups= - Comma-separated list of groups that are permitted to
+      trigger this action.
+      * Note: If both "AuthorizedUsers" and "AuthorizedGroups" are unset or
+        empty, any user may trigger the action. Setting either key will restrict
+        the group of users that can run the action to whatever users are listed,
+        and whatever users are in any groups that are listed. For instance, if
+        "AuthorizedUsers=user1,user2" and "AuthorizedGroups=group1,group2" are
+        set, then user1, user2, and any user in group1 or group2 can all trigger
+        the action/
     * TargetUser= - The user that the action will run as. Defaults to "root".
     * TargetGroup= - The group that the action will run as. Defaults to "root".
 * Each persistent user configuration section starts with the special header
