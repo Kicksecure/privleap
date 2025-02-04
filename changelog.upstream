@@ -1,3 +1,52 @@
+commit ee1e7b8a172b107201464621634f62c12fb2438f
+Merge: 6690263 fb3a359
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Mon Feb 3 06:16:11 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit fb3a3590d48647a9ae49d17ead4fd8cf91c453be
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Feb 2 21:51:39 2025 -0600
+
+    Allow multiple users and groups to be authorized to run one action, polish tests
+
+commit cff5981eb763e670bb12806f588cc61738379050
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Feb 2 14:34:40 2025 -0600
+
+    Fix botched function call, add test to catch similar issues in the future
+
+commit 1520ed870c46611c9e783695016365c9c58c86c0
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Feb 2 13:35:22 2025 -0600
+
+    Polish tests and code further, ensure that UIDs/GIDs work in places where user names and group names are expected
+
+commit 9ddf886fa56800281d85120071d9525f7853f4a8
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Feb 2 00:05:35 2025 -0600
+
+    (wip) Allow UIDs and GIDs to be used anywhere usernames or group names would be accepted
+
+commit 18712266d1f6d2f2c8eb9a473b04eccab5adc724
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sat Feb 1 20:52:19 2025 -0600
+
+    Add support for persistent users, simplify simple message classes
+
+commit 48532969f7ff44aeb0eafda3823e90478c611f7f
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sat Feb 1 19:53:18 2025 -0600
+
+    Allow root to run all actions
+
+commit 669026342a24e8a36d6e396441f9446ea36ff2f3
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Feb 1 13:38:37 2025 +0000
+
+    bumped changelog version
+
 commit 1d52d0e33cb5bd850e06c7cb211979379060beaa
 Merge: ec31cc1 6b87a13
 Author: Patrick Schleizer <adrelanos@whonix.org>
