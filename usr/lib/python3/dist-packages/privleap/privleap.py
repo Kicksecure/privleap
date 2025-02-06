@@ -455,7 +455,7 @@ class PrivleapSession:
         for idx, byte_val in enumerate(recv_buf):
             # Don't allow anything other than printable 7-bit-ASCII in the type
             # field
-            if byte_val < 0x1F or byte_val > 0x7F:
+            if byte_val <= 0x1F or byte_val >= 0x7F:
                 raise ValueError("Invalid byte found in ASCII string data")
             if byte_val == 0x20:
                 type_field_len = idx
@@ -491,7 +491,7 @@ class PrivleapSession:
                 # Don't allow anything other than printable 7-bit-ASCII in the
                 # type field
                 byte_val: int = recv_buf[j]
-                if byte_val < 0x1F or byte_val > 0x7F:
+                if byte_val <= 0x1F or byte_val >= 0x7F:
                     raise ValueError("Invalid byte found in ASCII string data")
                 if byte_val == 0x20:
                     space_idx = j
