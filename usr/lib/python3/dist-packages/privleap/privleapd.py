@@ -273,10 +273,13 @@ def run_action(desired_action: pl.PrivleapAction, calling_user: str) \
          desired_action.action_command],
         stdout = subprocess.PIPE,
         stderr = subprocess.PIPE,
+        stdin = subprocess.PIPE,
         user = target_user,
         group = target_group,
         env = action_env,
         cwd = user_info.pw_dir)
+    assert action_process.stdin is not None
+    action_process.stdin.close()
     return action_process
 
 def get_signal_msg(comm_session: pl.PrivleapSession) \
@@ -401,8 +404,6 @@ def send_action_results(comm_session: pl.PrivleapSession,
         action_process.wait()
 
     finally:
-        # TODO: Closing the stdout and stderr streams here might be a bad idea,
-        #   since it could cause the running process to misbehave.
         action_process.stdout.close()
         action_process.stderr.close()
         action_process.terminate()

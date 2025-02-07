@@ -463,6 +463,13 @@ Command=id
 TargetUser={PlTestGlobal.test_username}
 TargetGroup=root
 
+[test-act-missing-user]
+Command=echo 'test-act-missing-user'
+AuthorizedUsers={PlTestGlobal.test_username},nonexistent
+
+[test-act-multi-equals]
+Command=echo abc=def
+
 [persistent-users]
 User=messagebus
 """
@@ -686,4 +693,91 @@ Commandecho 'test-act-crash'
     ]
     send_random_garbage_lines: list[str] = [
         "get_signal_msg: ERROR: Could not get message from client!\n",
+    ]
+    invalid_ascii_list: list[bytes] = [
+        b"\x00\x00\x00\x05\x1BTEST",
+        b"\x00\x00\x00\x05TEST\x1B",
+        b"\x00\x00\x00\x05TE\x1BST",
+        b"\x00\x00\x00\x05\x1FTEST",
+        b"\x00\x00\x00\x05TEST\x1F",
+        b"\x00\x00\x00\x05TE\x1FST",
+        b"\x00\x00\x00\x05\x7FTEST",
+        b"\x00\x00\x00\x05TEST\x7F",
+        b"\x00\x00\x00\x05TE\x7FST",
+        b"\x00\x00\x00\x04TEST",
+        b"\x00\x00\x00\x0ESIGNAL PARAM1\x1B",
+        b"\x00\x00\x00\x0ESIGNAL \x1BPARAM1",
+        b"\x00\x00\x00\x0ESIGNAL PAR\x1BAM1",
+        b"\x00\x00\x00\x0ESIGNAL PARAM1\x1F",
+        b"\x00\x00\x00\x0ESIGNAL \x1FPARAM1",
+        b"\x00\x00\x00\x0ESIGNAL PAR\x1BAM1",
+        b"\x00\x00\x00\x0ESIGNAL PARAM1\x1F",
+        b"\x00\x00\x00\x0ESIGNAL \x7FPARAM1",
+        b"\x00\x00\x00\x0ESIGNAL PAR\x7FAM1",
+        b"\x00\x00\x00\x0DSIGNAL PARAM1",
+        b"\x00\x00\x00\x0ESIGNAL  PARAM1"
+    ]
+    # TODO: Any good way to avoid all the repetition?
+    invalid_ascii_lines_list: list[list[str]] = [
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid byte found in ASCII string data\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid byte found in ASCII string data\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid byte found in ASCII string data\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid byte found in ASCII string data\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid byte found in ASCII string data\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid byte found in ASCII string data\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid byte found in ASCII string data\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid byte found in ASCII string data\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid byte found in ASCII string data\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid message type 'TEST' for socket\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid byte found in ASCII string data\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid byte found in ASCII string data\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid byte found in ASCII string data\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid byte found in ASCII string data\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid byte found in ASCII string data\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid byte found in ASCII string data\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid byte found in ASCII string data\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid byte found in ASCII string data\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: Invalid byte found in ASCII string data\n" ],
+        [ "auth_signal_request: WARNING: Could not find action 'PARAM1'\n" ],
+        [ "get_signal_msg: ERROR: Could not get message from client!\n",
+          "Traceback (most recent call last):\n",
+          "ValueError: recv_buf contains data past the last string\n" ]
     ]
