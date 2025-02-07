@@ -278,6 +278,7 @@ def run_action(desired_action: pl.PrivleapAction, calling_user: str) \
         group = target_group,
         env = action_env,
         cwd = user_info.pw_dir)
+    assert action_process.stdin is not None
     action_process.stdin.close()
     return action_process
 
