@@ -467,6 +467,9 @@ TargetGroup=root
 Command=echo 'test-act-missing-user'
 AuthorizedUsers={PlTestGlobal.test_username},nonexistent
 
+[test-act-multi-equals]
+Command=echo abc=def
+
 [persistent-users]
 User=messagebus
 """
