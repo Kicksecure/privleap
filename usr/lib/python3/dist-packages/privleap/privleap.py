@@ -827,9 +827,11 @@ class PrivleapAction:
                 auth_user: str | None = PrivleapCommon.normalize_user_id(
                     raw_auth_user)
                 if auth_user is None:
-                    raise ValueError(f"User '{raw_auth_user}' specified by "
-                        f"field 'AuthorizedUsers' of action '{action_name}' "
-                        "does not exist!")
+                    # We don't bail out on a nonexistent user since there are
+                    # legitimate situations for an action to specify an
+                    # authorized user that doesn't exist. We just skip over
+                    # nonexistent users.
+                    continue
                 self.auth_users.append(auth_user)
 
         if auth_groups is not None:
@@ -837,9 +839,11 @@ class PrivleapAction:
                 auth_group: str | None = PrivleapCommon.normalize_group_id(
                     raw_auth_group)
                 if auth_group is None:
-                    raise ValueError(f"Group '{raw_auth_group}' specified by "
-                        f"field 'AuthorizedGroups' of action '{action_name}' "
-                        "does not exist!")
+                    # We don't bail out on a nonexistent group since there are
+                    # legitimate situations for an action to specify an
+                    # authorized group that doesn't exist. We just skip over
+                    # nonexistent groups.
+                    continue
                 self.auth_groups.append(auth_group)
 
         if target_user is not None:

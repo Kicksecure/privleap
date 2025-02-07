@@ -525,6 +525,11 @@ def run_leaprun_tests() -> None:
         stdout_data = PlTestData.test_act_target_user_and_group)
     # ---
     leaprun_assert_command(["sudo", "-u", PlTestGlobal.test_username, "leaprun",
+        "test-act-missing-user"],
+        exit_code = 0,
+        stdout_data = b"test-act-missing-user\n")
+    # ---
+    leaprun_assert_command(["sudo", "-u", PlTestGlobal.test_username, "leaprun",
         "test-act-free"],
         exit_code = 0,
         stdout_data = b"test-act-free\n")

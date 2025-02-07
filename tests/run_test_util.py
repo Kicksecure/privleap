@@ -463,6 +463,10 @@ Command=id
 TargetUser={PlTestGlobal.test_username}
 TargetGroup=root
 
+[test-act-missing-user]
+Command=echo 'test-act-missing-user'
+AuthorizedUsers={PlTestGlobal.test_username},nonexistent
+
 [persistent-users]
 User=messagebus
 """
