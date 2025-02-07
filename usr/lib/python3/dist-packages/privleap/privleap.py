@@ -793,11 +793,11 @@ class PrivleapAction:
     A single action defined by privleap's configuration.
     """
 
-    # pylint: disable=too-many-arguments, too_many_branches
+    # pylint: disable=too-many-arguments, too-many-branches
     # Rationale:
-    #   too-many-arguments: This constructor loads configuration data, it's far
-    #     easier to do all data assignment and validation at once (and arguably
-    #     more readable too).
+    #   too-many-arguments, too-many-branches: This constructor loads
+    #     configuration data, it's far easier to do all data assignment and
+    #     validation at once (and arguably more readable too).
     def __init__(self,
         action_name: str | None = None,
         action_command: str | None = None,

@@ -1222,6 +1222,31 @@ def privleapd_send_valid_signal_and_bail_test(bogus: str) -> bool:
             return True
     return False
 
+def privleapd_invalid_ascii_test(idx_str: str) -> bool:
+    """
+    Test how privleapd handles a comm client that sends well-formed messages
+      with invalid ASCII contents.
+    """
+
+    idx: int = int(idx_str)
+    if idx > len(PlTestData.invalid_ascii_list):
+        return False
+    comm_session: pl.PrivleapSession = pl.PrivleapSession(
+        PlTestGlobal.test_username)
+    assert comm_session.backend_socket is not None
+    comm_session.backend_socket.send(PlTestData.invalid_ascii_list[idx])
+    try:
+        # This line will usually error out, we include it only so that we can
+        # wait for the server to fully process the invalid data we've sent it.
+        _ = comm_session.get_msg()
+    except Exception:
+        pass
+    comm_session.close_session()
+    if util.compare_privleapd_stderr(
+        PlTestData.invalid_ascii_lines_list[idx], False):
+        return True
+    return False
+
 def privleapd_send_random_garbage_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that sends pseudorandom data.
@@ -1408,6 +1433,11 @@ def run_privleapd_tests() -> None:
     # ---
     privleapd_assert_function(privleapd_send_random_garbage_test,
         "", "Test privleapd random garbage handling")
+    # ---
+    for i in range(0, len(PlTestData.invalid_ascii_list)):
+        privleapd_assert_function(privleapd_invalid_ascii_test,
+            str(i), f"Test privleapd invalid ASCII handling (iteration {i+1})")
+    # ---
 
     logging.info("privleapd passed asserts: %s, failed asserts: %s",
         privleapd_asserts_passed, privleapd_asserts_failed)
