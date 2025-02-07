@@ -1,3 +1,40 @@
+commit a0df48709aea3f3b917954ed2b1a90626659cd21
+Merge: f5b55c1 daa0487
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Fri Feb 7 06:15:13 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit daa048708f1bd45193ff910f535f70b792e36cf1
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Feb 7 00:01:44 2025 -0600
+
+    Fix a mypy gripe
+
+commit 7b744f89862c0ca64867a411ff19b63857ffadcf
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Thu Feb 6 23:55:19 2025 -0600
+
+    Add invalid ASCII testing, close the stdin stream of child processes upon creation
+
+commit 0b80a23c8d1668ccab8ca39fa9a9e2f279766f54
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Thu Feb 6 21:31:31 2025 -0600
+
+    Avoid login failure if privleap is unable to start, add test for command lines with multiple equals signs
+
+commit d20f9aa2f6332c112de4b79f06dd4b74cba80f30
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Thu Feb 6 21:17:53 2025 -0600
+
+    Prevent crashes if an authorized user or group does not exist
+
+commit f5b55c154febbae7678fa81cd6618d7a71ab8f8f
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Thu Feb 6 17:16:14 2025 +0000
+
+    bumped changelog version
+
 commit 556d4371f6e83f67e3b8dad68c6424de3f230275
 Merge: dec939e e81c890
 Author: Patrick Schleizer <adrelanos@whonix.org>
