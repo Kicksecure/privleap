@@ -45,7 +45,7 @@ case "$1" in
          done
       fi
 
-      ## This should not be required because the '#DEBHELPER#' token above
+      ## This should not be required because the 'DEBHELPER' token above
       ## already results in restarting privleap if appropriate.
       ##
       ## Causes lintian warning:
@@ -62,7 +62,6 @@ case "$1" in
             leapctl --create "${active_comm_users_item}" || true
          fi
       done
-
    ;;
 
    abort-upgrade|abort-remove|abort-deconfigure)
