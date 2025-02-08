@@ -52,7 +52,7 @@ case "$1" in
       ## W: privleap: maintainer-script-calls-systemctl
       #systemctl restart privleapd.service
 
-      ## TODO: needed?
+      ## TODO: needed? Can be replaced with systemd notify?
       ## Give privleapd some time to start
       #sleep 1
 
