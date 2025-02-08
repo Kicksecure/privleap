@@ -42,10 +42,10 @@ case "$1" in
       ## Causes lintian warning:
       ## W: privleap: maintainer-script-calls-systemctl
       #systemctl restart privleapd.service
-      # Give privleapd some time to start
+      ## Give privleapd some time to start
       #sleep 1
 
-      # Recreate any non-persistent user sockets that previously existed.
+      ## Recreate any non-persistent user sockets that previously existed.
       for active_comm_users_item in "${active_comm_users_list[@]}"; do
          if ! [ -e "/run/privleapd/comm/${active_comm_users_item}" ]; then
             leapctl --create "${active_comm_users_item}" || true
