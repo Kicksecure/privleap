@@ -38,9 +38,13 @@ case "$1" in
                active_comm_users+=( "$(basename "${item}")" )
             done
          fi
-         systemctl restart privleapd.service
+
+         ## Causes lintian warning:
+         ## W: privleap: maintainer-script-calls-systemctl
+         #systemctl restart privleapd.service
          # Give privleapd some time to start
-         sleep 1
+         #sleep 1
+
          # Recreate any non-persistent user sockets that previously existed.
          for item in "${active_comm_users[@]}"; do
             if ! [ -e "/run/privleapd/comm/${item}" ]; then
