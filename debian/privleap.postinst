@@ -15,6 +15,12 @@ true "
 #####################################################################
 "
 
+true "INFO: debhelper beginning here."
+
+#DEBHELPER#
+
+true "INFO: Done with debhelper."
+
 case "$1" in
    configure|triggered)
       ## We need to restart privleapd in order for it to pick up new
@@ -62,12 +68,6 @@ case "$1" in
       exit 1
    ;;
 esac
-
-true "INFO: debhelper beginning here."
-
-#DEBHELPER#
-
-true "INFO: Done with debhelper."
 
 true "
 #####################################################################
