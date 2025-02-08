@@ -32,26 +32,26 @@ case "$1" in
       ## significant security impact since users shouldn't be permitted to run
       ## sensitive operations via leaprun.
       active_comm_users=()
-      if [ -x "$(which systemctl)" ]; then
-         if [ -d '/run/privleapd/comm' ]; then
-            for item in '/run/privleapd/comm'/*; do
-               active_comm_users+=( "$(basename "${item}")" )
-            done
-         fi
 
-         ## Causes lintian warning:
-         ## W: privleap: maintainer-script-calls-systemctl
-         #systemctl restart privleapd.service
-         # Give privleapd some time to start
-         #sleep 1
-
-         # Recreate any non-persistent user sockets that previously existed.
-         for item in "${active_comm_users[@]}"; do
-            if ! [ -e "/run/privleapd/comm/${item}" ]; then
-               leapctl --create "${item}" || true
-            fi
+      if [ -d '/run/privleapd/comm' ]; then
+         for item in '/run/privleapd/comm'/*; do
+            active_comm_users+=( "$(basename "${item}")" )
          done
       fi
+
+      ## Causes lintian warning:
+      ## W: privleap: maintainer-script-calls-systemctl
+      #systemctl restart privleapd.service
+      # Give privleapd some time to start
+      #sleep 1
+
+      # Recreate any non-persistent user sockets that previously existed.
+      for item in "${active_comm_users[@]}"; do
+         if ! [ -e "/run/privleapd/comm/${item}" ]; then
+            leapctl --create "${item}" || true
+         fi
+      done
+
    ;;
 
    abort-upgrade|abort-remove|abort-deconfigure)
