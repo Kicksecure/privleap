@@ -1,3 +1,75 @@
+commit d25df76a304d173c51e194fa00db1419af406a36
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Feb 8 06:26:37 2025 -0500
+
+    comment
+
+commit d2e2a34c391558fbaf977794d91a358d06109a64
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Feb 8 06:17:01 2025 -0500
+
+    comment
+
+commit 899e20b5b9c327a3cdc551ef2bb2c16fe813bed6
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Feb 8 06:15:28 2025 -0500
+
+    chmod +x
+
+commit cda7165d040c5ac595539a24420b4b96b0a01979
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Feb 8 06:14:35 2025 -0500
+
+    comment
+
+commit 4a3714758cead75b642dd0839293a6f6e5b1de35
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Feb 8 06:14:14 2025 -0500
+
+    .
+
+commit e5d13f23f308cab1ca7ecb85f7c267f5fcfa0154
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Feb 8 06:13:08 2025 -0500
+
+    minor
+
+commit 94d8659f61bc0500b2f557ad06ffbb26f554eccb
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Feb 8 06:12:29 2025 -0500
+
+    let `#DEBHELPER#` restart privleap before re-creating privleap sockets
+
+commit 253d3aa317a2e31dba1ce188b8d7c402dbce7310
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Feb 8 06:07:24 2025 -0500
+
+    minor
+
+commit e2537eec4a2fd279909267998c25fb4a649e5811
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Feb 8 06:07:00 2025 -0500
+
+    refactoring
+
+commit 571c06eb5e6d0ada72c0ca2c044db6ac24f8483c
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Feb 8 06:05:26 2025 -0500
+
+    avoid `which` and assume `systemctl` is available
+
+commit 3c2c14ed5dc6920408c09cb7a8659f36bf3d88ba
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Feb 8 06:00:55 2025 -0500
+
+    disable manual and likely unneeded systemctl restart to fix lintian warning
+
+commit fe5ccebedad6789abde35c31e87315745d2f0b87
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Feb 8 10:49:44 2025 +0000
+
+    bumped changelog version
+
 commit 1c3b56605ccbf6530f8128ea0eab4327aa7d8567
 Merge: 30db2fd 6f24165
 Author: Patrick Schleizer <adrelanos@whonix.org>
