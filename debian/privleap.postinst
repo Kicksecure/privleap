@@ -45,10 +45,14 @@ case "$1" in
          done
       fi
 
+      ## This should not be required because the `#DEBHELPER#` token above
+      ## already results in restarting privleap if appropriate.
+      ##
       ## Causes lintian warning:
       ## W: privleap: maintainer-script-calls-systemctl
       #systemctl restart privleapd.service
 
+      ## TODO: needed?
       ## Give privleapd some time to start
       #sleep 1
 
