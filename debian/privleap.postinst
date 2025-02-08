@@ -48,6 +48,7 @@ case "$1" in
       ## Causes lintian warning:
       ## W: privleap: maintainer-script-calls-systemctl
       #systemctl restart privleapd.service
+
       ## Give privleapd some time to start
       #sleep 1
 
