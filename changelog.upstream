@@ -1,3 +1,28 @@
+commit 1c3b56605ccbf6530f8128ea0eab4327aa7d8567
+Merge: 30db2fd 6f24165
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Feb 8 05:40:44 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit 6f24165230db765b50194db20d62eebdc096994a
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Feb 7 15:15:18 2025 -0600
+
+    Add dpkg trigger for automatically restarting privleapd when new configuration is installed
+
+commit eb372e470b97b2dce1b3063ffdff236784a52673
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Feb 7 14:15:39 2025 -0600
+
+    Use systemd executable prefix instead of a shell to prevent privleapd start failure from preventing login
+
+commit 30db2fd12d3db6b6f1d84961e5457e033beb5c7a
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Fri Feb 7 11:17:21 2025 +0000
+
+    bumped changelog version
+
 commit a0df48709aea3f3b917954ed2b1a90626659cd21
 Merge: f5b55c1 daa0487
 Author: Patrick Schleizer <adrelanos@whonix.org>
