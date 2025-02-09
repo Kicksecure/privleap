@@ -398,6 +398,13 @@ Command=echo 'test-act-grouppermit-userrestrict'
 AuthorizedUsers=sys
 AuthorizedGroups={PlTestGlobal.test_username}
 
+[allowed-users]
+User={PlTestGlobal.test_username}
+User=_apt
+User=daemon
+User=deleteme
+User=root
+
 [test-act-grouprestrict-userpermit]
 Command=echo 'test-act-grouprestrict-userpermit'
 AuthorizedUsers={PlTestGlobal.test_username}

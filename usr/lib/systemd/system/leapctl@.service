@@ -1,0 +1,17 @@
+## Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
+## See the file COPYING for copying conditions.
+
+[Unit]
+Description=leapctl - Enable access to privleap for each user
+StartLimitIntervalSec=10
+StartLimitBurst=3
+Requires=privleapd.service user@.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=/usr/bin/leapctl --create %i
+ExecStop=/usr/bin/leapctl --destroy %i
+
+[Install]
+WantedBy=user@.service

@@ -15,35 +15,39 @@ true "
 #####################################################################
 "
 
-active_comm_users_list=()
-
 case "$1" in
-   configure|triggered)
-      if [ "$1" == 'configure' ]; then
-         deb-systemd-helper enable privleapd.service
-      fi
-      ## We need to restart privleapd in order for it to pick up new
-      ## configuration data. However, doing this will also result in all comm
-      ## sockets for users that aren't configured as persistent users being
-      ## destroyed. We need to recreate these after restart in order to keep
-      ## from needing all active users to log out and log in again.
+   configure)
+      deb-systemd-helper enable privleapd.service
+      deb-systemd-helper enable leapctl@.service
+      deb-systemd-invoke start privleapd.service
+      ## If this is the first installation, we need to start the leapctl
+      ## services corresponding to each actively logged-in user, otherwise
+      ## privleap won't work until the next login (or potentially until the
+      ## next reboot depending on the user's setup).
       ##
-      ## Due to a lag between when a user logs out and when user@.service
-      ## gets around to destroying their corresponding comm socket, this has a
-      ## very slight chance of creating a socket that was just destroyed by
-      ## user@.service. This would allow anything that can execute commands as
-      ## the now logged-out user to run leaprun actions that the user in
-      ## question is authorized to run. This is not expected to have any
-      ## significant security impact since users shouldn't be permitted to run
-      ## sensitive operations via leaprun.
-      if [ -d '/run/privleapd/comm' ]; then
-         for active_comm_users_item in '/run/privleapd/comm'/*; do
-            active_comm_users_list+=( "$(basename "${active_comm_users_item}")" )
-         done
+      ## deb-systemd-invoke doesn't work here because the leapctl instance
+      ## units are considered "disabled" by systemd even though they start
+      ## properly. This fact means deb-systemd-invoke will just ignore the
+      ## start commands.
+      if [ -x "$(command -v systemctl)" ] \
+         && systemctl status privleapd.service --no-pager --no-block &>/dev/null; then
+         if [ -f /usr/libexec/helper-scripts/accountctl.sh ]; then
+            source /usr/libexec/helper-scripts/accountctl.sh
+            for user in $(who | awk '{ print $1 }' | sort -u); do
+               target_uid="$(get_entry "${user}" passwd uid)"
+               systemctl start "leapctl@${target_uid}.service"
+            done
+         fi
       fi
    ;;
 
    abort-upgrade|abort-remove|abort-deconfigure)
+   ;;
+
+   triggered)
+      ## debhelper seems to not reliably start the service after installation,
+      ## so we have to start it explicitly.
+      deb-systemd-invoke restart privleapd.service
    ;;
 
    *)
@@ -57,21 +61,6 @@ true "INFO: debhelper beginning here."
 #DEBHELPER#
 
 true "INFO: Done with debhelper."
-
-case "$1" in
-   configure|triggered)
-
-      ## debhelper seems to not reliably start the service after installation,
-      ## so we have to start it explicitly.
-      deb-systemd-invoke restart privleapd.service
-      ## Recreate any non-persistent user sockets that previously existed.
-      for active_comm_users_item in "${active_comm_users_list[@]}"; do
-         if ! [ -e "/run/privleapd/comm/${active_comm_users_item}" ]; then
-            leapctl --create "${active_comm_users_item}" || true
-         fi
-      done
-   ;;
-esac
 
 true "
 #####################################################################
