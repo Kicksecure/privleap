@@ -15,14 +15,13 @@ true "
 #####################################################################
 "
 
-true "INFO: debhelper beginning here."
-
-#DEBHELPER#
-
-true "INFO: Done with debhelper."
+active_comm_users_list=()
 
 case "$1" in
    configure|triggered)
+      if [ "$1" == 'configure' ]; then
+         deb-systemd-helper enable privleapd.service
+      fi
       ## We need to restart privleapd in order for it to pick up new
       ## configuration data. However, doing this will also result in all comm
       ## sockets for users that aren't configured as persistent users being
@@ -37,31 +36,11 @@ case "$1" in
       ## question is authorized to run. This is not expected to have any
       ## significant security impact since users shouldn't be permitted to run
       ## sensitive operations via leaprun.
-      active_comm_users_list=()
-
       if [ -d '/run/privleapd/comm' ]; then
          for active_comm_users_item in '/run/privleapd/comm'/*; do
             active_comm_users_list+=( "$(basename "${active_comm_users_item}")" )
          done
       fi
-
-      ## This should not be required because the 'DEBHELPER' token above
-      ## already results in restarting privleap if appropriate.
-      ##
-      ## Causes lintian warning:
-      ## W: privleap: maintainer-script-calls-systemctl
-      #systemctl restart privleapd.service
-
-      ## TODO: needed? Can be replaced with systemd notify?
-      ## Give privleapd some time to start
-      #sleep 1
-
-      ## Recreate any non-persistent user sockets that previously existed.
-      for active_comm_users_item in "${active_comm_users_list[@]}"; do
-         if ! [ -e "/run/privleapd/comm/${active_comm_users_item}" ]; then
-            leapctl --create "${active_comm_users_item}" || true
-         fi
-      done
    ;;
 
    abort-upgrade|abort-remove|abort-deconfigure)
@@ -70,6 +49,27 @@ case "$1" in
    *)
       echo "$DPKG_MAINTSCRIPT_NAME called with unknown argument \`$1'" >&2
       exit 1
+   ;;
+esac
+
+true "INFO: debhelper beginning here."
+
+#DEBHELPER#
+
+true "INFO: Done with debhelper."
+
+case "$1" in
+   configure|triggered)
+
+      ## debhelper seems to not reliably start the service after installation,
+      ## so we have to start it explicitly.
+      deb-systemd-invoke restart privleapd.service
+      ## Recreate any non-persistent user sockets that previously existed.
+      for active_comm_users_item in "${active_comm_users_list[@]}"; do
+         if ! [ -e "/run/privleapd/comm/${active_comm_users_item}" ]; then
+            leapctl --create "${active_comm_users_item}" || true
+         fi
+      done
    ;;
 esac
 

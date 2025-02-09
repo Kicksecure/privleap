@@ -22,6 +22,7 @@ import socket
 import re
 import logging
 import time
+import sdnotify
 from enum import Enum
 from pathlib import Path
 from typing import Tuple, cast, SupportsIndex, IO, NoReturn
@@ -45,6 +46,7 @@ class PrivleapdGlobal:
     socket_list: list[pl.PrivleapSocket] = []
     pid_file_path: Path = Path(pl.PrivleapCommon.state_dir, "pid")
     in_test_mode = False
+    sdnotify_object: sdnotify.SystemdNotifier = sdnotify.SystemdNotifier()
 
 class PrivleapdAuthStatus(Enum):
     """
@@ -739,6 +741,8 @@ def main() -> NoReturn:
     populate_state_dir()
     open_control_socket()
     open_persistent_comm_sockets()
+    PrivleapdGlobal.sdnotify_object.notify("READY=1")
+    PrivleapdGlobal.sdnotify_object.notify("STATUS=Fully started")
     main_loop()
 
 if __name__ == "__main__":
