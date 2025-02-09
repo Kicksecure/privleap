@@ -1,3 +1,22 @@
+commit 64238cffacb8b74930d7f98bbf365075c356f87c
+Merge: cab7f1a 108871e
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sun Feb 9 04:50:55 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit 108871e9914e138bbb05b84e32ae497888f26b15
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sat Feb 8 23:57:28 2025 -0600
+
+    Fix up systemd restart support
+
+commit cab7f1a82d193819b89d3709bdd94677cb054997
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Feb 8 11:29:31 2025 +0000
+
+    bumped changelog version
+
 commit d25df76a304d173c51e194fa00db1419af406a36
 Author: Patrick Schleizer <adrelanos@whonix.org>
 Date:   Sat Feb 8 06:26:37 2025 -0500
