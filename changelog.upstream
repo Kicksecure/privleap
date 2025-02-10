@@ -1,3 +1,22 @@
+commit 8061b893ac26b5d35653839e07a660b604fa3d97
+Merge: 3d28f93 d244187
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Mon Feb 10 06:14:52 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit d244187a8b83cdcda0b3f1132444292b7e4486af
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Feb 9 15:20:30 2025 -0600
+
+    Add crash recovery, polish comm socket autocreation, add allowed-users configuration option
+
+commit 3d28f938910c5d98e9adf2aeff6ddfa9b8ba0fc1
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sun Feb 9 10:03:56 2025 +0000
+
+    bumped changelog version
+
 commit 64238cffacb8b74930d7f98bbf365075c356f87c
 Merge: cab7f1a 108871e
 Author: Patrick Schleizer <adrelanos@whonix.org>
