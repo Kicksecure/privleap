@@ -44,6 +44,16 @@ class PrivleapValidateType(Enum):
     CONFIG_FILE = 3
     SIGNAL_NAME = 4
 
+class PrivleapConfigSection(Enum):
+    """
+    Enum for internal use by the config file parser. Specifies what type of
+      section the parser is currently in.
+    """
+
+    ACTION = 1
+    PERSISTENT_USERS = 2
+    ALLOWED_USERS = 3
+
 class PrivleapMsg:
     """
     Base class for all message classes.
@@ -158,6 +168,19 @@ class PrivleapControlServerPersistentUserMsg(PrivleapMsg):
     """
 
     name = "PERSISTENT_USER"
+
+class PrivleapControlServerDisallowedUserMsg(PrivleapMsg):
+    """
+    Privleap message.
+
+    Sent from server to client.
+
+    Indicates that the requested creation operation specified a user that is
+      not configured as allowed, and thus cannot have a comm socket created
+      for them.
+    """
+
+    name = "DISALLOWED_USER"
 
 class PrivleapCommClientSignalMsg(PrivleapMsg):
     """
@@ -603,6 +626,10 @@ class PrivleapSession:
                 self.__parse_msg_parameters(
                     recv_buf, str_count = 0, blob_at_end = False)
                 return PrivleapControlServerPersistentUserMsg()
+            if msg_type_str == "DISALLOWED_USER":
+                self.__parse_msg_parameters(
+                    recv_buf, str_count = 0, blob_at_end = False)
+                return PrivleapControlServerDisallowedUserMsg()
             raise ValueError(
                 f"Invalid message type '{msg_type_str}' for socket")
 
@@ -686,7 +713,8 @@ class PrivleapSession:
                 PrivleapControlServerControlErrorMsg,
                 PrivleapControlServerExistsMsg,
                 PrivleapControlServerNouserMsg,
-                PrivleapControlServerPersistentUserMsg):
+                PrivleapControlServerPersistentUserMsg,
+                PrivleapControlServerDisallowedUserMsg):
                 raise ValueError("Invalid message type for socket.")
         elif self.is_control_session and not self.is_server_side:
             if msg_obj_type not in (PrivleapControlClientCreateMsg,
@@ -917,15 +945,17 @@ class PrivleapCommon:
     #     make it more difficult to read. Each section of the config file has
     #     quite a bit of data, so parsing is non-trivial.
     def parse_config_file(config_data: str) \
-        -> Tuple[list[PrivleapAction], list[str]]:
+        -> Tuple[list[PrivleapAction], list[str], list[str]]:
         """
         Parses the data from a privleap configuration file and returns all
         privleap actions defined therein.
         """
 
         action_output_list: list[PrivleapAction] = []
-        user_output_list: list[str] = []
-        in_persistent_users_section = False
+        persistent_user_output_list: list[str] = []
+        allowed_user_output_list: list[str] = []
+        current_section_type: PrivleapConfigSection \
+            = PrivleapConfigSection.ACTION
         conf_stream: StringIO = StringIO(config_data)
         detect_comment_regex: re.Pattern[str] = re.compile(r"\s*#")
         detect_header_regex: re.Pattern[str] = re.compile(r"\[.*]\Z")
@@ -946,7 +976,7 @@ class PrivleapCommon:
 
             if detect_header_regex.match(line):
                 if first_header_parsed:
-                    if not in_persistent_users_section:
+                    if current_section_type == PrivleapConfigSection.ACTION:
                         action_output_list.append(PrivleapAction(
                             current_action_name,
                             current_action_command,
@@ -966,11 +996,15 @@ class PrivleapCommon:
                     first_header_parsed = True
 
                 current_header_name: str = line[1:len(line)-1]
-                if current_header_name != "persistent-users":
-                    current_action_name = current_header_name
-                    in_persistent_users_section = False
+                if current_header_name == "persistent-users":
+                    current_section_type \
+                        = PrivleapConfigSection.PERSISTENT_USERS
+                elif current_header_name == "allowed-users":
+                    current_section_type \
+                        = PrivleapConfigSection.ALLOWED_USERS
                 else:
-                    in_persistent_users_section = True
+                    current_action_name = current_header_name
+                    current_section_type = PrivleapConfigSection.ACTION
                 continue
 
             line_parts: list[str] = line.split('=', maxsplit = 1)
@@ -979,19 +1013,28 @@ class PrivleapCommon:
 
             config_key: str = line_parts[0]
             config_val: str | None = line_parts[1]
-            if in_persistent_users_section:
+            if current_section_type == PrivleapConfigSection.PERSISTENT_USERS:
                 if config_key == "User":
                     assert config_val is not None
                     orig_config_val: str = config_val
                     config_val = PrivleapCommon.normalize_user_id(config_val)
                     if config_val is not None:
-                        if config_val not in user_output_list:
-                            user_output_list.append(config_val)
+                        if config_val not in persistent_user_output_list:
+                            persistent_user_output_list.append(config_val)
                     else:
                         raise ValueError("Requested persistent user "
                             f"'{orig_config_val}' does not exist!")
                 else:
                     raise ValueError(f"Unrecognized key '{config_key}' found")
+            elif current_section_type == PrivleapConfigSection.ALLOWED_USERS:
+                if config_key == "User":
+                    assert config_val is not None
+                    config_val = PrivleapCommon.normalize_user_id(config_val)
+                    if config_val is not None:
+                        if config_val not in allowed_user_output_list:
+                            allowed_user_output_list.append(config_val)
+                else:
+                    raise ValueError("Unrecognized key '{config_key}' found")
             else:
                 if config_key == "Command":
                     current_action_command = config_val
@@ -1008,9 +1051,9 @@ class PrivleapCommon:
                 else:
                     raise ValueError(f"Unrecognized key '{config_key}' found")
 
-        # The last action in the file may not be in the list yet, add it now if
-        # needed
-        if not in_persistent_users_section:
+        # The last action in the file may not be in the list yet, add it now
+        # if needed
+        if current_section_type == PrivleapConfigSection.ACTION:
             action_output_list.append(PrivleapAction(current_action_name,
                 current_action_command,
                 current_auth_users,
@@ -1018,7 +1061,8 @@ class PrivleapCommon:
                 current_target_user,
                 current_target_group))
 
-        return action_output_list, user_output_list
+        return (action_output_list, persistent_user_output_list,
+            allowed_user_output_list)
 
     @staticmethod
     def normalize_user_id(user_name: str) -> str | None:

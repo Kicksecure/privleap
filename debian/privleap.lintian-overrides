@@ -1,0 +1,10 @@
+## Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
+## See the file COPYING for copying conditions.
+
+## leapctl@.service triggers this because it's WantedBy=user@%i.service, which
+## is intentional and correct.
+privleap: systemd-service-file-refers-to-unusual-wantedby-target
+
+## deb-systemd-invoke isn't capable of working with the leapctl@.service unit
+## properly, so we have to invoke systemctl directly there.
+privleap: maintainer-script-calls-systemctl

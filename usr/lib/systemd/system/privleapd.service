@@ -10,6 +10,7 @@ StartLimitBurst=3
 Type=notify
 NotifyAccess=main
 ExecStart=/usr/bin/privleapd
+WatchdogSec=10s
 Restart=always
 
 [Install]

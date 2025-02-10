@@ -22,11 +22,11 @@ import socket
 import re
 import logging
 import time
-import sdnotify
 from enum import Enum
 from pathlib import Path
 from typing import Tuple, cast, SupportsIndex, IO, NoReturn
 
+import sdnotify # type: ignore
 # import privleap as pl
 import privleap.privleap as pl
 
@@ -43,6 +43,7 @@ class PrivleapdGlobal:
     config_dir: Path = Path("/etc/privleap/conf.d")
     action_list: list[pl.PrivleapAction] = []
     persistent_user_list: list[str] = []
+    allowed_user_list: list[str] = []
     socket_list: list[pl.PrivleapSocket] = []
     pid_file_path: Path = Path(pl.PrivleapCommon.state_dir, "pid")
     in_test_mode = False
@@ -87,6 +88,13 @@ def handle_control_create_msg(control_session: pl.PrivleapSession,
         logging.warning("User '%s' does not exist", control_msg.user_name)
         send_msg_safe(
             control_session, pl.PrivleapControlServerControlErrorMsg())
+        return
+
+    if user_name not in PrivleapdGlobal.allowed_user_list:
+        logging.warning("User '%s' is not allowed to have a comm socket",
+            control_msg.user_name)
+        send_msg_safe(
+            control_session, pl.PrivleapControlServerDisallowedUserMsg())
         return
 
     for sock in PrivleapdGlobal.socket_list:
@@ -594,13 +602,15 @@ def parse_config_files() -> None:
             with open(config_file, "r", encoding = "utf-8") as f:
                 action_arr: list[pl.PrivleapAction]
                 persistent_user_arr: list[str]
-                action_arr, persistent_user_arr \
+                allowed_user_arr: list[str]
+                action_arr, persistent_user_arr, allowed_user_arr \
                     = pl.PrivleapCommon.parse_config_file(f.read())
             for action_item in action_arr:
                 if action_item not in PrivleapdGlobal.action_list:
                     PrivleapdGlobal.action_list.append(action_item)
                 else:
-                    raise ValueError(f"Duplicate action '{action_item}' found!")
+                    raise ValueError(f"Duplicate action '{action_item}' "
+                        "found!")
             for persistent_user_item in persistent_user_arr:
                 # Note, parse_config_file() normalizes the usernames of
                 # persistent users for us.
@@ -609,6 +619,15 @@ def parse_config_files() -> None:
                     PrivleapdGlobal.persistent_user_list.append(
                         persistent_user_item)
                 # It isn't an error for duplicate persistent users to be
+                # defined, we just skip over the duplicates.
+            for allowed_user_item in allowed_user_arr:
+                # Note, parse_config_file() normalizes the usernames of
+                # allowed users for us.
+                if allowed_user_item not in \
+                    PrivleapdGlobal.allowed_user_list:
+                    PrivleapdGlobal.allowed_user_list.append(
+                        allowed_user_item)
+                # It isn't an error for duplicate allowed users to be
                 # defined, we just skip over the duplicates.
         except Exception as e:
             logging.critical("Failed to load config file '%s'!",
@@ -704,8 +723,10 @@ def main_loop() -> NoReturn:
                 [sock_obj.backend_socket \
                     for sock_obj in PrivleapdGlobal.socket_list],
                 [],
-                []
+                [],
+                5
             )
+        PrivleapdGlobal.sdnotify_object.notify("WATCHDOG=1")
         for ready_socket in ready_socket_list[0]:
             ready_sock_obj: pl.PrivleapSocket | None = None
             for sock_obj in PrivleapdGlobal.socket_list:

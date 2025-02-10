@@ -112,6 +112,9 @@ def handle_create_request(user_name: str) -> NoReturn:
         generic_error(
             "privleapd encountered an error while creating a comm socket "
             f"for user '{user_name}'!")
+    elif isinstance(control_msg, pl.PrivleapControlServerDisallowedUserMsg):
+        generic_error(
+            f"User '{user_name}' is not permitted to have a comm socket!")
     elif isinstance(control_msg, pl.PrivleapControlServerExistsMsg):
         print(f"Comm socket already exists for user '{user_name}'.")
         cleanup_and_exit(0)

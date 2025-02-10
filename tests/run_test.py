@@ -324,8 +324,10 @@ def run_leapctl_tests() -> None:
         exit_code = 0,
         stdout_data = b"Cannot destroy socket for persistent user 'sys'.\n")
     # ---
+    util.stop_privleapd_subprocess()
     leapctl_assert_function(leapctl_create_deleteme_user, "",
         "Create user for deleted user socket destroy test")
+    util.start_privleapd_subprocess()
     leapctl_assert_command(["leapctl", "--create", "deleteme"],
         exit_code = 0,
         stdout_data = b"Comm socket created for user 'deleteme'.\n")
@@ -334,6 +336,10 @@ def run_leapctl_tests() -> None:
     leapctl_assert_command(["leapctl", "--destroy", "deleteme"],
         exit_code = 0,
         stdout_data = b"Comm socket destroyed for user 'deleteme'.\n")
+    # ---
+    leapctl_assert_command(["leapctl", "--create", "man"],
+        exit_code = 1,
+        stderr_data = b"ERROR: User 'man' is not permitted to have a comm socket!\n")
     # ---
     util.stop_privleapd_subprocess()
     leapctl_assert_function(leapctl_server_error_test, "",
