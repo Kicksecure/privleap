@@ -29,15 +29,16 @@ case "$1" in
       ## units are considered "disabled" by systemd even though they start
       ## properly. This fact means deb-systemd-invoke will just ignore the
       ## start commands.
-      if [ -x "$(command -v systemctl)" ] \
-         && systemctl status privleapd.service --no-pager --no-block &>/dev/null; then
-         if [ -f /usr/libexec/helper-scripts/accountctl.sh ]; then
-            source /usr/libexec/helper-scripts/accountctl.sh
-            for user in $(who | awk '{ print $1 }' | sort -u); do
-               target_uid="$(get_entry "${user}" passwd uid)"
-               ## debhelper uses '|| true' for systemctl start action so we should too.
-               systemctl start "leapctl@${target_uid}.service" || true
-            done
+      if [ -x "$(command -v systemctl)" ]; then
+         if systemctl status privleapd.service --no-pager --no-block &>/dev/null; then
+            if [ -f /usr/libexec/helper-scripts/accountctl.sh ]; then
+               source /usr/libexec/helper-scripts/accountctl.sh
+               for user in $(who | awk '{ print $1 }' | sort -u); do
+                  target_uid="$(get_entry "${user}" passwd uid)"
+                  ## debhelper uses '|| true' for systemctl start action so we should too.
+                  systemctl start "leapctl@${target_uid}.service" || true
+               done
+            fi
          fi
       fi
    ;;
