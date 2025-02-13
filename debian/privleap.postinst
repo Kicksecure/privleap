@@ -30,15 +30,16 @@ make_privleapd_comm_sockets_first_time_maybe() {
    ## units are considered "disabled" by systemd even though they start
    ## properly. This fact means deb-systemd-invoke will just ignore the
    ## start commands.
-   if [ -x "$(command -v systemctl)" ] \
-      && systemctl status privleapd.service --no-pager --no-block &>/dev/null; then
-      if [ -f /usr/libexec/helper-scripts/accountctl.sh ]; then
-         source /usr/libexec/helper-scripts/accountctl.sh
-         for user in $(who | awk '{ print $1 }' | sort -u); do
-            target_uid="$(get_entry "${user}" passwd uid)"
-            systemctl start "leapctl@${target_uid}.service"
-         done
-      fi
+   ## debhelper checks for folder '/run/systemd/system' existence.
+   ## So we should do.
+   if [ -d /run/systemd/system ]; then
+      if systemctl --no-pager --no-block status privleapd.service  &>/dev/null; then
+      source /usr/libexec/helper-scripts/accountctl.sh
+      for user in $(who | awk '{ print $1 }' | sort -u); do
+         target_uid="$(get_entry "${user}" passwd uid)"
+         ## debhelper uses '|| true' for systemctl start action so we should too.
+         systemctl start "leapctl@${target_uid}.service" || true
+      done
    fi
 
    touch "/var/lib/privleap/do_once/${FUNCNAME}_version_1"
