@@ -15,33 +15,39 @@ true "
 #####################################################################
 "
 
+make_privleapd_comm_sockets_first_time_maybe() {
+   if [ -f "/var/lib/privleap/do_once/${FUNCNAME}_version_1" ]; then
+      return 0
+   fi
+   mkdir --parents "/var/lib/privleap/do_once"
+
+   ## If this is the first installation, we need to start the leapctl
+   ## services corresponding to each actively logged-in user, otherwise
+   ## privleap won't work until the next login (or potentially until the
+   ## next reboot depending on the user's setup).
+   ##
+   ## deb-systemd-invoke doesn't work here because the leapctl instance
+   ## units are considered "disabled" by systemd even though they start
+   ## properly. This fact means deb-systemd-invoke will just ignore the
+   ## start commands.
+   if [ -x "$(command -v systemctl)" ] \
+      && systemctl status privleapd.service --no-pager --no-block &>/dev/null; then
+      if [ -f /usr/libexec/helper-scripts/accountctl.sh ]; then
+         source /usr/libexec/helper-scripts/accountctl.sh
+         for user in $(who | awk '{ print $1 }' | sort -u); do
+            target_uid="$(get_entry "${user}" passwd uid)"
+            systemctl start "leapctl@${target_uid}.service"
+         done
+      fi
+   fi
+
+   touch "/var/lib/privleap/do_once/${FUNCNAME}_version_1"
+}
+
 case "$1" in
    configure)
       deb-systemd-helper enable privleapd.service
       deb-systemd-helper enable leapctl@.service
-      deb-systemd-invoke start privleapd.service
-      ## If this is the first installation, we need to start the leapctl
-      ## services corresponding to each actively logged-in user, otherwise
-      ## privleap won't work until the next login (or potentially until the
-      ## next reboot depending on the user's setup).
-      ##
-      ## deb-systemd-invoke doesn't work here because the leapctl instance
-      ## units are considered "disabled" by systemd even though they start
-      ## properly. This fact means deb-systemd-invoke will just ignore the
-      ## start commands.
-      ##
-      ## debhelper checks for folder '/run/systemd/system' existence.
-      ## So we should do.
-      if [ -d /run/systemd/system ]; then
-         if systemctl --no-pager --no-block status privleapd.service &>/dev/null; then
-            source /usr/libexec/helper-scripts/accountctl.sh
-            for user in $(who | awk '{ print $1 }' | sort -u); do
-               target_uid="$(get_entry "${user}" passwd uid)"
-               ## debhelper uses '|| true' for systemctl start action so we should too.
-               systemctl start "leapctl@${target_uid}.service" || true
-            done
-         fi
-      fi
    ;;
 
    abort-upgrade|abort-remove|abort-deconfigure)
@@ -51,6 +57,7 @@ case "$1" in
       ## debhelper seems to not reliably start the service after installation,
       ## so we have to start it explicitly.
       deb-systemd-invoke restart privleapd.service
+      make_privleapd_comm_sockets_first_time_maybe
    ;;
 
    *)

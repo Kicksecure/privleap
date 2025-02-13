@@ -618,6 +618,11 @@ def parse_config_files() -> None:
                     PrivleapdGlobal.persistent_user_list:
                     PrivleapdGlobal.persistent_user_list.append(
                         persistent_user_item)
+                # Persistent users are automatically allowed users too.
+                if persistent_user_item not in \
+                    PrivleapdGlobal.allowed_user_list:
+                    PrivleapdGlobal.allowed_user_list.append(
+                        persistent_user_item)
                 # It isn't an error for duplicate persistent users to be
                 # defined, we just skip over the duplicates.
             for allowed_user_item in allowed_user_arr:
