@@ -33,7 +33,7 @@ case "$1" in
       ## debhelper checks for folder '/run/systemd/system' existence.
       ## So we should do.
       if [ -d /run/systemd/system ]; then
-         if systemctl status privleapd.service --no-pager --no-block &>/dev/null; then
+         if systemctl --no-pager --no-block status privleapd.service &>/dev/null; then
             if [ -f /usr/libexec/helper-scripts/accountctl.sh ]; then
                source /usr/libexec/helper-scripts/accountctl.sh
                for user in $(who | awk '{ print $1 }' | sort -u); do
