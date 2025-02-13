@@ -35,7 +35,8 @@ case "$1" in
             source /usr/libexec/helper-scripts/accountctl.sh
             for user in $(who | awk '{ print $1 }' | sort -u); do
                target_uid="$(get_entry "${user}" passwd uid)"
-               systemctl start "leapctl@${target_uid}.service"
+               ## debhelper uses '|| true' for systemctl start action so we should too.
+               systemctl start "leapctl@${target_uid}.service" || true
             done
          fi
       fi
