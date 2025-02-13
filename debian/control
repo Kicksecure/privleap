@@ -19,7 +19,7 @@ Depends: helper-scripts,
          python3-sdnotify,
          ${misc:Depends}
 Description: Limited privilege escalation framework
- WARNING: Not yet stable.
- .
  Provides a privilege escalation framework for running pre-defined command
- sequences ("actions") as root. Does not require a SUID executable.
+ sequences ("actions") as root.
+ .
+ Does not require a SUID executable.
