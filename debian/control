@@ -14,7 +14,8 @@ Rules-Requires-Root: no
 
 Package: privleap
 Architecture: all
-Depends: python3,
+Depends: helper-scripts,
+         python3,
          python3-sdnotify,
          ${misc:Depends}
 Description: Limited privilege escalation framework
