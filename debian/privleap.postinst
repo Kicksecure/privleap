@@ -33,14 +33,18 @@ make_privleapd_comm_sockets_first_time_maybe() {
    ## debhelper checks for folder '/run/systemd/system' existence.
    ## So we should do.
    if [ -d /run/systemd/system ]; then
-      if systemctl --no-pager --no-block status privleapd.service  &>/dev/null; then
-      source /usr/libexec/helper-scripts/accountctl.sh
-      for user in $(who | awk '{ print $1 }' | sort -u); do
-         target_uid="$(get_entry "${user}" passwd uid)"
-         ## debhelper uses '|| true' for systemctl start action so we should too.
-         systemctl start "leapctl@${target_uid}.service" || true
-      done
+      return 0
    fi
+   if ! systemctl --no-pager --no-block status privleapd.service &>/dev/null; then
+      return 0
+   fi
+
+   source /usr/libexec/helper-scripts/accountctl.sh
+   for user in $(who | awk '{ print $1 }' | sort -u); do
+      target_uid="$(get_entry "${user}" passwd uid)"
+      ## debhelper uses '|| true' for systemctl start action so we should too.
+      systemctl start "leapctl@${target_uid}.service" || true
+   done
 
    touch "/var/lib/privleap/do_once/${FUNCNAME}_version_1"
 }
