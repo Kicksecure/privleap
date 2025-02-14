@@ -47,6 +47,7 @@ class PrivleapdGlobal:
     socket_list: list[pl.PrivleapSocket] = []
     pid_file_path: Path = Path(pl.PrivleapCommon.state_dir, "pid")
     in_test_mode = False
+    check_config_mode = False
     sdnotify_object: sdnotify.SystemdNotifier = sdnotify.SystemdNotifier()
 
 class PrivleapdAuthStatus(Enum):
@@ -753,13 +754,25 @@ def main() -> NoReturn:
     Main function.
     """
 
-    if len(sys.argv) > 2:
-        logging.critical("Too many arguments passed!")
-        sys.exit(1)
-    if len(sys.argv) == 2 and sys.argv[1] == "--test":
-        PrivleapdGlobal.in_test_mode = True
     logging.basicConfig(format = "%(funcName)s: %(levelname)s: %(message)s",
         level = logging.INFO)
+    for idx, arg in enumerate(sys.argv):
+        if idx == 0:
+            continue
+        if arg == "--test":
+            PrivleapdGlobal.in_test_mode = True
+        if arg == "-C" or arg == "--check-config":
+            PrivleapdGlobal.check_config_mode = True
+        else:
+            logging.critical(f"Unrecognized argument '{arg}'!")
+            sys.exit(1)
+
+    # TODO: Write automated test to ensure check config mode works as intended.
+    if PrivleapdGlobal.check_config_mode:
+        parse_config_files()
+        logging.info("privleap config is OK.")
+        sys.exit(0)
+
     ensure_running_as_root()
     verify_not_running_twice()
     cleanup_old_state_dir()
