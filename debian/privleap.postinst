@@ -32,7 +32,7 @@ make_privleapd_comm_sockets_first_time_maybe() {
    ## start commands.
    ## debhelper checks for folder '/run/systemd/system' existence.
    ## So we should do.
-   if [ -d /run/systemd/system ]; then
+   if [ ! -d /run/systemd/system ]; then
       return 0
    fi
    if ! systemctl --no-pager --no-block status privleapd.service &>/dev/null; then
