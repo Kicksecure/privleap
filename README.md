@@ -95,3 +95,12 @@ configuration for the most part. To run the tests, simply run the
 `run_autopkgtest` script from the root of the source tree. The script will 
 function regardless of what your current working directory is when you 
 call it.
+
+`run_autopkgtest` creates an unshare tarball under
+`~/.cache/sbuild/bookworm-amd64.tar.zst` (which is where autopkgtest 
+expects to find it). This tarball may eventually get out of date as packages
+in Debian are upgraded, or it may end up improperly built if you interrupt 
+`run_autopkgtest` while it is building the tarball initially. If for some 
+reason you need to rebuild this tarball from scratch before doing the next 
+test, run `run_autopkgtest --reset-tarball`. This will delete the tarball 
+and regenerate it, then run the tests as usual.
