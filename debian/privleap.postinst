@@ -45,26 +45,31 @@ make_privleapd_comm_sockets_first_time_maybe() {
    for user in $(who | awk '{ print $1 }' | sort -u); do
       target_uid="$(get_entry "${user}" passwd uid)"
       ## debhelper uses '|| true' for systemctl start action so we should too.
-      systemctl start "leapctl@${target_uid}.service" || true
+      systemctl start "leapctl@${target_uid}.service" 2>/dev/null || true
    done
 
    touch "/var/lib/privleap/do_once/${FUNCNAME}_version_1"
+}
+
+start_privleapd() {
+   ## debhelper seems to not reliably start the service after installation,
+   ## so we have to start it explicitly.
+   deb-systemd-invoke restart privleapd.service
+   make_privleapd_comm_sockets_first_time_maybe
 }
 
 case "$1" in
    configure)
       deb-systemd-helper enable privleapd.service
       deb-systemd-helper enable leapctl@.service
+      start_privleapd
    ;;
 
    abort-upgrade|abort-remove|abort-deconfigure)
    ;;
 
    triggered)
-      ## debhelper seems to not reliably start the service after installation,
-      ## so we have to start it explicitly.
-      deb-systemd-invoke restart privleapd.service
-      make_privleapd_comm_sockets_first_time_maybe
+      start_privleapd
    ;;
 
    *)

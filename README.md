@@ -62,7 +62,9 @@ privleapd.service`).
 
 ## Configuration format
 
-privleap stores its configuration under `/etc/privleap/conf.d`. See etc/privleap/conf.d/README in the code for all the details of privleap configuration.
+privleap stores its configuration under `/etc/privleap/conf.d`. See
+etc/privleap/conf.d/README in the code for all the details of privleap
+configuration.
 
 ## Protocol
 
@@ -71,34 +73,25 @@ own privleap client or server, this should give you the information you need.
 
 ## Testing
 
-The recommended way to run privleap's regression tests is with autopkgtest. You
-will need a Debian 12 machine to build the privleap package and run the tests.
-Note that running the tests directly on a VM or bare metal hardware is not
-supported, as the test results may vary depending on the environment the tests
-are run in. autopkgtest ensures a consistent environment to prevent this from
-being a problem.
+The following dependencies must be installed on the host system to run the test
+suite:
 
-* Install `mmdebstrap`, `debhelper`, `python3`, and `autopkgtest` on
-  your machine.
-* Create an isolated testing environment by running the following commands:
+* [helper-scripts](https://github.com/Kicksecure/helper-scripts)
+* mmdebstrap
+* debhelper
+* python3
+* autopkgtest
 
-    mkdir -p ~/.cache/sbuild
-    sudo mmdebstrap \
-      --include=ca-certificates \
-      --skip=output/dev \
-      --variant=buildd \
-      bookworm \
-      ~/.cache/sbuild/bookworm-amd64.tar.zst \
-      --customize-hook='chroot "$1" passwd --delete root' \
-      --customize-hook='chroot "$1" useradd --home-dir /home/user --create-home user' \
-      --customize-hook='chroot "$1" passwd --delete user' \
-      --customize-hook='cp /etc/hosts "$1/etc/hosts"' \
-      --customize-hook=/usr/share/autopkgtest/setup-commands/setup-testbed \
-      https://deb.debian.org/debian
+Additionally, the `/usr/bin/newuidmap` and `/usr/bin/newgidmap` 
+executables must be SUID-root.
 
-* Build the privleap package by `cd`'ing to the privleap source tree, and
-  running `dpkg-buildpackage -b -us -uc`. This will produce a `.deb` file in
-  the parent directory.
-* Run the autopkgtest by running `cd ..`, then
-  `autopkgtest --apt-upgrade -B privleap*.deb ./privleap -- unshare`. The tests
-  will run in an unshare-based chroot.
+It is recommended, though not necessarily required, that the host system 
+be running Debian 12 or a compatible derivative thereof such as
+[Kicksecure](https://www.kicksecure.com/).
+
+The test suite leverages Debian's autopkgtest tool, which allows running 
+the test suite in an isolated environment, unaffected by the host's 
+configuration for the most part. To run the tests, simply run the 
+`run_autopkgtest` script from the root of the source tree. The script will 
+function regardless of what your current working directory is when you 
+call it.

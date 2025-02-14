@@ -11,10 +11,10 @@ name adheres to the filename requirements. (The file used as the symlink's
 target is not obligated to follow the filename requirements, since its
 filename isn't used in any meaningful way by privleap.)
 
-Each configuration file can define either actions, enabled users, or
+Each configuration file can define either actions, allowed users, or
 persistent users. Actions are snippets of Bash code accompanied by metadata
 describing what user the code should run as and what users are authorized to
-run that code. Enabled users are user accounts that are permitted to talk to
+run that code. Allowed users are user accounts that are permitted to talk to
 privleapd - these users can have comm sockets created for them using leapctl.
 Persistent users are users who have privleap comm sockets  created for them
 when privleap launches, and that can't have their sockets destroyed normally.
@@ -46,14 +46,14 @@ Each configuration file is formatted as follows:
     * TargetUser= - The user that the action will run as. Defaults to "root".
     * TargetGroup= - The group that the action will run as. Defaults to
       "root".
-* Each enabled user configuration section starts with the special header
-  "[enabled-users]". Underneath this header, the only recognized key is
-  "User=", followed by the name of the enabled user. An arbitrary number of
+* Each allowed user configuration section starts with the special header
+  "[allowed-users]". Underneath this header, the only recognized key is
+  "User=", followed by the name of the allowed user. An arbitrary number of
   these key-value pairs may exist underneath the header. It is not an error
-  for the privleap configuration to contain multiple "[enabled-users]"
+  for the privleap configuration to contain multiple "[allowed-users]"
   sections, and it is not an error for the same user to be defined as an
-  enabled user more than once. Finally, it is not an error for a user to be
-  defined as enabled when that user doesn't exist - such users are simply
+  allowed user more than once. Finally, it is not an error for a user to be
+  defined as allowed when that user doesn't exist - such users are simply
   skipped over.
 * Each persistent user configuration section starts with the special header
   "[persistent-users]". Underneath this header, the only recognized key is
@@ -76,9 +76,9 @@ An example config file might look something like:
 
     [show-messagebus-id-info]
     Command=id
-    AuthorizedGroup=sudo
+    AuthorizedGroups=sudo
 
-    [enabled-users]
+    [allowed-users]
     User=user
 
     [persistent-users]
