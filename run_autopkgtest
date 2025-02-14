@@ -10,6 +10,7 @@ set -o pipefail
 
 autopkgtest_tarball_path="$HOME/.cache/sbuild/bookworm-amd64.tar.zst"
 privleap_project_dir="$(dirname "$(readlink -f "${0}")")"
+target_distribution="bookworm"
 
 create_autopkgtest_tarball() {
   mkdir -p ~/.cache/sbuild
@@ -17,8 +18,8 @@ create_autopkgtest_tarball() {
     --include=ca-certificates \
     --skip=output/dev \
     --variant=buildd \
-    bookworm \
-    ~/.cache/sbuild/bookworm-amd64.tar.zst \
+    "${target_distribution}" \
+    "${HOME}/.cache/sbuild/${target_distribution}-amd64.tar.zst" \
     --customize-hook='chroot "$1" passwd --delete root' \
     --customize-hook='chroot "$1" useradd --home-dir /home/user --create-home user' \
     --customize-hook='chroot "$1" passwd --delete user' \
