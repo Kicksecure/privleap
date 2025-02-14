@@ -8,20 +8,11 @@ set -o nounset
 set -o errtrace
 set -o pipefail
 
-# shellcheck source=../helper-scripts/usr/libexec/helper-scripts/log_run_die.sh
-source /usr/libexec/helper-scripts/log_run_die.sh
-
 autopkgtest_tarball_path="$HOME/.cache/sbuild/bookworm-amd64.tar.zst"
 privleap_project_dir="$(dirname "$(readlink -f "${0}")")"
 
 create_autopkgtest_tarball() {
-  local tmp_file
-  tmp_file="$(mktemp)"
   mkdir -p ~/.cache/sbuild
-  wget -O "${tmp_file}" https://www.kicksecure.com/keys/derivative.asc
-  ## sudo is not needed to build the tarball, unshare is automatically used
-  ## instead.
-  # shellcheck disable=SC2016
   sudo mmdebstrap \
     --include=ca-certificates \
     --skip=output/dev \
@@ -33,37 +24,42 @@ create_autopkgtest_tarball() {
     --customize-hook='chroot "$1" passwd --delete user' \
     --customize-hook='cp /etc/hosts "$1/etc/hosts"' \
     --customize-hook=/usr/share/autopkgtest/setup-commands/setup-testbed \
-    --customize-hook="cp ${tmp_file} \"\$1/usr/share/keyrings/derivative.asc\"" \
-    --customize-hook='echo "deb [signed-by=/usr/share/keyrings/derivative.asc] https://deb.kicksecure.com bookworm main contrib non-free" >> "$1/etc/apt/sources.list"' \
     https://deb.debian.org/debian
-  rm "${tmp_file}"
 }
 
 run_autopkgtest() {
   ## Ensure unshare executable exists, it's critical for this script to work
   if ! [ -x '/usr/bin/unshare' ]; then
-    die 1 'Cannot find unshare executable!'
+    1>&2 echo 'Cannot find unshare executable!'
+    exit 1
   fi
   if [ "$(basename "${privleap_project_dir}")" != 'privleap' ]; then
-    die 1 'The run_autopkgtest script does not appear to be in the root of the privleap source tree!'
+    1>&2 echo 'The run_autopkgtest script does not appear to be in the root of the privleap source tree!'
+    exit 1
   fi
   if [ "$(stat -c "%u|%a" /usr/bin/newuidmap)" != '0|4755' ]; then
-    die 1 'autopkgtest requires /usr/bin/newuidmap to be SUID-root!'
+    1>&2 echo 'autopkgtest requires /usr/bin/newuidmap to be SUID-root!'
+    exit 1
   fi
   if [ "$(stat -c "%u|%a" /usr/bin/newgidmap)" != '0|4755' ]; then
-    die 1 'autopkgtest requires /usr/bin/newgidmap to be SUID-root!'
+    1>&2 echo 'autopkgtest requires /usr/bin/newgidmap to be SUID-root!'
+    exit 1
   fi
   if [ "$(pwd)" != "${privleap_project_dir}" ]; then
-    cd "${privleap_project_dir}" >/dev/null \
-      || die 1 'Cannot change to privleap source tree directory!'
+    cd "${privleap_project_dir}" >/dev/null || {
+      1>&2 echo 'Cannot change to privleap source tree directory!'
+      exit 1
+    }
   fi
 
   if ! [ -f "${autopkgtest_tarball_path}" ]; then
     create_autopkgtest_tarball
   fi
 
-  dpkg-buildpackage -i -us -uc -b \
-    || die 1 'Cannot build privleap deb package!'
+  dpkg-buildpackage -i -us -uc -b || {
+    1>&2 echo 'Cannot build privleap deb package!'
+    exit 1
+  }
   cd ..
   autopkgtest -l "${privleap_project_dir}/privleap-test-log.txt" \
     --apt-upgrade -B privleap*.deb "${privleap_project_dir}" -- unshare
