@@ -5,6 +5,12 @@
 Description=privleap - Limited Privilege Escalation Framework
 StartLimitIntervalSec=10
 StartLimitBurst=3
+DefaultDependencies=no
+Requires=sysinit.target
+After=sysinit.target
+Conflicts=shutdown.target
+Before=basic.target
+Before=shutdown.target
 
 [Service]
 Type=notify
