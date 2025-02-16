@@ -231,7 +231,7 @@ def run_leapctl_tests() -> None:
     """
 
     # ---
-    util.start_privleapd_subprocess()
+    util.start_privleapd_subprocess([])
     leapctl_assert_command(["leapctl", "--create", "nonexistent"],
         exit_code = 1,
         stderr_data = PlTestData.specified_user_missing)
@@ -327,7 +327,7 @@ def run_leapctl_tests() -> None:
     util.stop_privleapd_subprocess()
     leapctl_assert_function(leapctl_create_deleteme_user, "",
         "Create user for deleted user socket destroy test")
-    util.start_privleapd_subprocess()
+    util.start_privleapd_subprocess([])
     leapctl_assert_command(["leapctl", "--create", "deleteme"],
         exit_code = 0,
         stdout_data = b"Comm socket created for user 'deleteme'.\n")
@@ -465,7 +465,7 @@ def run_leaprun_tests() -> None:
     """
 
     # ---
-    util.start_privleapd_subprocess()
+    util.start_privleapd_subprocess([])
     leaprun_assert_command(["sudo", "-u", PlTestGlobal.test_username, "leaprun",
         "test"],
         exit_code = 1,
@@ -480,7 +480,7 @@ def run_leaprun_tests() -> None:
         exit_code = 1,
         stderr_data = PlTestData.privleapd_connection_failed)
     # ---
-    util.start_privleapd_subprocess()
+    util.start_privleapd_subprocess([])
     leaprun_assert_command(["leapctl", "--create", PlTestGlobal.test_username],
         exit_code = 0,
         stdout_data = PlTestData.test_username_socket_created)
@@ -702,7 +702,23 @@ def privleapd_bad_config_file_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.start_privleapd_subprocess(allow_error_output = True)
+    util.start_privleapd_subprocess([], allow_error_output = True)
+    if not util.compare_privleapd_stderr(
+        PlTestData.bad_config_file_lines):
+        stop_privleapd_subprocess()
+        return False
+    stop_privleapd_subprocess()
+    return True
+
+def privleapd_bad_config_file_check_test(bogus: str) -> bool:
+    """
+    Tests how privleapd handles a bad config file when using --check-config.
+    """
+
+    if bogus != "":
+        return False
+    util.start_privleapd_subprocess(["--check-config"],
+        allow_error_output = True)
     if not util.compare_privleapd_stderr(
         PlTestData.bad_config_file_lines):
         stop_privleapd_subprocess()
@@ -1318,7 +1334,7 @@ def run_privleapd_tests() -> None:
     """
 
     # ---
-    util.start_privleapd_subprocess()
+    util.start_privleapd_subprocess([])
     privleapd_assert_function(privleapd_check_persistent_users_test, "",
         "Ensure all configured persistent users have comm sockets")
     # ---
@@ -1334,7 +1350,7 @@ def run_privleapd_tests() -> None:
     # ---
     privleapd_assert_function(write_config_file_with_bad_name, "",
         "Write config file that privleapd will ignore")
-    util.start_privleapd_subprocess()
+    util.start_privleapd_subprocess([])
     privleapd_assert_command(["leapctl", "--create",
         PlTestGlobal.test_username],
         exit_code = 0,
@@ -1349,11 +1365,14 @@ def run_privleapd_tests() -> None:
         "Write config file with invalid contents")
     privleapd_assert_function(privleapd_bad_config_file_test, "",
         "Test privleapd behavior with bad config file")
+    # ---
+    privleapd_assert_function(privleapd_bad_config_file_check_test, "",
+        "Test privleapd behavior when checking bad config file")
     privleapd_assert_function(try_remove_file,
         str(Path(PlTestGlobal.privleap_conf_dir, "crash.conf")),
         "Remove config file with invalid contents")
     # ---
-    util.start_privleapd_subprocess()
+    util.start_privleapd_subprocess([])
     privleapd_assert_function(privleapd_control_disconnect_test, "",
         "Test privleapd client instant disconnect on control socket")
     # ---
@@ -1447,6 +1466,10 @@ def run_privleapd_tests() -> None:
     for i in range(0, len(PlTestData.invalid_ascii_list)):
         privleapd_assert_function(privleapd_invalid_ascii_test,
             str(i), f"Test privleapd invalid ASCII handling (iteration {i+1})")
+    # ---
+    privleapd_assert_command(["/usr/bin/privleapd", "-C"],
+        exit_code = 0,
+        stderr_data = b"main: INFO: privleap config is OK.\n")
     # ---
 
     logging.info("privleapd passed asserts: %s, failed asserts: %s",

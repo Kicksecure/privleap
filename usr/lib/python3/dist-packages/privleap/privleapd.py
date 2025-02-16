@@ -761,7 +761,7 @@ def main() -> NoReturn:
             continue
         if arg == "--test":
             PrivleapdGlobal.in_test_mode = True
-        if arg == "-C" or arg == "--check-config":
+        elif arg == "-C" or arg == "--check-config":
             PrivleapdGlobal.check_config_mode = True
         else:
             logging.critical(f"Unrecognized argument '{arg}'!")

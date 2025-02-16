@@ -203,7 +203,8 @@ def stop_privleapd_service() -> None:
             exc_info = e)
         sys.exit(1)
 
-def start_privleapd_subprocess(allow_error_output: bool = False) -> None:
+def start_privleapd_subprocess(extra_args: list[str],
+    allow_error_output: bool = False) -> None:
     """
     Launches privleapd as a subprocess so its output can be monitored by the
       tester.
@@ -214,8 +215,10 @@ def start_privleapd_subprocess(allow_error_output: bool = False) -> None:
         # Rationale:
         #   consider-using-with: "with" is not suitable for the architecture of
         #   this script in this scenario.
-        PlTestGlobal.privleapd_proc = subprocess.Popen(["/usr/bin/privleapd",
-            "--test"],
+        full_args: list[str] = ["/usr/bin/privleapd", "--test"]
+        for arg in extra_args:
+            full_args.append(arg)
+        PlTestGlobal.privleapd_proc = subprocess.Popen(full_args,
             stdout = subprocess.PIPE,
             stderr = subprocess.PIPE,
             encoding = "utf-8")
