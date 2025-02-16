@@ -607,11 +607,12 @@ def parse_config_files() -> None:
                 action_arr, persistent_user_arr, allowed_user_arr \
                     = pl.PrivleapCommon.parse_config_file(f.read())
             for action_item in action_arr:
-                if action_item not in PrivleapdGlobal.action_list:
-                    PrivleapdGlobal.action_list.append(action_item)
-                else:
-                    raise ValueError(f"Duplicate action '{action_item}' "
-                        "found!")
+                for existing_action_item in PrivleapdGlobal.action_list:
+                    if action_item.action_name \
+                        == existing_action_item.action_name:
+                        raise ValueError("Duplicate action "
+                            f"'{action_item.action_name}' found!")
+                PrivleapdGlobal.action_list.append(action_item)
             for persistent_user_item in persistent_user_arr:
                 # Note, parse_config_file() normalizes the usernames of
                 # persistent users for us.
@@ -761,13 +762,12 @@ def main() -> NoReturn:
             continue
         if arg == "--test":
             PrivleapdGlobal.in_test_mode = True
-        elif arg == "-C" or arg == "--check-config":
+        elif arg in ("-C", "--check-config"):
             PrivleapdGlobal.check_config_mode = True
         else:
-            logging.critical(f"Unrecognized argument '{arg}'!")
+            logging.critical("Unrecognized argument '%s'!", arg)
             sys.exit(1)
 
-    # TODO: Write automated test to ensure check config mode works as intended.
     if PrivleapdGlobal.check_config_mode:
         parse_config_files()
         logging.info("privleap config is OK.")

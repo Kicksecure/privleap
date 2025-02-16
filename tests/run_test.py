@@ -676,6 +676,22 @@ def write_bad_config_file(bogus: str) -> bool:
     except Exception:
         return False
 
+def write_duplicate_action_config_file(bogus: str) -> bool:
+    """
+    Writes a config file with an action name that already exists in another
+      config file. This should crash privleapd.
+    """
+
+    if bogus != "":
+        return False
+    try:
+        with open(Path(PlTestGlobal.privleap_conf_dir, "duplicate.conf"),
+            "w", encoding = "utf-8") as config_file:
+            config_file.write(PlTestData.duplicate_action_config_file)
+            return True
+    except Exception:
+        return False
+
 def privleapd_check_persistent_users_test(bogus: str) -> bool:
     """
     Ensures all persistent users configured in privleapd's test configuration
@@ -721,6 +737,22 @@ def privleapd_bad_config_file_check_test(bogus: str) -> bool:
         allow_error_output = True)
     if not util.compare_privleapd_stderr(
         PlTestData.bad_config_file_lines):
+        stop_privleapd_subprocess()
+        return False
+    stop_privleapd_subprocess()
+    return True
+
+def privleapd_duplicate_action_config_file_test(bogus: str) -> bool:
+    """
+    Tests how privleapd handles a config file containing a duplicate action
+      name.
+    """
+
+    if bogus != "":
+        return False
+    util.start_privleapd_subprocess([], allow_error_output = True)
+    if not util.compare_privleapd_stderr(
+        PlTestData.duplicate_config_file_lines):
         stop_privleapd_subprocess()
         return False
     stop_privleapd_subprocess()
@@ -1371,6 +1403,14 @@ def run_privleapd_tests() -> None:
     privleapd_assert_function(try_remove_file,
         str(Path(PlTestGlobal.privleap_conf_dir, "crash.conf")),
         "Remove config file with invalid contents")
+    # ---
+    privleapd_assert_function(write_duplicate_action_config_file, "",
+        "Write config file with duplicate action name")
+    privleapd_assert_function(privleapd_duplicate_action_config_file_test, "",
+        "Test privleapd behavior with duplicate action config file")
+    privleapd_assert_function(try_remove_file,
+        str(Path(PlTestGlobal.privleap_conf_dir, "duplicate.conf")),
+        "Remove config file with duplicate action name")
     # ---
     util.start_privleapd_subprocess([])
     privleapd_assert_function(privleapd_control_disconnect_test, "",

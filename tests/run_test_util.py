@@ -490,6 +490,10 @@ Command=echo 'test-act-invalid'
     crash_config_file: str = """[test-act-crash]
 Commandecho 'test-act-crash'
 """
+    duplicate_action_config_file: str = """[test-act-sudopermit]
+Command=echo 'duplicate-test-act-sudopermit'
+AuthorizedGroups=sudo
+"""
     test_username_create_error: bytes \
         = (b"ERROR: privleapd encountered an error while creating a comm "
            b"socket for user '"
@@ -790,4 +794,10 @@ Commandecho 'test-act-crash'
         [ "get_signal_msg: ERROR: Could not get message from client!\n",
           "Traceback (most recent call last):\n",
           "ValueError: recv_buf contains data past the last string\n" ]
+    ]
+    duplicate_config_file_lines: list[str] = [
+        "parse_config_files: CRITICAL: Failed to load config file "
+        + "'/etc/privleap/conf.d/unit-test.conf'!\n",
+        "Traceback (most recent call last):\n",
+        "ValueError: Duplicate action 'test-act-sudopermit' found!\n"
     ]
