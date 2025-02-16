@@ -944,7 +944,9 @@ class PrivleapCommon:
     #     parses configuration data, splitting it up would be unreasonable and
     #     make it more difficult to read. Each section of the config file has
     #     quite a bit of data, so parsing is non-trivial.
-    def parse_config_file(config_file: str) \
+    # TODO: Changed my mind about splitting this up being a bad idea, try to
+    #   split it up if at all possible, this thing is getting way too big.
+    def parse_config_file(config_file: Path) \
         -> Tuple[list[PrivleapAction], list[str], list[str]]:
         """
         Parses the data from a privleap configuration file and returns all
@@ -959,6 +961,7 @@ class PrivleapCommon:
         line_idx: int = 0
         detect_comment_regex: re.Pattern[str] = re.compile(r"\s*#")
         detect_header_regex: re.Pattern[str] = re.compile(r"\[.*]\Z")
+        current_header_name: str | None = None
         current_action_name: str | None = None
         current_action_command: str | None = None
         current_auth_users: list[str] = []
@@ -997,7 +1000,7 @@ class PrivleapCommon:
                     else:
                         first_header_parsed = True
 
-                    current_header_name: str = line[1:len(line)-1]
+                    current_header_name = line[1:len(line)-1]
                     if current_header_name == "persistent-users":
                         current_section_type \
                             = PrivleapConfigSection.PERSISTENT_USERS
@@ -1013,7 +1016,7 @@ class PrivleapCommon:
                 if len(line_parts) != 2:
                     print(f"{config_file}:{line_idx}:error:Invalid syntax",
                         file = sys.stderr)
-                    raise ValueError(f"Failed to parse config!")
+                    raise ValueError("Failed to parse config!")
 
                 config_key: str = line_parts[0]
                 config_val: str | None = line_parts[1]
@@ -1035,7 +1038,8 @@ class PrivleapCommon:
                             raise ValueError("Failed to parse config!")
                     else:
                         print(f"{config_file}:{line_idx}:error:Unrecognized "
-                            f"key '{config_key}'",
+                            f"key '{config_key}' found under header "
+                            f"'{current_header_name}'",
                             file = sys.stderr)
                         raise ValueError("Failed to parse config!")
                 elif current_section_type \
@@ -1049,7 +1053,8 @@ class PrivleapCommon:
                                 allowed_user_output_list.append(config_val)
                     else:
                         print(f"{config_file}:{line_idx}:error:Unrecognized "
-                            f"key '{config_key}'",
+                            f"key '{config_key}' found under header "
+                            f"'{current_header_name}'",
                             file = sys.stderr)
                         raise ValueError("Failed to parse config!")
                 else:
@@ -1067,7 +1072,8 @@ class PrivleapCommon:
                         current_target_group = config_val
                     else:
                         print(f"{config_file}:{line_idx}:error:Unrecognized "
-                            f"key '{config_key}'",
+                            f"key '{config_key}' found under header "
+                            f"'{current_header_name}'",
                             file = sys.stderr)
                         raise ValueError("Failed to parse config!")
 

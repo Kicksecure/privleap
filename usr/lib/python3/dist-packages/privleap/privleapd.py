@@ -24,7 +24,7 @@ import logging
 import time
 from enum import Enum
 from pathlib import Path
-from typing import Tuple, cast, SupportsIndex, IO, NoReturn
+from typing import Tuple, cast, SupportsIndex, IO, NoReturn, Any
 
 import sdnotify # type: ignore
 # import privleap as pl
@@ -586,6 +586,14 @@ def cleanup_old_state_dir() -> None:
                 str(pl.PrivleapCommon.state_dir), exc_info = e)
             sys.exit(1)
 
+def append_if_not_in(item: Any, item_list: list[Any]) -> None:
+    """
+    Append an item to a list if the item is not already in the list.
+    """
+
+    if item not in item_list:
+        item_list.append(item)
+
 def parse_config_files() -> None:
     """
     Parses all config files under /etc/privleap/conf.d.
@@ -615,33 +623,33 @@ def parse_config_files() -> None:
             for persistent_user_item in persistent_user_arr:
                 # Note, parse_config_file() normalizes the usernames of
                 # persistent users for us.
-                if persistent_user_item not in \
-                    PrivleapdGlobal.persistent_user_list:
-                    PrivleapdGlobal.persistent_user_list.append(
-                        persistent_user_item)
+                append_if_not_in(persistent_user_item,
+                    PrivleapdGlobal.persistent_user_list)
                 # Persistent users are automatically allowed users too.
-                if persistent_user_item not in \
-                    PrivleapdGlobal.allowed_user_list:
-                    PrivleapdGlobal.allowed_user_list.append(
-                        persistent_user_item)
+                append_if_not_in(persistent_user_item,
+                    PrivleapdGlobal.allowed_user_list)
                 # It isn't an error for duplicate persistent users to be
                 # defined, we just skip over the duplicates.
             for allowed_user_item in allowed_user_arr:
                 # Note, parse_config_file() normalizes the usernames of
                 # allowed users for us.
-                if allowed_user_item not in \
-                    PrivleapdGlobal.allowed_user_list:
-                    PrivleapdGlobal.allowed_user_list.append(
-                        allowed_user_item)
+                append_if_not_in(allowed_user_item,
+                    PrivleapdGlobal.allowed_user_list)
                 # It isn't an error for duplicate allowed users to be
                 # defined, we just skip over the duplicates.
         except Exception as e:
             logging.critical("Failed to load config file '%s'!",
                 str(config_file), exc_info = e)
             if PrivleapdGlobal.check_config_mode:
+                # pylint: disable=raise-missing-from
+                # Rationale:
+                #   raise-missing-from: We're only using an exception here to
+                #     notify the config check mechanism that config parsing
+                #     failed. We do not need to re-raise the earlier exception,
+                #     and we already print out the earlier exception's traceback
+                #     using logging.critical().
                 raise ValueError("Config check failed!")
-            else:
-                sys.exit(1)
+            sys.exit(1)
 
 def populate_state_dir() -> None:
     """
