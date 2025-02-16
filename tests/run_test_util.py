@@ -576,12 +576,20 @@ AuthorizedGroups=sudo
         = (b"uid=1002("
            + PlTestGlobal.test_username_bytes
            + b") gid=0(root) groups=0(root)\n")
-    # noinspection SpellCheckingInspection
     bad_config_file_lines: list[str] = [
+        "/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax\n",
         "parse_config_files: CRITICAL: Failed to load config file "
         + "'/etc/privleap/conf.d/crash.conf'!\n",
         "Traceback (most recent call last):\n",
-        "ValueError: Invalid config line 'Commandecho 'test-act-crash''\n"
+        "ValueError: Failed to parse config!\n"
+    ]
+    bad_config_file_check_lines: list[str] = [
+        "/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax\n",
+        "parse_config_files: CRITICAL: Failed to load config file "
+        + "'/etc/privleap/conf.d/crash.conf'!\n",
+        "Traceback (most recent call last):\n",
+        "ValueError: Failed to parse config!\n",
+        "main: CRITICAL: privleap config is bad.\n"
     ]
     control_disconnect_lines: list[str] = [
         "handle_control_session: ERROR: Could not get message from client!\n",

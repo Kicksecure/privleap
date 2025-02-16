@@ -736,7 +736,7 @@ def privleapd_bad_config_file_check_test(bogus: str) -> bool:
     util.start_privleapd_subprocess(["--check-config"],
         allow_error_output = True)
     if not util.compare_privleapd_stderr(
-        PlTestData.bad_config_file_lines):
+        PlTestData.bad_config_file_check_lines):
         stop_privleapd_subprocess()
         return False
     stop_privleapd_subprocess()

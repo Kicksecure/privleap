@@ -600,12 +600,11 @@ def parse_config_files() -> None:
             continue
 
         try:
-            with open(config_file, "r", encoding = "utf-8") as f:
-                action_arr: list[pl.PrivleapAction]
-                persistent_user_arr: list[str]
-                allowed_user_arr: list[str]
-                action_arr, persistent_user_arr, allowed_user_arr \
-                    = pl.PrivleapCommon.parse_config_file(f.read())
+            action_arr: list[pl.PrivleapAction]
+            persistent_user_arr: list[str]
+            allowed_user_arr: list[str]
+            action_arr, persistent_user_arr, allowed_user_arr \
+                = pl.PrivleapCommon.parse_config_file(config_file)
             for action_item in action_arr:
                 for existing_action_item in PrivleapdGlobal.action_list:
                     if action_item.action_name \
@@ -639,7 +638,10 @@ def parse_config_files() -> None:
         except Exception as e:
             logging.critical("Failed to load config file '%s'!",
                 str(config_file), exc_info = e)
-            sys.exit(1)
+            if PrivleapdGlobal.check_config_mode:
+                raise ValueError("Config check failed!")
+            else:
+                sys.exit(1)
 
 def populate_state_dir() -> None:
     """
@@ -769,7 +771,11 @@ def main() -> NoReturn:
             sys.exit(1)
 
     if PrivleapdGlobal.check_config_mode:
-        parse_config_files()
+        try:
+            parse_config_files()
+        except ValueError:
+            logging.critical("privleap config is bad.")
+            sys.exit(1)
         logging.info("privleap config is OK.")
         sys.exit(0)
 

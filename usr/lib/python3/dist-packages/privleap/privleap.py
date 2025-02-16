@@ -20,7 +20,7 @@ import stat
 import pwd
 import grp
 import re
-from io import StringIO
+import sys
 from pathlib import Path
 from typing import Tuple
 from enum import Enum
@@ -944,7 +944,7 @@ class PrivleapCommon:
     #     parses configuration data, splitting it up would be unreasonable and
     #     make it more difficult to read. Each section of the config file has
     #     quite a bit of data, so parsing is non-trivial.
-    def parse_config_file(config_data: str) \
+    def parse_config_file(config_file: str) \
         -> Tuple[list[PrivleapAction], list[str], list[str]]:
         """
         Parses the data from a privleap configuration file and returns all
@@ -956,7 +956,7 @@ class PrivleapCommon:
         allowed_user_output_list: list[str] = []
         current_section_type: PrivleapConfigSection \
             = PrivleapConfigSection.ACTION
-        conf_stream: StringIO = StringIO(config_data)
+        line_idx: int = 0
         detect_comment_regex: re.Pattern[str] = re.compile(r"\s*#")
         detect_header_regex: re.Pattern[str] = re.compile(r"\[.*]\Z")
         current_action_name: str | None = None
@@ -966,90 +966,110 @@ class PrivleapCommon:
         current_target_user: str | None = None
         current_target_group: str | None = None
         first_header_parsed: bool = False
-        for line in conf_stream:
-            line = line.strip()
-            if line == "":
-                continue
+        with open(config_file, "r", encoding = "utf-8") as conf_stream:
+            for line in conf_stream:
+                line_idx += 1
+                line = line.strip()
+                if line == "":
+                    continue
 
-            if detect_comment_regex.match(line):
-                continue
+                if detect_comment_regex.match(line):
+                    continue
 
-            if detect_header_regex.match(line):
-                if first_header_parsed:
-                    if current_section_type == PrivleapConfigSection.ACTION:
-                        action_output_list.append(PrivleapAction(
-                            current_action_name,
-                            current_action_command,
-                            current_auth_users,
-                            current_auth_groups,
-                            current_target_user,
-                            current_target_group))
-                        # We don't need to nullify current_action_name since we
-                        # set its value below.
-                        # current_action_name = None
-                        current_action_command = None
-                        current_auth_users = []
-                        current_auth_groups = []
-                        current_target_user = None
-                        current_target_group = None
-                else:
-                    first_header_parsed = True
-
-                current_header_name: str = line[1:len(line)-1]
-                if current_header_name == "persistent-users":
-                    current_section_type \
-                        = PrivleapConfigSection.PERSISTENT_USERS
-                elif current_header_name == "allowed-users":
-                    current_section_type \
-                        = PrivleapConfigSection.ALLOWED_USERS
-                else:
-                    current_action_name = current_header_name
-                    current_section_type = PrivleapConfigSection.ACTION
-                continue
-
-            line_parts: list[str] = line.split('=', maxsplit = 1)
-            if len(line_parts) != 2:
-                raise ValueError(f"Invalid config line '{line}'")
-
-            config_key: str = line_parts[0]
-            config_val: str | None = line_parts[1]
-            if current_section_type == PrivleapConfigSection.PERSISTENT_USERS:
-                if config_key == "User":
-                    assert config_val is not None
-                    orig_config_val: str = config_val
-                    config_val = PrivleapCommon.normalize_user_id(config_val)
-                    if config_val is not None:
-                        if config_val not in persistent_user_output_list:
-                            persistent_user_output_list.append(config_val)
+                if detect_header_regex.match(line):
+                    if first_header_parsed:
+                        if current_section_type == PrivleapConfigSection.ACTION:
+                            action_output_list.append(PrivleapAction(
+                                current_action_name,
+                                current_action_command,
+                                current_auth_users,
+                                current_auth_groups,
+                                current_target_user,
+                                current_target_group))
+                            # We don't need to nullify current_action_name since
+                            # we set its value below.
+                            # current_action_name = None
+                            current_action_command = None
+                            current_auth_users = []
+                            current_auth_groups = []
+                            current_target_user = None
+                            current_target_group = None
                     else:
-                        raise ValueError("Requested persistent user "
-                            f"'{orig_config_val}' does not exist!")
+                        first_header_parsed = True
+
+                    current_header_name: str = line[1:len(line)-1]
+                    if current_header_name == "persistent-users":
+                        current_section_type \
+                            = PrivleapConfigSection.PERSISTENT_USERS
+                    elif current_header_name == "allowed-users":
+                        current_section_type \
+                            = PrivleapConfigSection.ALLOWED_USERS
+                    else:
+                        current_action_name = current_header_name
+                        current_section_type = PrivleapConfigSection.ACTION
+                    continue
+
+                line_parts: list[str] = line.split('=', maxsplit = 1)
+                if len(line_parts) != 2:
+                    print(f"{config_file}:{line_idx}:error:Invalid syntax",
+                        file = sys.stderr)
+                    raise ValueError(f"Failed to parse config!")
+
+                config_key: str = line_parts[0]
+                config_val: str | None = line_parts[1]
+                if current_section_type \
+                    == PrivleapConfigSection.PERSISTENT_USERS:
+                    if config_key == "User":
+                        assert config_val is not None
+                        orig_config_val: str = config_val
+                        config_val = PrivleapCommon.normalize_user_id(
+                            config_val)
+                        if config_val is not None:
+                            if config_val not in persistent_user_output_list:
+                                persistent_user_output_list.append(config_val)
+                        else:
+                            print(f"{config_file}:{line_idx}:error:Requested "
+                                f"persistent user '{orig_config_val}' does not "
+                                "exist",
+                                file = sys.stderr)
+                            raise ValueError("Failed to parse config!")
+                    else:
+                        print(f"{config_file}:{line_idx}:error:Unrecognized "
+                            f"key '{config_key}'",
+                            file = sys.stderr)
+                        raise ValueError("Failed to parse config!")
+                elif current_section_type \
+                    == PrivleapConfigSection.ALLOWED_USERS:
+                    if config_key == "User":
+                        assert config_val is not None
+                        config_val = PrivleapCommon.normalize_user_id(
+                            config_val)
+                        if config_val is not None:
+                            if config_val not in allowed_user_output_list:
+                                allowed_user_output_list.append(config_val)
+                    else:
+                        print(f"{config_file}:{line_idx}:error:Unrecognized "
+                            f"key '{config_key}'",
+                            file = sys.stderr)
+                        raise ValueError("Failed to parse config!")
                 else:
-                    raise ValueError(f"Unrecognized key '{config_key}' found")
-            elif current_section_type == PrivleapConfigSection.ALLOWED_USERS:
-                if config_key == "User":
-                    assert config_val is not None
-                    config_val = PrivleapCommon.normalize_user_id(config_val)
-                    if config_val is not None:
-                        if config_val not in allowed_user_output_list:
-                            allowed_user_output_list.append(config_val)
-                else:
-                    raise ValueError("Unrecognized key '{config_key}' found")
-            else:
-                if config_key == "Command":
-                    current_action_command = config_val
-                elif config_key == "AuthorizedUsers":
-                    assert config_val is not None
-                    current_auth_users = config_val.split(",")
-                elif config_key == "AuthorizedGroups":
-                    assert config_val is not None
-                    current_auth_groups = config_val.split(",")
-                elif config_key == "TargetUser":
-                    current_target_user = config_val
-                elif config_key == "TargetGroup":
-                    current_target_group = config_val
-                else:
-                    raise ValueError(f"Unrecognized key '{config_key}' found")
+                    if config_key == "Command":
+                        current_action_command = config_val
+                    elif config_key == "AuthorizedUsers":
+                        assert config_val is not None
+                        current_auth_users = config_val.split(",")
+                    elif config_key == "AuthorizedGroups":
+                        assert config_val is not None
+                        current_auth_groups = config_val.split(",")
+                    elif config_key == "TargetUser":
+                        current_target_user = config_val
+                    elif config_key == "TargetGroup":
+                        current_target_group = config_val
+                    else:
+                        print(f"{config_file}:{line_idx}:error:Unrecognized "
+                            f"key '{config_key}'",
+                            file = sys.stderr)
+                        raise ValueError("Failed to parse config!")
 
         # The last action in the file may not be in the list yet, add it now
         # if needed
