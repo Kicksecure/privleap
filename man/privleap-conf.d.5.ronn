@@ -1,0 +1,135 @@
+privleap-conf.d(5) -- privleap configuration files
+=============================================
+
+<!--
+# copyright (c) 2025 - 2025 encrypted support llc <adrelanos@whonix.org>
+# see the file copying for copying conditions.
+-->
+
+## SYNOPSIS
+`/etc/privleap/conf.d/*.conf`
+
+## DESCRIPTION
+These configuration files define the actions that can be run via privleapd, and
+control how privleapd interacts with user accounts on the local system.
+
+## FILE NAMES
+Each configuration file must end in a `.conf` extension, and the filename must
+consist only of the ASCII 7-bit characters a-z, A-Z, 0-9, underscore (`_`),
+hyphen (`-`), and period (`.`). Files that do not adhere to this requirement are
+silently ignored. Symlinks to files are followed so long as the symlink name
+adheres to the filename requirements. (The file used as the symlink's target
+does not have to follow the filename requirements, since its filename isn't used
+in any meaningful way by privleap.)
+
+## SYNTAX
+Each config file consists of one or more headers, each followed by zero or more
+lines of key/value pairs.
+
+Headers are formatted as `[header]`. Headers may only contain the ASCII 7-bit
+characters a-z, A-Z, 0-9, underscore, hyphen, and period.
+
+Each key/value pair has the key and value separated by an equals sign (`=`). No
+spaces are to be inserted between the key or value and the equals sign, the
+space will become part of the key or value if this is done.
+
+Lines starting with zero or more whitespace characters followed immediately by a
+hash symbol (`#`) are comments.
+
+Blank lines are ignored.
+
+## OPTIONS
+
+The following headers are recognized:
+
+* `[allowed-users]` :
+  Description: Specifies one or more users that shall be permitted to
+  communicate with privleapd. Users that are specified as "allowed" will have
+  communication sockets created for them when a privileged privleap client
+  requests privleapd to create those sockets. If a user is not specified as
+  "allowed", privleapd will refuse to create a communication socket for that
+  user. The `[allowed-users]` section can be specified more than once in
+  privleap's configuration. The contents of each section will be stacked on top
+  of each other.
+
+  Keys:
+
+  `User`: Specifies a user to mark as "allowed". This key may appear
+  multiple times in the section. The same user can be specified multiple
+  times. If the specified user does not exist, the user is skipped over.
+
+* `[persistent-users]` :
+  Description: Specifies one or more users that shall always have open
+  communication sockets for communicating with privleapd. Users that are
+  specified as "persistent" are automatically considered "allowed" as well. The
+  communication sockets for persistent users cannot be destroyed via a request
+  from a privileged privleap client. The `[persistent-users]` section can be
+  specified more than once in privleap's configuration. The contents of each
+  section will be stacked on top of each other.
+
+  Keys:
+
+  `User`: Specifies a user to mark as "persistent". This key may appear
+  multiple times in the section. The same user can be specified multiple
+  times. It is an error to specify a non-existent user as persistent.
+
+* Action headers :
+  Description: Action headers define an action that can be run via privleapd.
+  Any header that is not `[allowed-users]` or `[persistent-users]` is
+  interpreted as an action header. Each action header must appear only once in
+  privleap's configuration, attempting to define two actions with the same
+  header is an error.
+
+  Keys:
+
+  `Command`: A single line of Bash code to run when this action is triggered.
+  This code will be passed verbatim to `/usr/bin/bash -c`.
+
+  `AuthorizedUsers`: A comma-separated list of users that are permitted to run
+  this action. If a user is specified that does not exit, it will be skipped
+  over.
+
+  `AuthorizedGroups`: A comma-separated list of groups who's users are
+  permitted to run this action. If a group is specified that does not exist,
+  it will be skipped over.
+
+  `TargetUser`: The user the action will run as. Defaults to 'root'. It is an
+  error to specify a nonexistent user here.
+
+  `TargetGroup`: The group the action will run as. Defaults to 'root'. It is
+  an error to specify a nonexistent group here.
+
+## NOTES
+privleapd must be restarted for any changes to the configuration directory to
+take effect.
+
+If a configuration file contains an error, privleapd will fail to start.
+
+## EXAMPLE
+
+The following configuration file defines two actions, named `echo-hello` and
+`show-messagebus-id-info`. It also specifies that user `user` is permitted to
+communicate with privleapd, and configures `root` and `sdwdate` as persistent
+users:
+
+    [echo-hello]
+    Command=echo 'Hi!'
+
+    [show-messagebus-id-info]
+    Command=id
+    AuthorizedGroups=sudo
+    TargetUser=messagebus
+    TargetGroup=messagebus
+
+    [allowed-users]
+    User=user
+
+    [persistent-users]
+    User=root
+    User=sdwdate
+
+## WWW
+https://github.com/Kicksecure/privleap
+
+## AUTHOR
+This man page has been written by Aaron Rainbolt (arraybolt3@ubuntu.com).

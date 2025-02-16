@@ -22,8 +22,6 @@ designed for Linux and with PAM support added. Support for two-way
 communication may be added in the future if demand for such a feature is high
 enough.
 
-## Usage
-
 privleap consists of three executables, `leaprun` (the client), `leapctl` (a
 privileged client for interacting with privleap's control mechanism), and
 `privleapd` (the background process). `leaprun` can be used to run actions
@@ -36,34 +34,13 @@ utility to make privleap easier to use from within shell scripts and at the
 command line. `leapctl` should usually only be used by other background
 processes on the system, though it can be useful for debugging.
 
-The full syntax of the `leaprun` command is:
-
-    leaprun <signal_name>
-
-    signal_name : The name of the signal that leap should send. Sending a
-                  signal with a particular name will request privleapd to
-                  trigger an action of the same name.
-
-The full syntax of the `leapctl` command is:
-
-    leapctl <--create|--destroy> <user>
-
-    user : The username or UID of the user account to create or destroy a
-           communication socket of.
-	--create : Specifies that leapctl should request a communication socket to
-	           be created for the specified user.
-	--destroy : Specifies that leapctl should request a communication socket
-	            to be destroyed for the specified user.
-
-`privleapd` is not meant to be executed manually. You should start it using
-your init system (`systemctl start privleapd.service`). If you want to use it
-regularly, you should set it up to autostart (`systemctl enable
-privleapd.service`).
+See the `leaprun(8)`, `leapctl(8)`, and `privleapd(1)` manpages for usage 
+instructions.
 
 ## Configuration format
 
 privleap stores its configuration under `/etc/privleap/conf.d`. See
-etc/privleap/conf.d/README in the code for all the details of privleap
+the `privleap-conf.d(5)` manpage for all the details of privleap
 configuration.
 
 ## Protocol
@@ -73,8 +50,8 @@ own privleap client or server, this should give you the information you need.
 
 ## Testing
 
-The following dependencies must be installed on the host system to run the test
-suite:
+The following dependencies must be installed on the host system to run the
+test suite:
 
 * [helper-scripts](https://github.com/Kicksecure/helper-scripts)
 * mmdebstrap

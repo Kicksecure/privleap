@@ -1,0 +1,27 @@
+.\" generated with Ronn-NG/v0.9.1
+.\" http://github.com/apjanke/ronn-ng/tree/0.9.1
+.TH "LEAPRUN" "8" "January 2020" "privleap" "privleap Manual"
+.SH "NAME"
+\fBleaprun\fR \- Run actions with privleap
+.SH "SYNOPSIS"
+\fBleaprun action_name\fR
+.SH "DESCRIPTION"
+Connects to a privleapd server running on the local machine, and requests that the server run an action defined in privleap's config\. The exact actions that are available to run will vary from system to system\.
+.SH "OPTIONS"
+None\.
+.SH "ENVIRONMENT VARIABLES"
+None\.
+.SH "CONFIG FILES"
+See privleap\-conf\.d(5)\.
+.SH "EXIT CODES"
+1: An error occurred while running or attempting to run the requested action\.
+.P
+When the requested action is run successfully, leaprun will pass through the exit code of the requested action\. This means that if one runs an action that exits 1, leaprun will also exit 1, even if leaprun itself encountered no issues\.
+.SH "EXAMPLES"
+Run an action \fBhello\-world\fR (assuming the action \fBhello\-world\fR is defined in privleap's configuration):
+.P
+\fBleaprun hello\-world\fR
+.SH "WWW"
+https://github\.com/Kicksecure/privleap
+.SH "AUTHOR"
+This man page has been written by Aaron Rainbolt (arraybolt3@ubuntu\.com)

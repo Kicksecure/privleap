@@ -1,0 +1,44 @@
+leaprun(8) -- Run actions with privleap
+=============================================
+
+<!--
+# copyright (c) 2025 - 2025 encrypted support llc <adrelanos@whonix.org>
+# see the file copying for copying conditions.
+-->
+
+## SYNOPSIS
+`leaprun action_name`
+
+## DESCRIPTION
+Connects to a privleapd server running on the local machine, and requests that
+the server run an action defined in privleap's config. The exact actions that
+are available to run will vary from system to system.
+
+## OPTIONS
+None.
+
+## ENVIRONMENT VARIABLES
+None.
+
+## CONFIG FILES
+See privleap-conf.d(5).
+
+## EXIT CODES
+1: An error occurred while running or attempting to run the requested action.
+
+When the requested action is run successfully, leaprun will pass through the
+exit code of the requested action. This means that if one runs an action that
+exits 1, leaprun will also exit 1, even if leaprun itself encountered no
+issues.
+
+## EXAMPLES
+Run an action `hello-world` (assuming the action `hello-world` is defined in
+privleap's configuration):
+
+`leaprun hello-world`
+
+## WWW
+https://github.com/Kicksecure/privleap
+
+## AUTHOR
+This man page has been written by Aaron Rainbolt (arraybolt3@ubuntu.com)

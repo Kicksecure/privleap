@@ -1,0 +1,37 @@
+.\" generated with Ronn-NG/v0.9.1
+.\" http://github.com/apjanke/ronn-ng/tree/0.9.1
+.TH "PRIVLEAPD" "1" "January 2020" "privleap" "privleap Manual"
+.SH "NAME"
+\fBprivleapd\fR \- privleap backend server
+.SH "SYNOPSIS"
+\fBprivleapd [\-C|\-\-check\-config]\fR
+.SH "DESCRIPTION"
+The backend server for privleap\. Runs predefined code snippets as root when requested by an authorized client\. privleapd listens for connections on UNIX sockets under \fB/run/privleapd\fR, it does not send or receive information over a network\.
+.P
+You usually will not need to run this directly \- if \fBprivleap\fR was installed from your distribution's repository, it should be pre\-configured to start on boot\. The one time you usually will want to run it is when ensuring that all configuration is valid before restarting privleapd\.
+.SH "OPTIONS"
+.TP
+\fB\-C\fR, \fB\-\-check\-config\fR
+Checks to ensure the privleap configuration is valid, then outputs a short report and exits\.
+.SH "ENVIRONMENT VARIABLES"
+None\.
+.SH "CONFIG FILES"
+See privleap\-conf\.d(5)\.
+.SH "EXIT CODES"
+0: A config check succeeded\.
+.P
+1: A config check failed, or privleapd crashed\.
+.P
+Note that privleapd will usually not exit at all, as it is designed to run continuously in the background\.
+.SH "EXAMPLES"
+Check to ensure privleap configuration is valid:
+.P
+\fBprivleapd \-C\fR
+.P
+Restart privleapd to load new configuration files:
+.P
+\fBsystemctl restart privleapd\.service\fR
+.SH "WWW"
+https://github\.com/Kicksecure/privleap
+.SH "AUTHOR"
+This man page has been written by Aaron Rainbolt (arraybolt3@ubuntu\.com)\.

@@ -1,0 +1,62 @@
+leapctl(8) -- Administrative utility for privleap
+=============================================
+
+<!--
+# copyright (c) 2025 - 2025 encrypted support llc <adrelanos@whonix.org>
+# see the file copying for copying conditions.
+-->
+
+## SYNOPSIS
+`leapctl (--create|--destroy) username|uid`
+
+## DESCRIPTION
+Provides administrative controls for privleap. Right now this is only used to
+open and close sockets used to allow individual user accounts to communicate
+with the privleapd server.
+
+You usually will not need to run this directly - if `privleap` was installed
+from your distribution's repository, it should be pre-configured to create and
+destroy user communication sockets on user login and logout.
+
+## OPTIONS
+
+* `--create` :
+  Instructs privleapd to create a communication socket for the specified user.
+  This will allow the user to communicate with privleapd and request
+  privileged operations to be run.
+
+* `--destroy` :
+  Instructs privleapd to destroy a communication socket for the specified
+  user. This will prevent the user from communicating with privleapd any
+  further.
+
+## ENVIRONMENT VARIABLES
+None.
+
+## CONFIG FILES
+See privleap-conf.d(5).
+
+## EXIT CODES
+0: The requested operation was successful, or did not need to be done.
+
+1: The requested operation failed.
+
+## EXAMPLES
+Create a communication socket for user `user`:
+
+`leapctl --create user`
+
+Destroy a communication socket for the user with UID 1001:
+
+`leapctl --destroy 1001`
+
+## NOTES
+leapctl communicates with privleapd using a UNIX socket that by default can only
+be read from and written to by `root`. You will therefore usually have to run
+leapctl as root for it to work.
+
+## WWW
+https://github.com/Kicksecure/privleap
+
+## AUTHOR
+This man page has been written by Aaron Rainbolt (arraybolt3@ubuntu.com).
