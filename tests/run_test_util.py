@@ -203,7 +203,8 @@ def stop_privleapd_service() -> None:
             exc_info = e)
         sys.exit(1)
 
-def start_privleapd_subprocess(allow_error_output: bool = False) -> None:
+def start_privleapd_subprocess(extra_args: list[str],
+    allow_error_output: bool = False) -> None:
     """
     Launches privleapd as a subprocess so its output can be monitored by the
       tester.
@@ -214,8 +215,10 @@ def start_privleapd_subprocess(allow_error_output: bool = False) -> None:
         # Rationale:
         #   consider-using-with: "with" is not suitable for the architecture of
         #   this script in this scenario.
-        PlTestGlobal.privleapd_proc = subprocess.Popen(["/usr/bin/privleapd",
-            "--test"],
+        full_args: list[str] = ["/usr/bin/privleapd", "--test"]
+        for arg in extra_args:
+            full_args.append(arg)
+        PlTestGlobal.privleapd_proc = subprocess.Popen(full_args,
             stdout = subprocess.PIPE,
             stderr = subprocess.PIPE,
             encoding = "utf-8")
@@ -487,6 +490,10 @@ Command=echo 'test-act-invalid'
     crash_config_file: str = """[test-act-crash]
 Commandecho 'test-act-crash'
 """
+    duplicate_action_config_file: str = """[test-act-sudopermit]
+Command=echo 'duplicate-test-act-sudopermit'
+AuthorizedGroups=sudo
+"""
     test_username_create_error: bytes \
         = (b"ERROR: privleapd encountered an error while creating a comm "
            b"socket for user '"
@@ -569,12 +576,20 @@ Commandecho 'test-act-crash'
         = (b"uid=1002("
            + PlTestGlobal.test_username_bytes
            + b") gid=0(root) groups=0(root)\n")
-    # noinspection SpellCheckingInspection
     bad_config_file_lines: list[str] = [
+        "/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax\n",
         "parse_config_files: CRITICAL: Failed to load config file "
         + "'/etc/privleap/conf.d/crash.conf'!\n",
         "Traceback (most recent call last):\n",
-        "ValueError: Invalid config line 'Commandecho 'test-act-crash''\n"
+        "ValueError: Failed to parse config!\n"
+    ]
+    bad_config_file_check_lines: list[str] = [
+        "/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax\n",
+        "parse_config_files: CRITICAL: Failed to load config file "
+        + "'/etc/privleap/conf.d/crash.conf'!\n",
+        "Traceback (most recent call last):\n",
+        "ValueError: Failed to parse config!\n",
+        "main: CRITICAL: privleap config is bad.\n"
     ]
     control_disconnect_lines: list[str] = [
         "handle_control_session: ERROR: Could not get message from client!\n",
@@ -787,4 +802,10 @@ Commandecho 'test-act-crash'
         [ "get_signal_msg: ERROR: Could not get message from client!\n",
           "Traceback (most recent call last):\n",
           "ValueError: recv_buf contains data past the last string\n" ]
+    ]
+    duplicate_config_file_lines: list[str] = [
+        "parse_config_files: CRITICAL: Failed to load config file "
+        + "'/etc/privleap/conf.d/unit-test.conf'!\n",
+        "Traceback (most recent call last):\n",
+        "ValueError: Duplicate action 'test-act-sudopermit' found!\n"
     ]

@@ -1,0 +1,98 @@
+#!/bin/bash
+
+## Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
+## See the file COPYING for copying conditions.
+
+set -o errexit
+set -o nounset
+set -o errtrace
+set -o pipefail
+
+privleap_project_dir="$(dirname "$(readlink -f "${0}")")"
+target_distribution="bookworm"
+autopkgtest_tarball_path="${HOME}/.cache/sbuild/${target_distribution}-amd64.tar.zst"
+
+create_autopkgtest_tarball() {
+  mkdir -p ~/.cache/sbuild
+  sudo mmdebstrap \
+    --include=ca-certificates \
+    --skip=output/dev \
+    --variant=buildd \
+    "${target_distribution}" \
+    "${autopkgtest_tarball_path}" \
+    --customize-hook='chroot "$1" passwd --delete root' \
+    --customize-hook='chroot "$1" useradd --home-dir /home/user --create-home user' \
+    --customize-hook='chroot "$1" passwd --delete user' \
+    --customize-hook='cp /etc/hosts "$1/etc/hosts"' \
+    --customize-hook=/usr/share/autopkgtest/setup-commands/setup-testbed \
+    https://deb.debian.org/debian
+}
+
+offer_package_install() {
+  local pkg_name install_yn
+  pkg_name="$1"
+  1>&2 echo "${pkg_name} is not installed, but is needed to run the test suite."
+  1>&2 echo -n 'Would you like to install it now? [y/N] '
+  read -r install_yn
+  if [ "${install_yn,,}" = 'y' ]; then
+    sudo apt-get install "${pkg_name}"
+  else
+    1>&2 echo 'Test run aborted.'
+    exit 1
+  fi
+}
+
+run_autopkgtest() {
+  local reset_autopkgtest_tarball
+  reset_autopkgtest_tarball="${1:-}"
+  ## Dependency checks
+  if ! [ -x '/usr/bin/unshare' ]; then
+    1>&2 echo 'unshare is not executable or does not exist!'
+    exit 1
+  fi
+  if ! [ -f '/usr/bin/autopkgtest' ]; then
+    offer_package_install 'autopkgtest'
+  fi
+  if ! [ -f '/usr/bin/mmdebstrap' ]; then
+    offer_package_install 'mmdebstrap'
+  fi
+  if ! [ -f '/usr/bin/dh' ]; then
+    offer_package_install 'debhelper'
+  fi
+  if [ "$(basename "${privleap_project_dir}")" != 'privleap' ]; then
+    1>&2 echo 'The run_autopkgtest script does not appear to be in the root of the privleap source tree!'
+    exit 1
+  fi
+  if [ "$(stat -c "%u|%a" /usr/bin/newuidmap)" != '0|4755' ]; then
+    1>&2 echo 'autopkgtest requires /usr/bin/newuidmap to be SUID-root!'
+    exit 1
+  fi
+  if [ "$(stat -c "%u|%a" /usr/bin/newgidmap)" != '0|4755' ]; then
+    1>&2 echo 'autopkgtest requires /usr/bin/newgidmap to be SUID-root!'
+    exit 1
+  fi
+  if [ "$(pwd)" != "${privleap_project_dir}" ]; then
+    cd "${privleap_project_dir}" >/dev/null || {
+      1>&2 echo 'Cannot change to privleap source tree directory!'
+      exit 1
+    }
+  fi
+
+  if [ "${reset_autopkgtest_tarball}" = '--reset-tarball' ]; then
+    rm -f "${autopkgtest_tarball_path}"
+  fi
+  if ! [ -f "${autopkgtest_tarball_path}" ]; then
+    create_autopkgtest_tarball
+  fi
+
+  dpkg-buildpackage -i -us -uc -b || {
+    1>&2 echo 'Cannot build privleap deb package!'
+    exit 1
+  }
+  cd ..
+  autopkgtest -l "${privleap_project_dir}/privleap-test-log.txt" \
+    --apt-upgrade -B privleap*.deb "${privleap_project_dir}" -- unshare
+  echo "Test complete. Results are stored in ${privleap_project_dir}/privleap-test-log.txt."
+}
+
+run_autopkgtest "$@"

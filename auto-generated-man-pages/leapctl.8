@@ -1,0 +1,40 @@
+.\" generated with Ronn-NG/v0.9.1
+.\" http://github.com/apjanke/ronn-ng/tree/0.9.1
+.TH "LEAPCTL" "8" "January 2020" "privleap" "privleap Manual"
+.SH "NAME"
+\fBleapctl\fR \- Administrative utility for privleap
+.SH "SYNOPSIS"
+\fBleapctl (\-\-create|\-\-destroy) username|uid\fR
+.SH "DESCRIPTION"
+Provides administrative controls for privleap\. Right now this is only used to open and close sockets used to allow individual user accounts to communicate with the privleapd server\.
+.P
+You usually will not need to run this directly \- if \fBprivleap\fR was installed from your distribution's repository, it should be pre\-configured to create and destroy user communication sockets on user login and logout\.
+.SH "OPTIONS"
+.TP
+\fB\-\-create\fR
+Instructs privleapd to create a communication socket for the specified user\. This will allow the user to communicate with privleapd and request privileged operations to be run\.
+.TP
+\fB\-\-destroy\fR
+Instructs privleapd to destroy a communication socket for the specified user\. This will prevent the user from communicating with privleapd any further\.
+.SH "ENVIRONMENT VARIABLES"
+None\.
+.SH "CONFIG FILES"
+See privleap\-conf\.d(5)\.
+.SH "EXIT CODES"
+0: The requested operation was successful, or did not need to be done\.
+.P
+1: The requested operation failed\.
+.SH "EXAMPLES"
+Create a communication socket for user \fBuser\fR:
+.P
+\fBleapctl \-\-create user\fR
+.P
+Destroy a communication socket for the user with UID 1001:
+.P
+\fBleapctl \-\-destroy 1001\fR
+.SH "NOTES"
+leapctl communicates with privleapd using a UNIX socket that by default can only be read from and written to by \fBroot\fR\. You will therefore usually have to run leapctl as root for it to work\.
+.SH "WWW"
+https://github\.com/Kicksecure/privleap
+.SH "AUTHOR"
+This man page has been written by Aaron Rainbolt (arraybolt3@ubuntu\.com)\.
