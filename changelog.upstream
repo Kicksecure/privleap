@@ -1,3 +1,88 @@
+commit eed911a8097cc09ff09dc422e0f9f62eb4ce2849
+Merge: 023462f 46f1ad0
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Mon Feb 17 07:10:51 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit 46f1ad00587cd1b34ee43fd14abf55b271cf8182
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Feb 16 13:36:29 2025 -0600
+
+    Configure to start before basic.target is reached
+
+commit 6a010d2615e98ad4ad953c7a6f7c4b32322d1971
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sat Feb 15 23:21:58 2025 -0600
+
+    Add manpages, remove redundant and outdated bits of documentation
+
+commit 404a31e2fdf7b75b068472180eadd865e45f33ab
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sat Feb 15 21:49:24 2025 -0600
+
+    Improve config file diagnostics, make pylint happy
+
+commit a9e7dd4bfc84bf6368a0241fe808f1134991ffd2
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sat Feb 15 21:29:24 2025 -0600
+
+    Slightly rearchitecture config file loading, add error messages with filenames and line numbers when invalid config is hit
+
+commit 27fb000a8415e00d25809a61b9739f6e1affc480
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sat Feb 15 20:25:24 2025 -0600
+
+    Fix duplicate action name check
+
+commit 411c933d111dfbd524083b185bfdeba40c01d956
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sat Feb 15 19:24:24 2025 -0600
+
+    Add automated tests for -C and --check-config options
+
+commit 93db6a41105da94786d748fda047feb12e46ba01
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Feb 14 17:46:58 2025 -0600
+
+    Add config check mode to privleapd
+
+commit 490139a0210ba9d43f0407b674326c7765f18bcc
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Feb 14 17:35:20 2025 -0600
+
+    Document --reset-tarball argument to run_autopkgtest
+
+commit d99b518e26003df2289a81457a0982f2b97ada0c
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Feb 14 17:23:34 2025 -0600
+
+    Add easy autopkgtest dependency installation, misc run_autopkgtest improvements
+
+commit f01e6f17fd8a5bc80c057f0e82b543d1451df35d
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Feb 14 17:06:01 2025 -0600
+
+    Don't hardcode distribution name in autopkgtest code
+
+commit 2470b2c4ff664231b19c44fb112ecd0b01993786
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Feb 14 16:30:40 2025 -0600
+
+    Remove dependency on helper-scripts
+
+commit 8ba3651866a2909b2b09ca8d251a5ce0d2a73bcc
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Feb 14 00:52:44 2025 -0600
+
+    Fix postinst behavior, create run_autopkgtest script, fix bad instructions in config readme
+
+commit 023462f374baa8877dd981357bb7176e043cbde8
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Fri Feb 14 00:07:07 2025 +0000
+
+    bumped changelog version
+
 commit aa7a06ac320584075b716d29a770bc94e8b0a712
 Author: Patrick Schleizer <adrelanos@whonix.org>
 Date:   Thu Feb 13 19:02:10 2025 -0500
