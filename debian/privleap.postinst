@@ -35,6 +35,12 @@ make_privleapd_comm_sockets_first_time_maybe() {
    if [ ! -d /run/systemd/system ]; then
       return 0
    fi
+   ## The existence of `/run/systemd/system` is not necessarily enough to be
+   ## sure that systemctl is even present on the system, see
+   ## https://github.com/ArrayBolt3/privleap/issues/7#issuecomment-2663055757
+   if [ ! -x "$(command -v systemctl)" ]; then
+      return 0
+   fi
    if ! systemctl --no-pager --no-block status privleapd.service &>/dev/null; then
       return 0
    fi
@@ -53,6 +59,13 @@ make_privleapd_comm_sockets_first_time_maybe() {
 start_privleapd() {
    ## debhelper seems to not reliably start the service after installation,
    ## so we have to start it explicitly.
+   ##
+   ## deb-systemd-invoke isn't clever enough to know for sure if systemctl is
+   ## even present on the system, see
+   ## https://github.com/ArrayBolt3/privleap/issues/7#issuecomment-2663055757
+   if [ ! -x "$(command -v systemctl)" ]; then
+      return 0
+   fi
    deb-systemd-invoke restart privleapd.service
    make_privleapd_comm_sockets_first_time_maybe
 }
