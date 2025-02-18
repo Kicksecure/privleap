@@ -682,6 +682,10 @@ def write_bad_config_file(bad_config_file: str) -> bool:
             target_path = Path(PlTestGlobal.privleap_conf_dir,
                 "wrongorder.conf")
             target_contents = PlTestData.wrongorder_config_file
+        case "duplicate_keys_config_file":
+            target_path = Path(PlTestGlobal.privleap_conf_dir,
+                "dupkeys.conf")
+            target_contents = PlTestData.duplicate_keys_config_file
         case _:
             return False
 
@@ -769,6 +773,22 @@ def privleapd_wrongorder_config_file_test(bogus: str) -> bool:
     util.start_privleapd_subprocess([], allow_error_output = True)
     if not util.compare_privleapd_stderr(
         PlTestData.wrongorder_config_file_lines):
+        stop_privleapd_subprocess()
+        return False
+    stop_privleapd_subprocess()
+    return True
+
+def privleapd_duplicate_keys_config_file_test(bogus: str) -> bool:
+    """
+    Tests how privleapd handles a config file that specifies the same key more
+      than once.
+    """
+
+    if bogus != "":
+        return False
+    util.start_privleapd_subprocess([], allow_error_output = True)
+    if not util.compare_privleapd_stderr(
+        PlTestData.duplicate_keys_config_file_lines):
         stop_privleapd_subprocess()
         return False
     stop_privleapd_subprocess()
@@ -1435,6 +1455,15 @@ def run_privleapd_tests() -> None:
     privleapd_assert_function(try_remove_file,
         str(Path(PlTestGlobal.privleap_conf_dir, "wrongorder.conf")),
         "Remove config file with badly ordered contents")
+    # ---
+    privleapd_assert_function(write_bad_config_file,
+        "duplicate_keys_config_file",
+        "Write config file with duplicate keys")
+    privleapd_assert_function(privleapd_duplicate_keys_config_file_test, "",
+        "Test privleapd behavior with duplicate keys config file")
+    privleapd_assert_function(try_remove_file,
+        str(Path(PlTestGlobal.privleap_conf_dir, "dupkeys.conf")),
+        "Remove config file with duplicate keys")
     # ---
     util.start_privleapd_subprocess([])
     privleapd_assert_function(privleapd_control_disconnect_test, "",

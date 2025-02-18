@@ -508,6 +508,10 @@ AuthorizedGroups=sudo
         = """Command=echo 'test-act-wrongorder'
 [test-act-wrongorder]
 """
+    duplicate_keys_config_file: str = """[test-act-dupkeys]
+Command=echo 'test-act-dupkeys'
+Command=echo 'oops'
+"""
     test_username_create_error: bytes \
         = (b"ERROR: privleapd encountered an error while creating a comm "
            b"socket for user '"
@@ -828,6 +832,14 @@ AuthorizedGroups=sudo
         + "header\n",
         "parse_config_files: CRITICAL: Failed to load config file "
         + "'/etc/privleap/conf.d/wrongorder.conf'!\n",
+        "Traceback (most recent call last):\n",
+        "ValueError: Failed to parse config!\n"
+    ]
+    duplicate_keys_config_file_lines: list[str] = [
+        "/etc/privleap/conf.d/dupkeys.conf:3:error:Multiple 'Command' keys in "
+        + "action 'test-act-dupkeys'\n",
+        "parse_config_files: CRITICAL: Failed to load config file "
+        + "'/etc/privleap/conf.d/dupkeys.conf'!\n",
         "Traceback (most recent call last):\n",
         "ValueError: Failed to parse config!\n"
     ]

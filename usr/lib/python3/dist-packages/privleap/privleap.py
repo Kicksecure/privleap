@@ -1067,17 +1067,52 @@ class PrivleapCommon:
                         raise ValueError("Failed to parse config!")
                 else:
                     if config_key == "Command":
-                        current_action_command = config_val
+                        if current_action_command is None:
+                            current_action_command = config_val
+                        else:
+                            print(f"{config_file}:{line_idx}:error:Multiple "
+                                "'Command' keys in action "
+                                f"'{current_action_name}'",
+                                file = sys.stderr)
+                            raise ValueError("Failed to parse config!")
                     elif config_key == "AuthorizedUsers":
                         assert config_val is not None
-                        current_auth_users = config_val.split(",")
+                        if len(current_auth_users) == 0:
+                            current_auth_users = config_val.split(",")
+                        else:
+                            print(f"{config_file}:{line_idx}:error: Multiple "
+                                "'AuthorizedUsers' keys in action "
+                                f"'{current_action_name}'",
+                                file = sys.stderr)
+                            raise ValueError("Failed to parse config!")
                     elif config_key == "AuthorizedGroups":
                         assert config_val is not None
-                        current_auth_groups = config_val.split(",")
+                        if len(current_auth_groups) == 0:
+                            current_auth_groups = config_val.split(",")
+                        else:
+                            print(f"{config_file}:{line_idx}:error: Multiple "
+                                "'AuthorizedGroups' keys in action "
+                                f"'{current_action_name}'",
+                                file = sys.stderr)
+                            raise ValueError("Failed to parse config!")
                     elif config_key == "TargetUser":
-                        current_target_user = config_val
+                        if current_target_user is None:
+                            current_target_user = config_val
+                        else:
+                            print(f"{config_file}:{line_idx}:error: Multiple "
+                                "'TargetUser' keys in action "
+                                f"'{current_action_name}'",
+                                file = sys.stderr)
+                            raise ValueError("Failed to parse config!")
                     elif config_key == "TargetGroup":
-                        current_target_group = config_val
+                        if current_target_group is None:
+                            current_target_group = config_val
+                        else:
+                            print(f"{config_file}:{line_idx}:error: Multiple "
+                                "'TargetGroup' keys in action "
+                                f"'{current_action_name}'",
+                                file = sys.stderr)
+                            raise ValueError("Failed to parse config!")
                     else:
                         print(f"{config_file}:{line_idx}:error:Unrecognized "
                             f"key '{config_key}' found under header "
