@@ -53,6 +53,7 @@ class PrivleapConfigSection(Enum):
     ACTION = 1
     PERSISTENT_USERS = 2
     ALLOWED_USERS = 3
+    NONE = 4
 
 class PrivleapMsg:
     """
@@ -957,7 +958,7 @@ class PrivleapCommon:
         persistent_user_output_list: list[str] = []
         allowed_user_output_list: list[str] = []
         current_section_type: PrivleapConfigSection \
-            = PrivleapConfigSection.ACTION
+            = PrivleapConfigSection.NONE
         line_idx: int = 0
         detect_comment_regex: re.Pattern[str] = re.compile(r"\s*#")
         detect_header_regex: re.Pattern[str] = re.compile(r"\[.*]\Z")

@@ -292,12 +292,19 @@ def assert_command_result(command_data: list[str], exit_code: int,
 
 def write_privleap_test_config() -> None:
     """
-    Writes test privleap config data.
+    Writes test privleap config data. Includes one legitimate config file, one
+      empty file, and one file that contains only comments.
     """
 
-    with open(Path(PlTestGlobal.privleap_conf_dir, "unit-test.conf"), "w",
-        encoding = "utf-8") as config_file:
+    with open(Path(PlTestGlobal.privleap_conf_dir, "unit-test.conf"),
+        "w", encoding = "utf-8") as config_file:
         config_file.write(PlTestData.primary_test_config_file)
+    with open(Path(PlTestGlobal.privleap_conf_dir, "comment-only.conf"),
+        "w", encoding = "utf-8") as config_file:
+        config_file.write(PlTestData.comment_only_config_file)
+    with open(Path(PlTestGlobal.privleap_conf_dir, "empty.conf"), "w",
+        encoding = "utf-8") as config_file:
+        config_file.write("\n")
 
 def compare_privleapd_stderr(assert_line_list: list[str], quiet: bool = False) \
     -> bool:
@@ -482,6 +489,9 @@ Command=echo abc=def
 
 [persistent-users]
 User=messagebus
+"""
+    comment_only_config_file: str = """# this is a comment
+# and so is this
 """
     invalid_filename_test_config_file: str = """[test-act-invalid]
 Command=echo 'test-act-invalid'
