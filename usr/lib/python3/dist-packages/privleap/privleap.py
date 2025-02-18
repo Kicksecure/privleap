@@ -1013,6 +1013,13 @@ class PrivleapCommon:
                         current_section_type = PrivleapConfigSection.ACTION
                     continue
 
+                # Config lines are only valid if under a header, if we hit a
+                # config line before a header something is wrong
+                if not first_header_parsed:
+                    print(f"{config_file}:{line_idx}:error:Config line before "
+                        "header", file = sys.stderr)
+                    raise ValueError("Failed to parse config!")
+
                 line_parts: list[str] = line.split('=', maxsplit = 1)
                 if len(line_parts) != 2:
                     print(f"{config_file}:{line_idx}:error:Invalid syntax",

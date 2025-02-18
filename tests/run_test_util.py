@@ -504,6 +504,10 @@ Commandecho 'test-act-crash'
 Command=echo 'duplicate-test-act-sudopermit'
 AuthorizedGroups=sudo
 """
+    wrongorder_config_file: str \
+        = """Command=echo 'test-act-wrongorder'
+[test-act-wrongorder]
+"""
     test_username_create_error: bytes \
         = (b"ERROR: privleapd encountered an error while creating a comm "
            b"socket for user '"
@@ -818,4 +822,12 @@ AuthorizedGroups=sudo
         + "'/etc/privleap/conf.d/unit-test.conf'!\n",
         "Traceback (most recent call last):\n",
         "ValueError: Duplicate action 'test-act-sudopermit' found!\n"
+    ]
+    wrongorder_config_file_lines: list[str] = [
+        "/etc/privleap/conf.d/wrongorder.conf:1:error:Config line before "
+        + "header\n",
+        "parse_config_files: CRITICAL: Failed to load config file "
+        + "'/etc/privleap/conf.d/wrongorder.conf'!\n",
+        "Traceback (most recent call last):\n",
+        "ValueError: Failed to parse config!\n"
     ]
