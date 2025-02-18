@@ -599,7 +599,14 @@ def parse_config_files() -> None:
     Parses all config files under /etc/privleap/conf.d.
     """
 
+    config_file_list: list[Path] = []
     for config_file in PrivleapdGlobal.config_dir.iterdir():
+        if not config_file.is_file():
+            continue
+        config_file_list.append(config_file)
+    config_file_list.sort()
+
+    for config_file in config_file_list:
         if not config_file.is_file():
             continue
 
