@@ -52,13 +52,15 @@ print_usage() {
 }
 
 run_autopkgtest() {
-  if [ "$1" = '--help' ] || [ "$1" = '-h' ] || [ "$1" = '-?' ]; then
+  local arg
+  arg="${1:-}"
+  if [ "${arg}" = '--help' ] || [ "${arg}" = '-h' ] || [ "${arg}" = '-?' ]; then
     print_usage
     exit 0
-  elif [ "$1" = '--reset-tarball' ]; then
+  elif [ "${arg}" = '--reset-tarball' ]; then
     rm -f "${autopkgtest_tarball_path}"
-  else
-    echo "Unrecognized argument: '$1'. Try 'run_autopkgtest --help' for usage info."
+  elif [ -n "${arg}" ]; then
+    echo "Unrecognized argument: '${arg}'. Try 'run_autopkgtest --help' for usage info."
     exit 1
   fi
 
