@@ -37,6 +37,7 @@ class PlTestGlobal:
     privleap_conf_dir: Path = Path(f"{privleap_conf_base_dir}/conf.d")
     privleap_conf_backup_dir: Path = Path(f"{privleap_conf_base_dir}/conf.d.bak")
     privleapd_proc: subprocess.Popen[str] | None = None
+    privleapd_test_ready_file: Path = Path("/tmp/privleapd-ready-for-test")
     test_username: str = "privleaptest"
     test_username_bytes: bytes = test_username.encode("utf-8")
     test_home_dir: Path = Path(f"/home/{test_username}")
@@ -87,6 +88,7 @@ def proc_try_readline(proc: subprocess.Popen[str], timeout: float,
         current_time = datetime.now()
         if current_time >= end_time:
             break
+        time.sleep(0.0001)
 
     # Retrieve a line from the buffer and return it.
     linebuf_parts = PlTestGlobal.linebuf.split("\n",
@@ -232,8 +234,17 @@ def start_privleapd_subprocess(extra_args: list[str],
         fcntl.F_SETFL, os.O_NONBLOCK)
     fcntl.fcntl(PlTestGlobal.privleapd_proc.stderr.fileno(),
         fcntl.F_SETFL, os.O_NONBLOCK)
-    time.sleep(PlTestGlobal.base_delay)
-    if not allow_error_output:
+    if allow_error_output:
+        time.sleep(PlTestGlobal.base_delay * 2)
+    else:
+        privleapd_started_checks = 0
+        while not PlTestGlobal.privleapd_test_ready_file.exists():
+            if privleapd_started_checks >= 10:
+                logging.critical("privleapd failed to start!")
+                sys.exit(1)
+            time.sleep(PlTestGlobal.base_delay)
+            privleapd_started_checks += 1
+        PlTestGlobal.privleapd_test_ready_file.unlink()
         early_privleapd_output: str | None = proc_try_readline(
             PlTestGlobal.privleapd_proc, PlTestGlobal.base_delay,
             read_stderr = True)

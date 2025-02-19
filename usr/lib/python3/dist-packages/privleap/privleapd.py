@@ -837,6 +837,8 @@ def main() -> NoReturn:
     open_persistent_comm_sockets()
     PrivleapdGlobal.sdnotify_object.notify("READY=1")
     PrivleapdGlobal.sdnotify_object.notify("STATUS=Fully started")
+    if PrivleapdGlobal.test_mode:
+        Path("/tmp/privleapd-ready-for-test").touch()
     main_loop()
 
 if __name__ == "__main__":
