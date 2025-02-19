@@ -814,8 +814,9 @@ Command=echo 'oops'
           "ValueError: recv_buf contains data past the last string\n" ]
     ]
     duplicate_config_file_lines: list[str] = [
-        "parse_config_files: CRITICAL: Duplicate action "
-        + "'test-act-sudopermit' found!\n"
+        "parse_config_files: CRITICAL: Error parsing config: "
+        + "'/etc/privleap/conf.d/unit-test.conf:51:error:Duplicate action "
+        + "'test-act-sudopermit' found'\n"
     ]
     wrongorder_config_file_lines: list[str] = [
         "parse_config_files: CRITICAL: Error parsing config: "

@@ -649,9 +649,14 @@ def parse_config_files() -> None:
                 duplicate_action_name: str | None = extend_action_list(
                     action_arr)
                 if duplicate_action_name is not None:
-                    # TODO: Scan for line number
-                    logging.critical("Duplicate action '%s' found!",
-                        duplicate_action_name)
+                    duplicate_action_error \
+                        = pl.PrivleapCommon.find_dup_config_header(
+                            config_file, duplicate_action_name)
+                    if PrivleapdGlobal.check_config_mode:
+                        print(duplicate_action_error, file = sys.stderr)
+                    else:
+                        logging.critical("Error parsing config: '%s'",
+                            duplicate_action_error)
                     sys.exit(1)
                 for persistent_user_item in persistent_user_arr:
                     # Note, parse_config_file() normalizes the usernames of

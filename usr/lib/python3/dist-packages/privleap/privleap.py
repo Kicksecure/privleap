@@ -1114,6 +1114,24 @@ class PrivleapCommon:
             allowed_user_output_list)
 
     @staticmethod
+    def find_dup_config_header(config_file: Path, target_header: str) -> str:
+        """
+        Finds the line number a specific header in the specified config file is
+          at, and returns the error line for it.
+        """
+
+        line_idx: int = 0
+        with open(config_file, "r", encoding = "utf-8") as conf_stream:
+            for line in conf_stream:
+                line_idx += 1
+                line = line.strip()
+                if line == f"[{target_header}]":
+                    return(f"{config_file}:{line_idx}:error:Duplicate action "
+                        f"'{target_header}' found")
+        return ""
+
+
+    @staticmethod
     def normalize_user_id(user_name: str) -> str | None:
         """
         Ensures the user with the specified name or UID exists on the system.
