@@ -524,10 +524,10 @@ class PrivleapSession:
             # __get_msg_type_field
             if i == 0:
                 # If space_idx isn't equal to len(recv_buf), we hit an actual
-                # space, so we want to pick up scanning immediately *after* that
-                # space. If space_idx is equal to len(recv_buf) though, it's
-                # already at an index equal to one past the end of the data
-                # buffer, so there's no need to increment it.
+                # space, so we want to pick up scanning immediately *after*
+                # that space. If space_idx is equal to len(recv_buf) though,
+                # it's already at an index equal to one past the end of the
+                # data buffer, so there's no need to increment it.
                 if space_idx != len(recv_buf):
                     recv_buf_pos = space_idx + 1
                 else:
@@ -879,15 +879,16 @@ class PrivleapAction:
             target_user = PrivleapCommon.normalize_user_id(target_user)
             if target_user is None:
                 raise ValueError(f"User '{orig_target_user}' specified by "
-                f"field 'TargetUser' of action '{action_name}' does not exist!")
+                    f"field 'TargetUser' of action '{action_name}' does not "
+                    "exist!")
 
         if target_group is not None:
             orig_target_group: str = target_group
             target_group = PrivleapCommon.normalize_user_id(target_group)
             if target_group is None:
                 raise ValueError(f"User '{orig_target_group}' specified by "
-                f"field 'TargetGroup' of action '{action_name}' does not "
-                "exist!")
+                    f"field 'TargetGroup' of action '{action_name}' does not "
+                    "exist!")
 
         self.action_name = action_name
         self.action_command = action_command

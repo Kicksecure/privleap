@@ -94,7 +94,7 @@ def handle_control_create_msg(control_session: pl.PrivleapSession,
 
     if user_name not in PrivleapdGlobal.allowed_user_list:
         logging.warning("User '%s' is not allowed to have a comm socket",
-            control_msg.user_name)
+            user_name)
         send_msg_safe(
             control_session, pl.PrivleapControlServerDisallowedUserMsg())
         return
@@ -820,8 +820,8 @@ def main() -> NoReturn:
             print_usage()
             sys.exit(0)
         else:
-            print(f"Unrecognized argument '{arg}', try 'privleapd --help' for "
-                "usage info", file = sys.stderr)
+            print(f"Unrecognized argument {repr(arg)}, try 'privleapd --help' "
+                "for usage info", file = sys.stderr)
             sys.exit(1)
 
     if PrivleapdGlobal.check_config_mode:

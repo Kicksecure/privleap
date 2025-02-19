@@ -1571,6 +1571,10 @@ def run_privleapd_tests() -> None:
         exit_code = 1,
         stderr_data = PlTestData.privleapd_unrecognized_argument)
     # ---
+    privleapd_assert_command(["/usr/bin/privleapd", "\x1b[31mHi\x1b[m"],
+        exit_code = 1,
+        stderr_data = PlTestData.privleapd_unrecognized_argument_escape)
+    # ---
 
     logging.info("privleapd passed asserts: %s, failed asserts: %s",
         privleapd_asserts_passed, privleapd_asserts_failed)

@@ -616,6 +616,9 @@ Command=echo 'oops'
            + b"normally.\n")
     privleapd_unrecognized_argument: bytes \
         = b"Unrecognized argument '-z', try 'privleapd --help' for usage info\n"
+    privleapd_unrecognized_argument_escape: bytes \
+        = (b"Unrecognized argument '\\x1b[31mHi\\x1b[m', try 'privleapd "
+           + b"--help' for usage info\n")
     bad_config_file_lines: list[str] = [
         "parse_config_files: CRITICAL: Error parsing config: "
         + "'/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax'\n",
