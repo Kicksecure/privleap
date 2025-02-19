@@ -595,19 +595,11 @@ Command=echo 'oops'
            + PlTestGlobal.test_username_bytes
            + b") gid=0(root) groups=0(root)\n")
     bad_config_file_lines: list[str] = [
-        "/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax\n",
-        "parse_config_files: CRITICAL: Failed to load config file "
-        + "'/etc/privleap/conf.d/crash.conf'!\n",
-        "Traceback (most recent call last):\n",
-        "ValueError: Failed to parse config!\n"
+        "parse_config_files: CRITICAL: Error parsing config: "
+        + "'/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax'\n",
     ]
     bad_config_file_check_lines: list[str] = [
         "/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax\n",
-        "parse_config_files: CRITICAL: Failed to load config file "
-        + "'/etc/privleap/conf.d/crash.conf'!\n",
-        "Traceback (most recent call last):\n",
-        "ValueError: Failed to parse config!\n",
-        "main: CRITICAL: privleap config is bad.\n"
     ]
     control_disconnect_lines: list[str] = [
         "handle_control_session: ERROR: Could not get message from client!\n",
@@ -822,24 +814,16 @@ Command=echo 'oops'
           "ValueError: recv_buf contains data past the last string\n" ]
     ]
     duplicate_config_file_lines: list[str] = [
-        "parse_config_files: CRITICAL: Failed to load config file "
-        + "'/etc/privleap/conf.d/unit-test.conf'!\n",
-        "Traceback (most recent call last):\n",
-        "ValueError: Duplicate action 'test-act-sudopermit' found!\n"
+        "parse_config_files: CRITICAL: Duplicate action "
+        + "'test-act-sudopermit' found!\n"
     ]
     wrongorder_config_file_lines: list[str] = [
-        "/etc/privleap/conf.d/wrongorder.conf:1:error:Config line before "
-        + "header\n",
-        "parse_config_files: CRITICAL: Failed to load config file "
-        + "'/etc/privleap/conf.d/wrongorder.conf'!\n",
-        "Traceback (most recent call last):\n",
-        "ValueError: Failed to parse config!\n"
+        "parse_config_files: CRITICAL: Error parsing config: "
+        + "'/etc/privleap/conf.d/wrongorder.conf:1:error:Config line "
+        + "before header'\n"
     ]
     duplicate_keys_config_file_lines: list[str] = [
-        "/etc/privleap/conf.d/dupkeys.conf:3:error:Multiple 'Command' keys in "
-        + "action 'test-act-dupkeys'\n",
-        "parse_config_files: CRITICAL: Failed to load config file "
-        + "'/etc/privleap/conf.d/dupkeys.conf'!\n",
-        "Traceback (most recent call last):\n",
-        "ValueError: Failed to parse config!\n"
+        "parse_config_files: CRITICAL: Error parsing config: "
+        + "'/etc/privleap/conf.d/dupkeys.conf:3:error:Multiple 'Command' "
+        + "keys in action 'test-act-dupkeys''\n"
     ]

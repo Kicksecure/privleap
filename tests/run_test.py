@@ -8,8 +8,7 @@
 #   broad-exception-caught: We use broad exception catching for general-purpose
 #     error handlers.
 #   global-statement: Only used for the assert count variables, not a problem.
-#   too-many-lines: This file isn't too far over 1000 lines, and breaking it up
-#     wouldn't enhance readability that much (it might even make it worse).
+#   too-many-lines: Breaking up this file is not a priority at the moment.
 
 """
 run_test.py - Tests for privleap. This is implemented as an entire program as
@@ -30,7 +29,7 @@ import shutil
 import socket
 import time
 from pathlib import Path
-from typing import NoReturn, Tuple, IO
+from typing import NoReturn, Tuple, IO, TypeAlias
 from collections.abc import Callable
 
 # import privleap as pl
@@ -46,7 +45,7 @@ leaprun_asserts_failed: int = 0
 privleapd_asserts_passed: int = 0
 privleapd_asserts_failed: int = 0
 
-SelectInfo = (Tuple[list[IO[bytes]], list[IO[bytes]], list[IO[bytes]]])
+SelectInfo: TypeAlias = Tuple[list[IO[bytes]], list[IO[bytes]], list[IO[bytes]]]
 
 def test_if_path_exists(path_str: str) -> bool:
     """
@@ -1396,6 +1395,7 @@ def privleapd_assert_function(target_function: Callable[[str], bool],
         privleapd_asserts_failed += 1
         PlTestGlobal.all_asserts_passed = False
 
+# pylint: disable=too-many-statements
 def run_privleapd_tests() -> None:
     """
     Runs all tests on the privleapd executable.
@@ -1561,8 +1561,7 @@ def run_privleapd_tests() -> None:
             str(i), f"Test privleapd invalid ASCII handling (iteration {i+1})")
     # ---
     privleapd_assert_command(["/usr/bin/privleapd", "-C"],
-        exit_code = 0,
-        stderr_data = b"main: INFO: privleap config is OK.\n")
+        exit_code = 0)
     # ---
 
     logging.info("privleapd passed asserts: %s, failed asserts: %s",

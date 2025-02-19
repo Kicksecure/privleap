@@ -20,9 +20,8 @@ import stat
 import pwd
 import grp
 import re
-import sys
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, TypeAlias
 from enum import Enum
 
 class PrivleapSocketType(Enum):
@@ -895,6 +894,8 @@ class PrivleapAction:
         self.target_user = target_user
         self.target_group = target_group
 
+ConfigData: TypeAlias = Tuple[list[PrivleapAction], list[str], list[str]]
+
 class PrivleapCommon:
     """
     Common constants and functions used throughout privleap.
@@ -948,7 +949,7 @@ class PrivleapCommon:
     # TODO: Changed my mind about splitting this up being a bad idea, try to
     #   split it up if at all possible, this thing is getting way too big.
     def parse_config_file(config_file: Path) \
-        -> Tuple[list[PrivleapAction], list[str], list[str]]:
+        -> ConfigData | str:
         """
         Parses the data from a privleap configuration file and returns all
         privleap actions defined therein.
@@ -1016,15 +1017,12 @@ class PrivleapCommon:
                 # Config lines are only valid if under a header, if we hit a
                 # config line before a header something is wrong
                 if not first_header_parsed:
-                    print(f"{config_file}:{line_idx}:error:Config line before "
-                        "header", file = sys.stderr)
-                    raise ValueError("Failed to parse config!")
+                    return(f"{config_file}:{line_idx}:error:Config line "
+                        f"before header")
 
                 line_parts: list[str] = line.split('=', maxsplit = 1)
                 if len(line_parts) != 2:
-                    print(f"{config_file}:{line_idx}:error:Invalid syntax",
-                        file = sys.stderr)
-                    raise ValueError("Failed to parse config!")
+                    return f"{config_file}:{line_idx}:error:Invalid syntax"
 
                 config_key: str = line_parts[0]
                 config_val: str | None = line_parts[1]
@@ -1039,17 +1037,13 @@ class PrivleapCommon:
                             if config_val not in persistent_user_output_list:
                                 persistent_user_output_list.append(config_val)
                         else:
-                            print(f"{config_file}:{line_idx}:error:Requested "
-                                f"persistent user '{orig_config_val}' does not "
-                                "exist",
-                                file = sys.stderr)
-                            raise ValueError("Failed to parse config!")
+                            return(f"{config_file}:{line_idx}:error:"
+                                "Requested persistent user"
+                                f"'{orig_config_val}' does not exist")
                     else:
-                        print(f"{config_file}:{line_idx}:error:Unrecognized "
+                        return(f"{config_file}:{line_idx}:error:Unrecognized "
                             f"key '{config_key}' found under header "
-                            f"'{current_header_name}'",
-                            file = sys.stderr)
-                        raise ValueError("Failed to parse config!")
+                            f"'{current_header_name}'")
                 elif current_section_type \
                     == PrivleapConfigSection.ALLOWED_USERS:
                     if config_key == "User":
@@ -1060,65 +1054,51 @@ class PrivleapCommon:
                             if config_val not in allowed_user_output_list:
                                 allowed_user_output_list.append(config_val)
                     else:
-                        print(f"{config_file}:{line_idx}:error:Unrecognized "
+                        return(f"{config_file}:{line_idx}:error:Unrecognized "
                             f"key '{config_key}' found under header "
-                            f"'{current_header_name}'",
-                            file = sys.stderr)
-                        raise ValueError("Failed to parse config!")
+                            f"'{current_header_name}'")
                 else:
                     if config_key == "Command":
                         if current_action_command is None:
                             current_action_command = config_val
                         else:
-                            print(f"{config_file}:{line_idx}:error:Multiple "
+                            return(f"{config_file}:{line_idx}:error:Multiple "
                                 "'Command' keys in action "
-                                f"'{current_action_name}'",
-                                file = sys.stderr)
-                            raise ValueError("Failed to parse config!")
+                                f"'{current_action_name}'")
                     elif config_key == "AuthorizedUsers":
                         assert config_val is not None
                         if len(current_auth_users) == 0:
                             current_auth_users = config_val.split(",")
                         else:
-                            print(f"{config_file}:{line_idx}:error: Multiple "
-                                "'AuthorizedUsers' keys in action "
-                                f"'{current_action_name}'",
-                                file = sys.stderr)
-                            raise ValueError("Failed to parse config!")
+                            return(f"{config_file}:{line_idx}:error:"
+                                f"Multiple 'AuthorizedUsers' keys in action "
+                                f"'{current_action_name}'")
                     elif config_key == "AuthorizedGroups":
                         assert config_val is not None
                         if len(current_auth_groups) == 0:
                             current_auth_groups = config_val.split(",")
                         else:
-                            print(f"{config_file}:{line_idx}:error: Multiple "
-                                "'AuthorizedGroups' keys in action "
-                                f"'{current_action_name}'",
-                                file = sys.stderr)
-                            raise ValueError("Failed to parse config!")
+                            return(f"{config_file}:{line_idx}:error:"
+                                f"Multiple 'AuthorizedGroups' keys in action "
+                                f"'{current_action_name}'")
                     elif config_key == "TargetUser":
                         if current_target_user is None:
                             current_target_user = config_val
                         else:
-                            print(f"{config_file}:{line_idx}:error: Multiple "
-                                "'TargetUser' keys in action "
-                                f"'{current_action_name}'",
-                                file = sys.stderr)
-                            raise ValueError("Failed to parse config!")
+                            return(f"{config_file}:{line_idx}:error:"
+                                f"Multiple 'TargetUser' keys in action "
+                                f"'{current_action_name}'")
                     elif config_key == "TargetGroup":
                         if current_target_group is None:
                             current_target_group = config_val
                         else:
-                            print(f"{config_file}:{line_idx}:error: Multiple "
-                                "'TargetGroup' keys in action "
-                                f"'{current_action_name}'",
-                                file = sys.stderr)
-                            raise ValueError("Failed to parse config!")
+                            return(f"{config_file}:{line_idx}:error:"
+                                f"Multiple 'TargetGroup' keys in action "
+                                f"'{current_action_name}'")
                     else:
-                        print(f"{config_file}:{line_idx}:error:Unrecognized "
+                        return(f"{config_file}:{line_idx}:error:Unrecognized "
                             f"key '{config_key}' found under header "
-                            f"'{current_header_name}'",
-                            file = sys.stderr)
-                        raise ValueError("Failed to parse config!")
+                            f"'{current_header_name}'")
 
         # The last action in the file may not be in the list yet, add it now
         # if needed
