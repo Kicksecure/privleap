@@ -594,6 +594,17 @@ Command=echo 'oops'
         = (b"uid=1002("
            + PlTestGlobal.test_username_bytes
            + b") gid=0(root) groups=0(root)\n")
+    privleapd_help: bytes \
+        = (b"privleapd: privleap backend server\n"
+           + b"Usage:\n"
+           + b"  privleapd [-C|--check-config] [-h|--help|-?]\n"
+           + b"Options:\n"
+           + b"  -C, --check-config: Check configuration for validity.\n"
+           + b"  -h, --help, -?: Print usage information.\n"
+           + b"If run without any options specified, the server will start "
+           + b"normally.\n")
+    privleapd_unrecognized_argument: bytes \
+        = b"Unrecognized argument '-z', try 'privleapd --help' for usage info\n"
     bad_config_file_lines: list[str] = [
         "parse_config_files: CRITICAL: Error parsing config: "
         + "'/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax'\n",

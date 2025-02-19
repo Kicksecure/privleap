@@ -789,6 +789,19 @@ def main_loop() -> NoReturn:
                     args = [ready_sock_obj])
                 comm_thread.start()
 
+def print_usage() -> None:
+    """
+    Print usage information.
+    """
+    print("""privleapd: privleap backend server
+Usage:
+  privleapd [-C|--check-config] [-h|--help|-?]
+Options:
+  -C, --check-config: Check configuration for validity.
+  -h, --help, -?: Print usage information.
+If run without any options specified, the server will start normally.""",
+        file = sys.stderr)
+
 def main() -> NoReturn:
     """
     Main function.
@@ -803,8 +816,12 @@ def main() -> NoReturn:
             PrivleapdGlobal.test_mode = True
         elif arg in ("-C", "--check-config"):
             PrivleapdGlobal.check_config_mode = True
+        elif arg in ("-h", "--help", "-?"):
+            print_usage()
+            sys.exit(0)
         else:
-            logging.critical("Unrecognized argument '%s'!", arg)
+            print(f"Unrecognized argument '{arg}', try 'privleapd --help' for "
+                "usage info", file = sys.stderr)
             sys.exit(1)
 
     if PrivleapdGlobal.check_config_mode:

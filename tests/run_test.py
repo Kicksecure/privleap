@@ -1563,6 +1563,14 @@ def run_privleapd_tests() -> None:
     privleapd_assert_command(["/usr/bin/privleapd", "-C"],
         exit_code = 0)
     # ---
+    privleapd_assert_command(["/usr/bin/privleapd", "--help"],
+        exit_code = 0,
+        stderr_data = PlTestData.privleapd_help)
+    # ---
+    privleapd_assert_command(["/usr/bin/privleapd", "-z"],
+        exit_code = 1,
+        stderr_data = PlTestData.privleapd_unrecognized_argument)
+    # ---
 
     logging.info("privleapd passed asserts: %s, failed asserts: %s",
         privleapd_asserts_passed, privleapd_asserts_failed)

@@ -7,7 +7,7 @@ privleapd(1) -- privleap backend server
 -->
 
 ## SYNOPSIS
-`privleapd [-C|--check-config]`
+`privleapd [-C|--check-config] [-h|--help|-?]`
 
 ## DESCRIPTION
 The backend server for privleap. Runs predefined code snippets as root when
@@ -25,6 +25,8 @@ configuration is valid before restarting privleapd.
 * `-C`, `--check-config` :
   Checks to ensure the privleap configuration is valid, then outputs a short
   report and exits.
+* `-h`, `--help`, `-?` :
+  Prints usage information.
 
 ## ENVIRONMENT VARIABLES
 None.
