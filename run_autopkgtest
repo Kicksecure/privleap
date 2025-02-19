@@ -43,12 +43,14 @@ offer_package_install() {
 }
 
 print_usage() {
-  echo "run_autopkgtest: Runs regression tests for privleap using autopkgtest"
-  echo "Usage:"
-  echo "  run_autopkgtest [--reset-tarball]"
-  echo "Options:"
-  echo "  --reset-tarball: Deletes and recreates the tarball used by unshare"
-  echo "                   for running the tests."
+  local help_info
+  help_info='run_autopkgtest: Runs regression tests for privleap using autopkgtest
+Usage:
+  run_autopkgtest [--reset-tarball]
+Options:
+  --reset-tarball: Deletes and recreates the tarball used by unshare
+                   for running the tests.'
+  1>&2 echo "${help_info}"
 }
 
 run_autopkgtest() {
@@ -57,10 +59,17 @@ run_autopkgtest() {
   if [ "${arg}" = '--help' ] || [ "${arg}" = '-h' ] || [ "${arg}" = '-?' ]; then
     print_usage
     exit 0
-  elif [ "${arg}" = '--reset-tarball' ]; then
+  fi
+
+  if [ "$(id -u)" = '0' ]; then
+    1>&2 echo 'Do not run this script as root!'
+    exit 1
+  fi
+
+  if [ "${arg}" = '--reset-tarball' ]; then
     rm -f "${autopkgtest_tarball_path}"
   elif [ -n "${arg}" ]; then
-    echo "Unrecognized argument: '${arg}'. Try 'run_autopkgtest --help' for usage info."
+    1>&2 echo "Unrecognized argument: '${arg}'. Try 'run_autopkgtest --help' for usage info."
     exit 1
   fi
 
