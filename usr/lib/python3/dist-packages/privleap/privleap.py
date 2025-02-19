@@ -985,6 +985,18 @@ class PrivleapCommon:
                 if detect_header_regex.match(line):
                     if first_header_parsed:
                         if current_section_type == PrivleapConfigSection.ACTION:
+                            if current_action_command is None:
+                                return PrivleapCommon.find_bad_config_header(
+                                    config_file,
+                                    current_header_name,
+                                    "No command configured for action:")
+                            if not PrivleapCommon.validate_id(
+                                current_action_name,
+                                PrivleapValidateType.SIGNAL_NAME):
+                                return PrivleapCommon.find_bad_config_header(
+                                    config_file,
+                                    current_header_name,
+                                    "Invalid action name:")
                             action_output_list.append(PrivleapAction(
                                 current_action_name,
                                 current_action_command,
@@ -1027,6 +1039,8 @@ class PrivleapCommon:
 
                 config_key: str = line_parts[0]
                 config_val: str | None = line_parts[1]
+                if config_val.strip() == "":
+                    return f"{config_file}:{line_idx}:error:Empty config value"
                 if current_section_type \
                     == PrivleapConfigSection.PERSISTENT_USERS:
                     if config_key == "User":
@@ -1104,6 +1118,14 @@ class PrivleapCommon:
         # The last action in the file may not be in the list yet, add it now
         # if needed
         if current_section_type == PrivleapConfigSection.ACTION:
+            if current_action_command is None:
+                return PrivleapCommon.find_bad_config_header(config_file,
+                    current_header_name,
+                    "No command configured for action:")
+            if not PrivleapCommon.validate_id(current_action_name,
+                PrivleapValidateType.SIGNAL_NAME):
+                return PrivleapCommon.find_bad_config_header(config_file,
+                    current_header_name, "Invalid action name:")
             action_output_list.append(PrivleapAction(current_action_name,
                 current_action_command,
                 current_auth_users,
@@ -1115,7 +1137,8 @@ class PrivleapCommon:
             allowed_user_output_list)
 
     @staticmethod
-    def find_dup_config_header(config_file: Path, target_header: str) -> str:
+    def find_bad_config_header(config_file: Path, target_header: str,
+        msg: str) -> str:
         """
         Finds the line number a specific header in the specified config file is
           at, and returns the error line for it.
@@ -1127,10 +1150,9 @@ class PrivleapCommon:
                 line_idx += 1
                 line = line.strip()
                 if line == f"[{target_header}]":
-                    return(f"{config_file}:{line_idx}:error:Duplicate action "
-                        f"'{target_header}' found")
+                    return(f"{config_file}:{line_idx}:error:{msg} "
+                        f"'{target_header}'")
         return ""
-
 
     @staticmethod
     def normalize_user_id(user_name: str) -> str | None:

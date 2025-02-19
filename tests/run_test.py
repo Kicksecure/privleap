@@ -685,6 +685,14 @@ def write_bad_config_file(bad_config_file: str) -> bool:
             target_path = Path(PlTestGlobal.privleap_conf_dir,
                 "dupkeys.conf")
             target_contents = PlTestData.duplicate_keys_config_file
+        case "absent_command_directive_config_file":
+            target_path = Path(PlTestGlobal.privleap_conf_dir,
+                "absent.conf")
+            target_contents = PlTestData.absent_command_directive_config_file
+        case "invalid_action_config_file":
+            target_path = Path(PlTestGlobal.privleap_conf_dir,
+                "invalidaction.conf")
+            target_contents = PlTestData.invalid_action_config_file
         case _:
             return False
 
@@ -788,6 +796,38 @@ def privleapd_duplicate_keys_config_file_test(bogus: str) -> bool:
     util.start_privleapd_subprocess([], allow_error_output = True)
     if not util.compare_privleapd_stderr(
         PlTestData.duplicate_keys_config_file_lines):
+        stop_privleapd_subprocess()
+        return False
+    stop_privleapd_subprocess()
+    return True
+
+def privleapd_absent_command_directive_config_file_test(bogus: str) -> bool:
+    """
+    Tests how privleapd handles a config file that specifies the same key more
+      than once.
+    """
+
+    if bogus != "":
+        return False
+    util.start_privleapd_subprocess([], allow_error_output = True)
+    if not util.compare_privleapd_stderr(
+        PlTestData.absent_command_directive_config_file_lines):
+        stop_privleapd_subprocess()
+        return False
+    stop_privleapd_subprocess()
+    return True
+
+def privleapd_invalid_action_config_file_test(bogus: str) -> bool:
+    """
+    Tests how privleapd handles a config file that specifies an invalid action
+      name.
+    """
+
+    if bogus != "":
+        return False
+    util.start_privleapd_subprocess([], allow_error_output = True)
+    if not util.compare_privleapd_stderr(
+        PlTestData.invalid_action_config_file_lines):
         stop_privleapd_subprocess()
         return False
     stop_privleapd_subprocess()
@@ -1464,6 +1504,25 @@ def run_privleapd_tests() -> None:
     privleapd_assert_function(try_remove_file,
         str(Path(PlTestGlobal.privleap_conf_dir, "dupkeys.conf")),
         "Remove config file with duplicate keys")
+    # ---
+    privleapd_assert_function(write_bad_config_file,
+        "absent_command_directive_config_file",
+        "Write config file with absent command directive")
+    privleapd_assert_function(
+        privleapd_absent_command_directive_config_file_test,
+        "", "Test privleapd behavior with absent command directive config file")
+    privleapd_assert_function(try_remove_file,
+        str(Path(PlTestGlobal.privleap_conf_dir, "absent.conf")),
+        "Remove config file with absent command directive")
+    # ---
+    privleapd_assert_function(write_bad_config_file,
+        "invalid_action_config_file",
+        "Write config file with invalid action name")
+    privleapd_assert_function(privleapd_invalid_action_config_file_test,
+        "", "Test privleapd behavior with invalid action name config file")
+    privleapd_assert_function(try_remove_file,
+        str(Path(PlTestGlobal.privleap_conf_dir, "invalidaction.conf")),
+        "Remove config file with invalid action name")
     # ---
     util.start_privleapd_subprocess([])
     privleapd_assert_function(privleapd_control_disconnect_test, "",

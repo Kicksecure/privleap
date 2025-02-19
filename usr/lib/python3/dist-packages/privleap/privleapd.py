@@ -650,8 +650,9 @@ def parse_config_files() -> None:
                     action_arr)
                 if duplicate_action_name is not None:
                     duplicate_action_error \
-                        = pl.PrivleapCommon.find_dup_config_header(
-                            config_file, duplicate_action_name)
+                        = pl.PrivleapCommon.find_bad_config_header(
+                            config_file, duplicate_action_name,
+                            "Duplicate action found:")
                     if PrivleapdGlobal.check_config_mode:
                         print(duplicate_action_error, file = sys.stderr)
                     else:

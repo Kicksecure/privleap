@@ -523,6 +523,15 @@ AuthorizedGroups=sudo
 Command=echo 'test-act-dupkeys'
 Command=echo 'oops'
 """
+    absent_command_directive_config_file: str = """[test-act-notabsent]
+Command=echo 'test-act-notabsent'
+
+[test-act-absent]
+# Command=echo 'test-act-absent'
+"""
+    invalid_action_config_file: str = """[test-@ct-invalidaction]
+Command=echo 'test-@ct-invalidaction'
+"""
     test_username_create_error: bytes \
         = (b"ERROR: privleapd encountered an error while creating a comm "
            b"socket for user '"
@@ -841,7 +850,7 @@ Command=echo 'oops'
     duplicate_config_file_lines: list[str] = [
         "parse_config_files: CRITICAL: Error parsing config: "
         + "'/etc/privleap/conf.d/unit-test.conf:51:error:Duplicate action "
-        + "'test-act-sudopermit' found'\n"
+        + "found: 'test-act-sudopermit''\n"
     ]
     wrongorder_config_file_lines: list[str] = [
         "parse_config_files: CRITICAL: Error parsing config: "
@@ -852,4 +861,14 @@ Command=echo 'oops'
         "parse_config_files: CRITICAL: Error parsing config: "
         + "'/etc/privleap/conf.d/dupkeys.conf:3:error:Multiple 'Command' "
         + "keys in action 'test-act-dupkeys''\n"
+    ]
+    absent_command_directive_config_file_lines: list[str] = [
+        "parse_config_files: CRITICAL: Error parsing config: "
+        + "'/etc/privleap/conf.d/absent.conf:4:error:No command configured for "
+        + "action: 'test-act-absent''\n"
+    ]
+    invalid_action_config_file_lines: list[str] = [
+        "parse_config_files: CRITICAL: Error parsing config: "
+        + "'/etc/privleap/conf.d/invalidaction.conf:1:error:Invalid action "
+        + "name: 'test-@ct-invalidaction''\n"
     ]
