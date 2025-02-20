@@ -37,6 +37,7 @@ class PlTestGlobal:
     privleap_conf_dir: Path = Path(f"{privleap_conf_base_dir}/conf.d")
     privleap_conf_backup_dir: Path = Path(f"{privleap_conf_base_dir}/conf.d.bak")
     privleapd_proc: subprocess.Popen[str] | None = None
+    privleapd_test_ready_file: Path = Path("/tmp/privleapd-ready-for-test")
     test_username: str = "privleaptest"
     test_username_bytes: bytes = test_username.encode("utf-8")
     test_home_dir: Path = Path(f"/home/{test_username}")
@@ -87,6 +88,7 @@ def proc_try_readline(proc: subprocess.Popen[str], timeout: float,
         current_time = datetime.now()
         if current_time >= end_time:
             break
+        time.sleep(0.0001)
 
     # Retrieve a line from the buffer and return it.
     linebuf_parts = PlTestGlobal.linebuf.split("\n",
@@ -232,8 +234,17 @@ def start_privleapd_subprocess(extra_args: list[str],
         fcntl.F_SETFL, os.O_NONBLOCK)
     fcntl.fcntl(PlTestGlobal.privleapd_proc.stderr.fileno(),
         fcntl.F_SETFL, os.O_NONBLOCK)
-    time.sleep(PlTestGlobal.base_delay)
-    if not allow_error_output:
+    if allow_error_output:
+        time.sleep(PlTestGlobal.base_delay * 2)
+    else:
+        privleapd_started_checks = 0
+        while not PlTestGlobal.privleapd_test_ready_file.exists():
+            if privleapd_started_checks >= 10:
+                logging.critical("privleapd failed to start!")
+                sys.exit(1)
+            time.sleep(PlTestGlobal.base_delay)
+            privleapd_started_checks += 1
+        PlTestGlobal.privleapd_test_ready_file.unlink()
         early_privleapd_output: str | None = proc_try_readline(
             PlTestGlobal.privleapd_proc, PlTestGlobal.base_delay,
             read_stderr = True)
@@ -292,12 +303,19 @@ def assert_command_result(command_data: list[str], exit_code: int,
 
 def write_privleap_test_config() -> None:
     """
-    Writes test privleap config data.
+    Writes test privleap config data. Includes one legitimate config file, one
+      empty file, and one file that contains only comments.
     """
 
-    with open(Path(PlTestGlobal.privleap_conf_dir, "unit-test.conf"), "w",
-        encoding = "utf-8") as config_file:
+    with open(Path(PlTestGlobal.privleap_conf_dir, "unit-test.conf"),
+        "w", encoding = "utf-8") as config_file:
         config_file.write(PlTestData.primary_test_config_file)
+    with open(Path(PlTestGlobal.privleap_conf_dir, "comment-only.conf"),
+        "w", encoding = "utf-8") as config_file:
+        config_file.write(PlTestData.comment_only_config_file)
+    with open(Path(PlTestGlobal.privleap_conf_dir, "empty.conf"), "w",
+        encoding = "utf-8") as config_file:
+        config_file.write("\n")
 
 def compare_privleapd_stderr(assert_line_list: list[str], quiet: bool = False) \
     -> bool:
@@ -483,6 +501,9 @@ Command=echo abc=def
 [persistent-users]
 User=messagebus
 """
+    comment_only_config_file: str = """# this is a comment
+# and so is this
+"""
     invalid_filename_test_config_file: str = """[test-act-invalid]
 Command=echo 'test-act-invalid'
 """
@@ -493,6 +514,23 @@ Commandecho 'test-act-crash'
     duplicate_action_config_file: str = """[test-act-sudopermit]
 Command=echo 'duplicate-test-act-sudopermit'
 AuthorizedGroups=sudo
+"""
+    wrongorder_config_file: str \
+        = """Command=echo 'test-act-wrongorder'
+[test-act-wrongorder]
+"""
+    duplicate_keys_config_file: str = """[test-act-dupkeys]
+Command=echo 'test-act-dupkeys'
+Command=echo 'oops'
+"""
+    absent_command_directive_config_file: str = """[test-act-notabsent]
+Command=echo 'test-act-notabsent'
+
+[test-act-absent]
+# Command=echo 'test-act-absent'
+"""
+    invalid_action_config_file: str = """[test-@ct-invalidaction]
+Command=echo 'test-@ct-invalidaction'
 """
     test_username_create_error: bytes \
         = (b"ERROR: privleapd encountered an error while creating a comm "
@@ -576,20 +614,26 @@ AuthorizedGroups=sudo
         = (b"uid=1002("
            + PlTestGlobal.test_username_bytes
            + b") gid=0(root) groups=0(root)\n")
+    privleapd_help: bytes \
+        = (b"privleapd: privleap backend server\n"
+           + b"Usage:\n"
+           + b"  privleapd [-C|--check-config] [-h|--help|-?]\n"
+           + b"Options:\n"
+           + b"  -C, --check-config: Check configuration for validity.\n"
+           + b"  -h, --help, -?: Print usage information.\n"
+           + b"If run without any options specified, the server will start "
+           + b"normally.\n")
+    privleapd_unrecognized_argument: bytes \
+        = b"Unrecognized argument '-z', try 'privleapd --help' for usage info\n"
+    privleapd_unrecognized_argument_escape: bytes \
+        = (b"Unrecognized argument '\\x1b[31mHi\\x1b[m', try 'privleapd "
+           + b"--help' for usage info\n")
     bad_config_file_lines: list[str] = [
-        "/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax\n",
-        "parse_config_files: CRITICAL: Failed to load config file "
-        + "'/etc/privleap/conf.d/crash.conf'!\n",
-        "Traceback (most recent call last):\n",
-        "ValueError: Failed to parse config!\n"
+        "parse_config_files: CRITICAL: Error parsing config: "
+        + "'/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax'\n",
     ]
     bad_config_file_check_lines: list[str] = [
         "/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax\n",
-        "parse_config_files: CRITICAL: Failed to load config file "
-        + "'/etc/privleap/conf.d/crash.conf'!\n",
-        "Traceback (most recent call last):\n",
-        "ValueError: Failed to parse config!\n",
-        "main: CRITICAL: privleap config is bad.\n"
     ]
     control_disconnect_lines: list[str] = [
         "handle_control_session: ERROR: Could not get message from client!\n",
@@ -804,8 +848,27 @@ AuthorizedGroups=sudo
           "ValueError: recv_buf contains data past the last string\n" ]
     ]
     duplicate_config_file_lines: list[str] = [
-        "parse_config_files: CRITICAL: Failed to load config file "
-        + "'/etc/privleap/conf.d/unit-test.conf'!\n",
-        "Traceback (most recent call last):\n",
-        "ValueError: Duplicate action 'test-act-sudopermit' found!\n"
+        "parse_config_files: CRITICAL: Error parsing config: "
+        + "'/etc/privleap/conf.d/unit-test.conf:51:error:Duplicate action "
+        + "found: 'test-act-sudopermit''\n"
+    ]
+    wrongorder_config_file_lines: list[str] = [
+        "parse_config_files: CRITICAL: Error parsing config: "
+        + "'/etc/privleap/conf.d/wrongorder.conf:1:error:Config line "
+        + "before header'\n"
+    ]
+    duplicate_keys_config_file_lines: list[str] = [
+        "parse_config_files: CRITICAL: Error parsing config: "
+        + "'/etc/privleap/conf.d/dupkeys.conf:3:error:Multiple 'Command' "
+        + "keys in action 'test-act-dupkeys''\n"
+    ]
+    absent_command_directive_config_file_lines: list[str] = [
+        "parse_config_files: CRITICAL: Error parsing config: "
+        + "'/etc/privleap/conf.d/absent.conf:4:error:No command configured for "
+        + "action: 'test-act-absent''\n"
+    ]
+    invalid_action_config_file_lines: list[str] = [
+        "parse_config_files: CRITICAL: Error parsing config: "
+        + "'/etc/privleap/conf.d/invalidaction.conf:1:error:Invalid action "
+        + "name: 'test-@ct-invalidaction''\n"
     ]

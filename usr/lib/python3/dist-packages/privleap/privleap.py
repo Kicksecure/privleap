@@ -20,9 +20,8 @@ import stat
 import pwd
 import grp
 import re
-import sys
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, TypeAlias
 from enum import Enum
 
 class PrivleapSocketType(Enum):
@@ -53,6 +52,7 @@ class PrivleapConfigSection(Enum):
     ACTION = 1
     PERSISTENT_USERS = 2
     ALLOWED_USERS = 3
+    NONE = 4
 
 class PrivleapMsg:
     """
@@ -524,10 +524,10 @@ class PrivleapSession:
             # __get_msg_type_field
             if i == 0:
                 # If space_idx isn't equal to len(recv_buf), we hit an actual
-                # space, so we want to pick up scanning immediately *after* that
-                # space. If space_idx is equal to len(recv_buf) though, it's
-                # already at an index equal to one past the end of the data
-                # buffer, so there's no need to increment it.
+                # space, so we want to pick up scanning immediately *after*
+                # that space. If space_idx is equal to len(recv_buf) though,
+                # it's already at an index equal to one past the end of the
+                # data buffer, so there's no need to increment it.
                 if space_idx != len(recv_buf):
                     recv_buf_pos = space_idx + 1
                 else:
@@ -879,20 +879,23 @@ class PrivleapAction:
             target_user = PrivleapCommon.normalize_user_id(target_user)
             if target_user is None:
                 raise ValueError(f"User '{orig_target_user}' specified by "
-                f"field 'TargetUser' of action '{action_name}' does not exist!")
+                    f"field 'TargetUser' of action '{action_name}' does not "
+                    "exist!")
 
         if target_group is not None:
             orig_target_group: str = target_group
             target_group = PrivleapCommon.normalize_user_id(target_group)
             if target_group is None:
                 raise ValueError(f"User '{orig_target_group}' specified by "
-                f"field 'TargetGroup' of action '{action_name}' does not "
-                "exist!")
+                    f"field 'TargetGroup' of action '{action_name}' does not "
+                    "exist!")
 
         self.action_name = action_name
         self.action_command = action_command
         self.target_user = target_user
         self.target_group = target_group
+
+ConfigData: TypeAlias = Tuple[list[PrivleapAction], list[str], list[str]]
 
 class PrivleapCommon:
     """
@@ -947,7 +950,7 @@ class PrivleapCommon:
     # TODO: Changed my mind about splitting this up being a bad idea, try to
     #   split it up if at all possible, this thing is getting way too big.
     def parse_config_file(config_file: Path) \
-        -> Tuple[list[PrivleapAction], list[str], list[str]]:
+        -> ConfigData | str:
         """
         Parses the data from a privleap configuration file and returns all
         privleap actions defined therein.
@@ -957,7 +960,7 @@ class PrivleapCommon:
         persistent_user_output_list: list[str] = []
         allowed_user_output_list: list[str] = []
         current_section_type: PrivleapConfigSection \
-            = PrivleapConfigSection.ACTION
+            = PrivleapConfigSection.NONE
         line_idx: int = 0
         detect_comment_regex: re.Pattern[str] = re.compile(r"\s*#")
         detect_header_regex: re.Pattern[str] = re.compile(r"\[.*]\Z")
@@ -982,6 +985,18 @@ class PrivleapCommon:
                 if detect_header_regex.match(line):
                     if first_header_parsed:
                         if current_section_type == PrivleapConfigSection.ACTION:
+                            if current_action_command is None:
+                                return PrivleapCommon.find_bad_config_header(
+                                    config_file,
+                                    current_header_name,
+                                    "No command configured for action:")
+                            if not PrivleapCommon.validate_id(
+                                current_action_name,
+                                PrivleapValidateType.SIGNAL_NAME):
+                                return PrivleapCommon.find_bad_config_header(
+                                    config_file,
+                                    current_header_name,
+                                    "Invalid action name:")
                             action_output_list.append(PrivleapAction(
                                 current_action_name,
                                 current_action_command,
@@ -1012,14 +1027,20 @@ class PrivleapCommon:
                         current_section_type = PrivleapConfigSection.ACTION
                     continue
 
+                # Config lines are only valid if under a header, if we hit a
+                # config line before a header something is wrong
+                if not first_header_parsed:
+                    return(f"{config_file}:{line_idx}:error:Config line "
+                        f"before header")
+
                 line_parts: list[str] = line.split('=', maxsplit = 1)
                 if len(line_parts) != 2:
-                    print(f"{config_file}:{line_idx}:error:Invalid syntax",
-                        file = sys.stderr)
-                    raise ValueError("Failed to parse config!")
+                    return f"{config_file}:{line_idx}:error:Invalid syntax"
 
                 config_key: str = line_parts[0]
                 config_val: str | None = line_parts[1]
+                if config_val.strip() == "":
+                    return f"{config_file}:{line_idx}:error:Empty config value"
                 if current_section_type \
                     == PrivleapConfigSection.PERSISTENT_USERS:
                     if config_key == "User":
@@ -1031,17 +1052,13 @@ class PrivleapCommon:
                             if config_val not in persistent_user_output_list:
                                 persistent_user_output_list.append(config_val)
                         else:
-                            print(f"{config_file}:{line_idx}:error:Requested "
-                                f"persistent user '{orig_config_val}' does not "
-                                "exist",
-                                file = sys.stderr)
-                            raise ValueError("Failed to parse config!")
+                            return(f"{config_file}:{line_idx}:error:"
+                                "Requested persistent user"
+                                f"'{orig_config_val}' does not exist")
                     else:
-                        print(f"{config_file}:{line_idx}:error:Unrecognized "
+                        return(f"{config_file}:{line_idx}:error:Unrecognized "
                             f"key '{config_key}' found under header "
-                            f"'{current_header_name}'",
-                            file = sys.stderr)
-                        raise ValueError("Failed to parse config!")
+                            f"'{current_header_name}'")
                 elif current_section_type \
                     == PrivleapConfigSection.ALLOWED_USERS:
                     if config_key == "User":
@@ -1052,34 +1069,63 @@ class PrivleapCommon:
                             if config_val not in allowed_user_output_list:
                                 allowed_user_output_list.append(config_val)
                     else:
-                        print(f"{config_file}:{line_idx}:error:Unrecognized "
+                        return(f"{config_file}:{line_idx}:error:Unrecognized "
                             f"key '{config_key}' found under header "
-                            f"'{current_header_name}'",
-                            file = sys.stderr)
-                        raise ValueError("Failed to parse config!")
+                            f"'{current_header_name}'")
                 else:
                     if config_key == "Command":
-                        current_action_command = config_val
+                        if current_action_command is None:
+                            current_action_command = config_val
+                        else:
+                            return(f"{config_file}:{line_idx}:error:Multiple "
+                                "'Command' keys in action "
+                                f"'{current_action_name}'")
                     elif config_key == "AuthorizedUsers":
                         assert config_val is not None
-                        current_auth_users = config_val.split(",")
+                        if len(current_auth_users) == 0:
+                            current_auth_users = config_val.split(",")
+                        else:
+                            return(f"{config_file}:{line_idx}:error:"
+                                f"Multiple 'AuthorizedUsers' keys in action "
+                                f"'{current_action_name}'")
                     elif config_key == "AuthorizedGroups":
                         assert config_val is not None
-                        current_auth_groups = config_val.split(",")
+                        if len(current_auth_groups) == 0:
+                            current_auth_groups = config_val.split(",")
+                        else:
+                            return(f"{config_file}:{line_idx}:error:"
+                                f"Multiple 'AuthorizedGroups' keys in action "
+                                f"'{current_action_name}'")
                     elif config_key == "TargetUser":
-                        current_target_user = config_val
+                        if current_target_user is None:
+                            current_target_user = config_val
+                        else:
+                            return(f"{config_file}:{line_idx}:error:"
+                                f"Multiple 'TargetUser' keys in action "
+                                f"'{current_action_name}'")
                     elif config_key == "TargetGroup":
-                        current_target_group = config_val
+                        if current_target_group is None:
+                            current_target_group = config_val
+                        else:
+                            return(f"{config_file}:{line_idx}:error:"
+                                f"Multiple 'TargetGroup' keys in action "
+                                f"'{current_action_name}'")
                     else:
-                        print(f"{config_file}:{line_idx}:error:Unrecognized "
+                        return(f"{config_file}:{line_idx}:error:Unrecognized "
                             f"key '{config_key}' found under header "
-                            f"'{current_header_name}'",
-                            file = sys.stderr)
-                        raise ValueError("Failed to parse config!")
+                            f"'{current_header_name}'")
 
         # The last action in the file may not be in the list yet, add it now
         # if needed
         if current_section_type == PrivleapConfigSection.ACTION:
+            if current_action_command is None:
+                return PrivleapCommon.find_bad_config_header(config_file,
+                    current_header_name,
+                    "No command configured for action:")
+            if not PrivleapCommon.validate_id(current_action_name,
+                PrivleapValidateType.SIGNAL_NAME):
+                return PrivleapCommon.find_bad_config_header(config_file,
+                    current_header_name, "Invalid action name:")
             action_output_list.append(PrivleapAction(current_action_name,
                 current_action_command,
                 current_auth_users,
@@ -1089,6 +1135,24 @@ class PrivleapCommon:
 
         return (action_output_list, persistent_user_output_list,
             allowed_user_output_list)
+
+    @staticmethod
+    def find_bad_config_header(config_file: Path, target_header: str,
+        msg: str) -> str:
+        """
+        Finds the line number a specific header in the specified config file is
+          at, and returns the error line for it.
+        """
+
+        line_idx: int = 0
+        with open(config_file, "r", encoding = "utf-8") as conf_stream:
+            for line in conf_stream:
+                line_idx += 1
+                line = line.strip()
+                if line == f"[{target_header}]":
+                    return(f"{config_file}:{line_idx}:error:{msg} "
+                        f"'{target_header}'")
+        return ""
 
     @staticmethod
     def normalize_user_id(user_name: str) -> str | None:

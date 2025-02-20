@@ -85,7 +85,8 @@ def create_signal_msg() -> None:
         LeaprunGlobal.signal_msg \
             = pl.PrivleapCommClientSignalMsg(LeaprunGlobal.signal_name)
     except Exception:
-        generic_error(f"Signal name '{LeaprunGlobal.signal_name}' is invalid!")
+        generic_error(f"Signal name {repr(LeaprunGlobal.signal_name)} is "
+            "invalid!")
 
 def start_comm_session() -> None:
     """
@@ -119,7 +120,7 @@ def send_signal() -> None:
         LeaprunGlobal.comm_session.send_msg(LeaprunGlobal.signal_msg)
     except Exception:
         generic_error("Could not request privleapd to run action "
-            f"'{LeaprunGlobal.signal_name}'!")
+            f"{repr(LeaprunGlobal.signal_name)}!")
 
 def handle_response() -> NoReturn:
     """
@@ -139,10 +140,10 @@ def handle_response() -> NoReturn:
 
     if isinstance(comm_msg, pl.PrivleapCommServerUnauthorizedMsg):
         generic_error("You are unauthorized to run action "
-            f"'{LeaprunGlobal.signal_name}'.")
+            f"{repr(LeaprunGlobal.signal_name)}.")
     elif isinstance(comm_msg, pl.PrivleapCommServerTriggerErrorMsg):
         generic_error("An error was encountered launching action "
-            f"'{LeaprunGlobal.signal_name}'.")
+            f"{repr(LeaprunGlobal.signal_name)}.")
     elif isinstance(comm_msg, pl.PrivleapCommServerTriggerMsg):
         while True:
             try:

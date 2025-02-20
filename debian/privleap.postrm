@@ -21,6 +21,17 @@ true "INFO: debhelper beginning here."
 
 true "INFO: Done with debhelper."
 
+if [ "$1" = 'remove' ] || [ "$1" = 'purge' ]; then
+  ## Under Qubes OS, removing and then reinstalling privleap in the same
+  ## session results in a crash when deb-systemd-invoke attempts to (re)start
+  ## privleapd at postinst runtime. Stop privleapd when uninstalled to prevent
+  ## this from occurring.
+  if [ -d /run/systemd/system ] \
+    && [ -x "$(command -v systemctl)" ]; then
+    deb-systemd-invoke stop privleapd
+  fi
+fi
+
 ## Make sure if the user reinstalls the package after purge, the systemd unit
 ## is automatically enabled.
 if [ "$1" = 'purge' ]; then

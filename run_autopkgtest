@@ -42,9 +42,37 @@ offer_package_install() {
   fi
 }
 
+print_usage() {
+  local help_info
+  help_info='run_autopkgtest: Runs regression tests for privleap using autopkgtest
+Usage:
+  run_autopkgtest [--reset-tarball]
+Options:
+  --reset-tarball: Deletes and recreates the tarball used by unshare
+                   for running the tests.'
+  1>&2 echo "${help_info}"
+}
+
 run_autopkgtest() {
-  local reset_autopkgtest_tarball
-  reset_autopkgtest_tarball="${1:-}"
+  local arg
+  arg="${1:-}"
+  if [ "${arg}" = '--help' ] || [ "${arg}" = '-h' ] || [ "${arg}" = '-?' ]; then
+    print_usage
+    exit 0
+  fi
+
+  if [ "$(id -u)" = '0' ]; then
+    1>&2 echo 'Do not run this script as root!'
+    exit 1
+  fi
+
+  if [ "${arg}" = '--reset-tarball' ]; then
+    rm -f "${autopkgtest_tarball_path}"
+  elif [ -n "${arg}" ]; then
+    1>&2 echo "Unrecognized argument: '${arg}'. Try 'run_autopkgtest --help' for usage info."
+    exit 1
+  fi
+
   ## Dependency checks
   if ! [ -x '/usr/bin/unshare' ]; then
     1>&2 echo 'unshare is not executable or does not exist!'
@@ -78,9 +106,6 @@ run_autopkgtest() {
     }
   fi
 
-  if [ "${reset_autopkgtest_tarball}" = '--reset-tarball' ]; then
-    rm -f "${autopkgtest_tarball_path}"
-  fi
   if ! [ -f "${autopkgtest_tarball_path}" ]; then
     create_autopkgtest_tarball
   fi
