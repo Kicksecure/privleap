@@ -67,6 +67,10 @@ messages longer than this, although it is not generally recommended.
   user. `privleapd` will respond with `OK` if this succeeds, `NOUSER` if the
   specified user does not have a communication socket, and `CONTROL_ERROR` if
   this fails.
+* `RELOAD` - Reloads configuration data. `privleapd` will respond with `OK` if
+  this succeeds, and `CONTROL_ERROR` if this fails (due to invalid 
+  configuration). The details of the invalid configuration that lead to a 
+  failure will be logged.
 
 `privleapd` can send the following messages on the `control` socket, which
 clients must be able to understand:

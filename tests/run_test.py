@@ -16,9 +16,9 @@ run_test.py - Tests for privleap. This is implemented as an entire program as
   wide variety of real-world-like tests to ensure all components of privleap
   behave as expected. This should be run using an autopkgtest.
 
-WARNING: These tests are designed to not damage the system they are ran on, but
-  the chances of system damage occurring when running this script is non-zero!
-  Please only run this test in a virtual machine with privleap installed.
+WARNING: These tests are designed to not damage the system they are ran on,
+  but the chances of system damage occurring when running this script is
+  non-zero! Do not run these tests directly, use run_autopkgtest instead.
 """
 
 import os

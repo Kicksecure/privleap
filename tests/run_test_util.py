@@ -572,15 +572,18 @@ Command=echo 'test-@ct-invalidaction'
     root_socket_destroyed: bytes = b"Comm socket destroyed for user 'root'.\n"
     leapctl_help: bytes \
 = (b"leapctl <--create|--destroy> <user>\n"
++ b"leapctl --reload\n"
 + b"\n"
-+ b"    user : The username or UID of the user account to create or destroy a\n"
-+ b"           communication socket for.\n"
 + b"    --create : Specifies that leapctl should request a communication "
 + b"socket to\n"
 + b"               be created for the specified user.\n"
 + b"    --destroy : Specifies that leapctl should request a communication "
 + b"socket\n"
-+ b"                to be destroyed for the specified user.\n")
++ b"                to be destroyed for the specified user.\n"
++ b"    --reload : Instructs privleapd to reload configuration without "
++ b"restarting.\n"
++ b"    user : The username or UID of the user account to create or destroy a\n"
++ b"           communication socket for.\n")
     test_act_nonexistent_unauthorized: bytes \
         = (b"ERROR: You are unauthorized to run action "
            + b"'test-act-userrestrict'.\n")
