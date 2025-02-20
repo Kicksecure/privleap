@@ -35,15 +35,18 @@ make_privleapd_comm_sockets_first_time_maybe() {
    ## debhelper checks for folder '/run/systemd/system' existence.
    ## So we should do.
    if [ ! -d /run/systemd/system ]; then
+      true "INFO: folder /run/systemd/system does not exist."
       return 0
    fi
    ## The existence of `/run/systemd/system` is not necessarily enough to be
    ## sure that systemctl is even present on the system, see
    ## https://github.com/ArrayBolt3/privleap/issues/7#issuecomment-2663055757
    if [ ! -x "$(command -v systemctl)" ]; then
+      true "INFO: systemctl command unavailable."
       return 0
    fi
    if ! systemctl --no-pager --no-block status privleapd.service &>/dev/null; then
+      true "INFO: systemd unit privleapd.service not running."
       return 0
    fi
 
@@ -66,9 +69,11 @@ start_privleapd() {
    ## even present on the system, see
    ## https://github.com/ArrayBolt3/privleap/issues/7#issuecomment-2663055757
    if [ "${restarted_once}" = 'yes' ]; then
+      true "INFO: restarted_once=yes"
       return 0
    fi
    if [ ! -x "$(command -v systemctl)" ]; then
+      true "INFO: systemctl command unavailable."
       return 0
    fi
    deb-systemd-invoke restart privleapd.service
