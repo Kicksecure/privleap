@@ -1,3 +1,131 @@
+commit 8e641857d09301d35718cfda1ac56c8a5b3b848d
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Thu Feb 20 00:14:33 2025 -0500
+
+    re-generate man pages (generated using "genmkfile manpages")
+
+commit a97da79015701416d34fc5a5de422df4aa0147eb
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Wed Feb 19 22:59:03 2025 -0500
+
+    debugging
+
+commit 087563c57023f70f3919b47f07a0268f92858053
+Merge: 87c72c2 d6bbdc8
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Wed Feb 19 22:56:45 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit d6bbdc8fde6f5f09d81fa454a434a5c26643534f
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Feb 19 15:36:03 2025 -0600
+
+    Improve config parser error messaging and make parser more strict
+
+commit 148d58cb96f2cb90c6b053908a1dddb6d73007e2
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Feb 19 13:31:45 2025 -0600
+
+    Avoid printing things like ANSI escape sequences
+
+commit 0d5dd5e0c3737f013dd15d7c0dd3bab484abbd94
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Feb 19 12:45:06 2025 -0600
+
+    Avoid trying to start privleapd-run-sensitive testing before privleapd starts
+
+commit 54837d313b97f78f231c4fdc651e5557b0e1e3d6
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Feb 19 10:51:19 2025 -0600
+
+    Echo bugfixes/refactor in run_autopkgtest, forbid running run_autopkgtest as root
+
+commit b4e55c8e17294dd789019f2329d62529d9437eb0
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Feb 19 10:44:04 2025 -0600
+
+    Only start privleapd once during installation
+
+commit 7d6235660c1c00144484a151c9e44aaba6129e10
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Feb 19 10:34:11 2025 -0600
+
+    Prevent weird failures when purging and reinstalling on Qubes OS Debian VMs
+
+commit 6eed6e0993e6b25a78a0a0f847bca5a9b88075e2
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Feb 19 00:28:10 2025 -0600
+
+    Add help info to privleapd, add tests for privleapd help and invalid argument handling
+
+commit ea8b2ab439105cf81f5e589159f2e7ff997c4d11
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Tue Feb 18 23:54:56 2025 -0600
+
+    Report line number for duplicate action config errors
+
+commit 62bf39591acbc7478f07fdbf0644d10b68d010a3
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Tue Feb 18 23:35:18 2025 -0600
+
+    Refactoring, make config check more machine-readable
+
+commit 159eba7caef5939e32259a755d564f11d4139c19
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Tue Feb 18 22:05:31 2025 -0600
+
+    Fix run_autopkgtest argument parsing
+
+commit 560bfb1151fc4cfe45534f1cd2d9e8f883062f74
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Tue Feb 18 21:43:45 2025 -0600
+
+    Add help to run_autopkgtest, refactor argument parsing slightly
+
+commit 2238230c1833f49a40dd8d14ba00467861ee6d74
+Merge: 33ff309 87c72c2
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Tue Feb 18 21:12:11 2025 -0600
+
+    Merge branch 'master' of github.com:Kicksecure/privleap
+
+commit 33ff309cf7cebf50c4a06b7cbc6355c9630ed10e
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Mon Feb 17 23:36:39 2025 -0600
+
+    Prevent config files from having duplicate keys in action definitions
+
+commit adad988f33965d42074865d7472056cf257f816f
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Mon Feb 17 23:05:08 2025 -0600
+
+    Prevent config lines from showing up before config headers
+
+commit 73b8378390fbbf355d91e99986d61cf216a5a418
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Mon Feb 17 22:35:05 2025 -0600
+
+    Prevent blank or comment-only config files from crashing privleapd
+
+commit 17d4caa0a84499559c8f18dbd90076ef0172501d
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Mon Feb 17 22:20:59 2025 -0600
+
+    Avoid trying to (re)start the privleap service in the postinst if systemctl isn't executable
+
+commit cbe10804c4d7f9a4bf10aae33663377969a17481
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Mon Feb 17 21:55:01 2025 -0600
+
+    Process the config files in a deterministic order
+
+commit 87c72c21ec2728ff18c2b51a2dbc68a48a70105f
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Mon Feb 17 12:28:12 2025 +0000
+
+    bumped changelog version
+
 commit eed911a8097cc09ff09dc422e0f9f62eb4ce2849
 Merge: 023462f 46f1ad0
 Author: Patrick Schleizer <adrelanos@whonix.org>
