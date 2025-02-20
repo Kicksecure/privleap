@@ -4,7 +4,7 @@
 .SH "NAME"
 \fBprivleapd\fR \- privleap backend server
 .SH "SYNOPSIS"
-\fBprivleapd [\-C|\-\-check\-config]\fR
+\fBprivleapd [\-C|\-\-check\-config] [\-h|\-\-help|\-?]\fR
 .SH "DESCRIPTION"
 The backend server for privleap\. Runs predefined code snippets as root when requested by an authorized client\. privleapd listens for connections on UNIX sockets under \fB/run/privleapd\fR, it does not send or receive information over a network\.
 .P
@@ -13,6 +13,9 @@ You usually will not need to run this directly \- if \fBprivleap\fR was installe
 .TP
 \fB\-C\fR, \fB\-\-check\-config\fR
 Checks to ensure the privleap configuration is valid, then outputs a short report and exits\.
+.TP
+\fB\-h\fR, \fB\-\-help\fR, \fB\-?\fR
+Prints usage information\.
 .SH "ENVIRONMENT VARIABLES"
 None\.
 .SH "CONFIG FILES"
