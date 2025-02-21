@@ -850,7 +850,8 @@ def main() -> NoReturn:
             sys.exit(1)
 
     if PrivleapdGlobal.check_config_mode:
-        parse_config_files()
+        if not parse_config_files():
+            sys.exit(1)
         sys.exit(0)
 
     ensure_running_as_root()
