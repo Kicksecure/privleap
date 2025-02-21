@@ -1,8 +1,76 @@
+commit b44d18e8ea29b217b5670d0db06ac806f12b3b3c
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Fri Feb 21 04:47:01 2025 -0500
+
+    comment
+
+commit e9273b36a015c1c7471c33236012bef5dc297284
+Merge: 75d67bb dd77678
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Fri Feb 21 04:08:23 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit dd776782aedf176b3f2538e8b8b78db73504ba43
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Thu Feb 20 22:56:22 2025 -0600
+
+    Don't fail hard when upgrading privleap on a system with invalid config
+
+commit b482a05a1970b1be0bbad784753a1019730e0b0c
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Thu Feb 20 22:39:33 2025 -0600
+
+    Require action headers to be explicitly marked as such, test refactoring
+
+commit e8e00710d4d085f17183a32ec018c949184fcba2
+Merge: 29580c1 75d67bb
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Thu Feb 20 21:45:09 2025 -0600
+
+    Merge branch 'master' of github.com:Kicksecure/privleap
+
+commit 29580c1bc4991a87f03bdc7fc92738b36371ca37
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Thu Feb 20 21:28:17 2025 -0600
+
+    Don't (re)start privleapd if configuration is invalid, warn about invalid config on installation, prevent dh_installsystemd conflicts
+
+commit 4996e3980c9512295aa9ab1dac2eaf66e14e9f1b
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Thu Feb 20 19:31:29 2025 -0600
+
+    Require debian-archive-keyring in run_autopkgtest, remove bad helper-scripts reference, tidy up autopkgtest dep list
+
+commit 7422b104f19e1ea3d067c63af69aa0efca70690c
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Thu Feb 20 18:21:07 2025 -0600
+
+    Add systemctl reload support to privleapd
+
+commit 4a6e6ba7f1eb45ce9171391037184530f3219733
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Thu Feb 20 18:04:44 2025 -0600
+
+    Add regression tests for config reload support, fix minor issues with log messaging in privleapd
+
+commit 75d67bb8cf86accf3e60cb904a7de1d0a61a5806
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Thu Feb 20 05:14:34 2025 +0000
+
+    bumped changelog version
+
 commit 8e641857d09301d35718cfda1ac56c8a5b3b848d
 Author: Patrick Schleizer <adrelanos@whonix.org>
 Date:   Thu Feb 20 00:14:33 2025 -0500
 
     re-generate man pages (generated using "genmkfile manpages")
+
+commit 841eb30a3e1d8ced6c7cf6e4a4009209ff6ea482
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Feb 19 23:13:02 2025 -0600
+
+    Implement restartless config reload (wip, needs regression tests), refactor for maintainability
 
 commit a97da79015701416d34fc5a5de422df4aa0147eb
 Author: Patrick Schleizer <adrelanos@whonix.org>
