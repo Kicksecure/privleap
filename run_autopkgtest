@@ -87,6 +87,9 @@ run_autopkgtest() {
   if ! [ -f '/usr/bin/dh' ]; then
     offer_package_install 'debhelper'
   fi
+  if ! [ -f '/usr/share/keyrings/debian-archive-bookworm-stable.gpg' ]; then
+    offer_package_install 'debian-archive-keyring'
+  fi
   if [ "$(basename "${privleap_project_dir}")" != 'privleap' ]; then
     1>&2 echo 'The run_autopkgtest script does not appear to be in the root of the privleap source tree!'
     exit 1
