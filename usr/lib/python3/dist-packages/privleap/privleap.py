@@ -109,6 +109,17 @@ class PrivleapControlClientDestroyMsg(PrivleapMsg):
     def serialize(self) -> bytes:
         return f"{self.name} {self.user_name}".encode("utf-8")
 
+class PrivleapControlClientReloadMsg(PrivleapMsg):
+    """
+    Privleap message.
+
+    Sent from client to server.
+
+    Requests a configuration reload.
+    """
+
+    name = "RELOAD"
+
 class PrivleapControlServerOkMsg(PrivleapMsg):
     """
     Privleap message.
@@ -600,6 +611,10 @@ class PrivleapSession:
                 param_list, _ = self.__parse_msg_parameters(
                     recv_buf, str_count = 1, blob_at_end = False)
                 return PrivleapControlClientDestroyMsg(param_list[0])
+            if msg_type_str == "RELOAD":
+                self.__parse_msg_parameters(
+                    recv_buf, str_count = 0, blob_at_end = False)
+                return PrivleapControlClientReloadMsg()
             raise ValueError(
                 f"Invalid message type '{msg_type_str}' for socket")
 
@@ -718,7 +733,8 @@ class PrivleapSession:
                 raise ValueError("Invalid message type for socket.")
         elif self.is_control_session and not self.is_server_side:
             if msg_obj_type not in (PrivleapControlClientCreateMsg,
-                PrivleapControlClientDestroyMsg):
+                PrivleapControlClientDestroyMsg,
+                PrivleapControlClientReloadMsg):
                 raise ValueError("Invalid message type for socket.")
         elif not self.is_control_session and self.is_server_side:
             if msg_obj_type not in (PrivleapCommServerTriggerMsg,
@@ -985,17 +1001,17 @@ class PrivleapCommon:
                 if detect_header_regex.match(line):
                     if first_header_parsed:
                         if current_section_type == PrivleapConfigSection.ACTION:
+                            assert current_header_name is not None
+                            assert current_action_name is not None
                             if current_action_command is None:
                                 return PrivleapCommon.find_bad_config_header(
-                                    config_file,
-                                    current_header_name,
+                                    config_file, current_header_name,
                                     "No command configured for action:")
                             if not PrivleapCommon.validate_id(
                                 current_action_name,
                                 PrivleapValidateType.SIGNAL_NAME):
                                 return PrivleapCommon.find_bad_config_header(
-                                    config_file,
-                                    current_header_name,
+                                    config_file, current_action_name,
                                     "Invalid action name:")
                             action_output_list.append(PrivleapAction(
                                 current_action_name,
@@ -1022,9 +1038,12 @@ class PrivleapCommon:
                     elif current_header_name == "allowed-users":
                         current_section_type \
                             = PrivleapConfigSection.ALLOWED_USERS
-                    else:
-                        current_action_name = current_header_name
+                    elif current_header_name[:7] == "action:":
+                        current_action_name = current_header_name[7:]
                         current_section_type = PrivleapConfigSection.ACTION
+                    else:
+                        return(f"{config_file}:{line_idx}:error:"
+                            f"Unrecognized header '{current_header_name}'")
                     continue
 
                 # Config lines are only valid if under a header, if we hit a
@@ -1039,12 +1058,12 @@ class PrivleapCommon:
 
                 config_key: str = line_parts[0]
                 config_val: str | None = line_parts[1]
+                assert config_val is not None
                 if config_val.strip() == "":
                     return f"{config_file}:{line_idx}:error:Empty config value"
                 if current_section_type \
                     == PrivleapConfigSection.PERSISTENT_USERS:
                     if config_key == "User":
-                        assert config_val is not None
                         orig_config_val: str = config_val
                         config_val = PrivleapCommon.normalize_user_id(
                             config_val)
@@ -1118,14 +1137,14 @@ class PrivleapCommon:
         # The last action in the file may not be in the list yet, add it now
         # if needed
         if current_section_type == PrivleapConfigSection.ACTION:
+            assert current_action_name is not None
             if current_action_command is None:
                 return PrivleapCommon.find_bad_config_header(config_file,
-                    current_header_name,
-                    "No command configured for action:")
+                    current_action_name, "No command configured for action:")
             if not PrivleapCommon.validate_id(current_action_name,
                 PrivleapValidateType.SIGNAL_NAME):
                 return PrivleapCommon.find_bad_config_header(config_file,
-                    current_header_name, "Invalid action name:")
+                    current_action_name, "Invalid action name:")
             action_output_list.append(PrivleapAction(current_action_name,
                 current_action_command,
                 current_auth_users,
@@ -1149,7 +1168,7 @@ class PrivleapCommon:
             for line in conf_stream:
                 line_idx += 1
                 line = line.strip()
-                if line == f"[{target_header}]":
+                if line == f"[action:{target_header}]":
                     return(f"{config_file}:{line_idx}:error:{msg} "
                         f"'{target_header}'")
         return ""

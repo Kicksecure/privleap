@@ -186,6 +186,20 @@ def handle_control_destroy_msg(control_session: pl.PrivleapSession,
         control_session, pl.PrivleapControlServerNouserMsg())
     return
 
+def handle_control_reload_msg(control_session: pl.PrivleapSession) -> None:
+    """
+    Handles a RELOAD message from the client.
+    """
+
+    if parse_config_files():
+        logging.info("Handled RELOAD message, configuration reloaded")
+        send_msg_safe(
+            control_session, pl.PrivleapControlServerOkMsg())
+    else:
+        logging.warning("Handled RELOAD message, configuration was invalid!")
+        send_msg_safe(
+            control_session, pl.PrivleapControlServerControlErrorMsg())
+
 def handle_control_session(control_socket: pl.PrivleapSocket) -> None:
     """
     Handles control socket connections, for creating or destroying comm sockets.
@@ -212,6 +226,8 @@ def handle_control_session(control_socket: pl.PrivleapSocket) -> None:
             handle_control_create_msg(control_session, control_msg)
         elif isinstance(control_msg, pl.PrivleapControlClientDestroyMsg):
             handle_control_destroy_msg(control_session, control_msg)
+        elif isinstance(control_msg, pl.PrivleapControlClientReloadMsg):
+            handle_control_reload_msg(control_session)
         else:
             logging.critical(
                 "privleapd mis-parsed a control command from the client!")
@@ -595,20 +611,21 @@ def append_if_not_in(item: Any, item_list: list[Any]) -> None:
     if item not in item_list:
         item_list.append(item)
 
-def extend_action_list(action_arr: list[pl.PrivleapAction]) -> str | None:
+def extend_action_list(action_arr: list[pl.PrivleapAction],
+    target_arr: list[pl.PrivleapAction]) -> str | None:
     """
     Extend PrivleapdGlobal.action_list with the contents of action_arr. If a
       duplicate action is found, stop early and return the name of the
       duplicate, otherwise return None.
     """
     for action_item in action_arr:
-        for existing_action_item in PrivleapdGlobal.action_list:
+        for existing_action_item in target_arr:
             if action_item.action_name == existing_action_item.action_name:
                 return action_item.action_name
-        PrivleapdGlobal.action_list.append(action_item)
+        target_arr.append(action_item)
     return None
 
-def parse_config_files() -> None:
+def parse_config_files() -> bool:
     """
     Parses all config files under /etc/privleap/conf.d.
     """
@@ -619,6 +636,10 @@ def parse_config_files() -> None:
             continue
         config_file_list.append(config_file)
     config_file_list.sort()
+
+    temp_action_list: list[pl.PrivleapAction] = []
+    temp_persistent_user_list: list[str] = []
+    temp_allowed_user_list: list[str] = []
 
     for config_file in config_file_list:
         if not config_file.is_file():
@@ -639,47 +660,50 @@ def parse_config_files() -> None:
                 if PrivleapdGlobal.check_config_mode:
                     print(config_result, file = sys.stderr)
                 else:
-                    logging.critical("Error parsing config: '%s'",
+                    logging.error("Error parsing config: '%s'",
                         config_result)
-                sys.exit(1)
-            else:
-                action_arr = config_result[0]
-                persistent_user_arr = config_result[1]
-                allowed_user_arr = config_result[2]
-                duplicate_action_name: str | None = extend_action_list(
-                    action_arr)
-                if duplicate_action_name is not None:
-                    duplicate_action_error \
-                        = pl.PrivleapCommon.find_bad_config_header(
-                            config_file, duplicate_action_name,
-                            "Duplicate action found:")
-                    if PrivleapdGlobal.check_config_mode:
-                        print(duplicate_action_error, file = sys.stderr)
-                    else:
-                        logging.critical("Error parsing config: '%s'",
-                            duplicate_action_error)
-                    sys.exit(1)
-                for persistent_user_item in persistent_user_arr:
-                    # Note, parse_config_file() normalizes the usernames of
-                    # persistent users for us.
-                    append_if_not_in(persistent_user_item,
-                        PrivleapdGlobal.persistent_user_list)
-                    # Persistent users are automatically allowed users too.
-                    append_if_not_in(persistent_user_item,
-                        PrivleapdGlobal.allowed_user_list)
-                    # It isn't an error for duplicate persistent users to be
-                    # defined, we just skip over the duplicates.
-                for allowed_user_item in allowed_user_arr:
-                    # Note, parse_config_file() normalizes the usernames of
-                    # allowed users for us.
-                    append_if_not_in(allowed_user_item,
-                        PrivleapdGlobal.allowed_user_list)
-                    # It isn't an error for duplicate allowed users to be
-                    # defined, we just skip over the duplicates.
+                return False
+            action_arr = config_result[0]
+            persistent_user_arr = config_result[1]
+            allowed_user_arr = config_result[2]
+            duplicate_action_name: str | None = extend_action_list(
+                action_arr, temp_action_list)
+            if duplicate_action_name is not None:
+                duplicate_action_error \
+                    = pl.PrivleapCommon.find_bad_config_header(
+                        config_file, duplicate_action_name,
+                        "Duplicate action found:")
+                if PrivleapdGlobal.check_config_mode:
+                    print(duplicate_action_error, file = sys.stderr)
+                else:
+                    logging.error("Error parsing config: '%s'",
+                        duplicate_action_error)
+                return False
+            for persistent_user_item in persistent_user_arr:
+                # Note, parse_config_file() normalizes the usernames of
+                # persistent users for us.
+                append_if_not_in(persistent_user_item,
+                    temp_persistent_user_list)
+                # Persistent users are automatically allowed users too.
+                append_if_not_in(persistent_user_item,
+                    temp_allowed_user_list)
+                # It isn't an error for duplicate persistent users to be
+                # defined, we just skip over the duplicates.
+            for allowed_user_item in allowed_user_arr:
+                # Note, parse_config_file() normalizes the usernames of
+                # allowed users for us.
+                append_if_not_in(allowed_user_item,
+                    temp_allowed_user_list)
+                # It isn't an error for duplicate allowed users to be
+                # defined, we just skip over the duplicates.
         except Exception as e:
-            logging.critical("Failed to load config file '%s'!",
+            logging.error("Failed to load config file '%s'!",
                 str(config_file), exc_info = e)
-            sys.exit(1)
+            return False
+    PrivleapdGlobal.action_list = temp_action_list
+    PrivleapdGlobal.persistent_user_list = temp_persistent_user_list
+    PrivleapdGlobal.allowed_user_list = temp_allowed_user_list
+    return True
 
 def populate_state_dir() -> None:
     """
@@ -826,13 +850,16 @@ def main() -> NoReturn:
             sys.exit(1)
 
     if PrivleapdGlobal.check_config_mode:
-        parse_config_files()
+        if not parse_config_files():
+            sys.exit(1)
         sys.exit(0)
 
     ensure_running_as_root()
     verify_not_running_twice()
     cleanup_old_state_dir()
-    parse_config_files()
+    if not parse_config_files():
+        logging.critical("Failed initial config load!")
+        sys.exit(1)
     populate_state_dir()
     open_control_socket()
     open_persistent_comm_sockets()

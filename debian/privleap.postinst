@@ -16,12 +16,15 @@ true "
 "
 
 restarted_once='no'
+red="\033[31m"
+bold="\033[1m"
+nocolor="\033[0m"
 
 make_privleapd_comm_sockets_first_time_maybe() {
-   if [ -f "/var/lib/privleap/do_once/${FUNCNAME}_version_1" ]; then
-      return 0
-   fi
-   mkdir --parents "/var/lib/privleap/do_once"
+#   if [ -f "/var/lib/privleap/do_once/${FUNCNAME}_version_1" ]; then
+#      return 0
+#   fi
+#   mkdir --parents "/var/lib/privleap/do_once"
 
    ## If this is the first installation, we need to start the leapctl
    ## services corresponding to each actively logged-in user, otherwise
@@ -58,7 +61,7 @@ make_privleapd_comm_sockets_first_time_maybe() {
       systemctl start "leapctl@${target_uid}.service" 2>/dev/null || true
    done
 
-   touch "/var/lib/privleap/do_once/${FUNCNAME}_version_1"
+#   touch "/var/lib/privleap/do_once/${FUNCNAME}_version_1"
 }
 
 start_privleapd() {
@@ -76,9 +79,13 @@ start_privleapd() {
       true "INFO: systemctl command unavailable."
       return 0
    fi
-   deb-systemd-invoke restart privleapd.service
-   make_privleapd_comm_sockets_first_time_maybe
-   restarted_once='yes'
+   if /usr/bin/privleapd --check-config ; then
+      deb-systemd-invoke restart privleapd.service || true
+      make_privleapd_comm_sockets_first_time_maybe
+      restarted_once='yes'
+   else
+      1>&2 echo -e "${red}${bold}WARNING: privleap configuration invalid. Not restarting privleapd.${nocolor}"
+   fi
 }
 
 case "$1" in

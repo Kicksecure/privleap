@@ -46,13 +46,15 @@ def print_usage() -> NoReturn:
     """
 
     print("""leapctl <--create|--destroy> <user>
+leapctl --reload
 
-    user : The username or UID of the user account to create or destroy a
-           communication socket for.
     --create : Specifies that leapctl should request a communication socket to
                be created for the specified user.
     --destroy : Specifies that leapctl should request a communication socket
-                to be destroyed for the specified user.""")
+                to be destroyed for the specified user.
+    --reload : Instructs privleapd to reload configuration without restarting.
+    user : The username or UID of the user account to create or destroy a
+           communication socket for.""")
     cleanup_and_exit(1)
 
 def generic_error(error_msg: str) -> NoReturn:
@@ -163,38 +165,73 @@ def handle_destroy_request(user_name: str) -> NoReturn:
     else:
         unexpected_msg_error(control_msg)
 
+def handle_reload_request() -> NoReturn:
+    """
+    Requests that privleapd reload its configuration files without restarting.
+    """
+
+    assert LeapctlGlobal.control_session is not None
+
+    try:
+        LeapctlGlobal.control_session.send_msg(
+            pl.PrivleapControlClientReloadMsg())
+    except Exception:
+        generic_error(
+            "Could not request privleapd to reload configuration!")
+
+    try:
+        control_msg: pl.PrivleapMsg = LeapctlGlobal.control_session.get_msg()
+    except Exception:
+        generic_error("privleapd didn't return a valid response!")
+
+    if isinstance(control_msg, pl.PrivleapControlServerOkMsg):
+        print("privleapd configuration reload successful.")
+        cleanup_and_exit(0)
+    elif isinstance(control_msg, pl.PrivleapControlServerControlErrorMsg):
+        generic_error("privleapd failed to reload configuration!")
+    else:
+        unexpected_msg_error(control_msg)
+
 def main() -> NoReturn:
     """
     Main function.
     """
 
-    if len(sys.argv) != 3:
+    if len(sys.argv) < 2 or len(sys.argv) > 3:
         print_usage()
 
     control_action: str = sys.argv[1]
-    control_user: str | None = sys.argv[2]
+    control_user: str | None = None
+    if len(sys.argv) == 3:
+        control_user = sys.argv[2]
 
-    if control_action not in ("--create", "--destroy"):
+    if control_action not in ("--create", "--destroy", "--reload"):
+        print_usage()
+    if control_action == "--reload" and control_user is not None:
         print_usage()
 
-    assert control_user is not None
-    orig_control_user = control_user
-    control_user = pl.PrivleapCommon.normalize_user_id(control_user)
-    # Allow a username that doesn't exist to be passed when using --destroy, so
-    # if a user is deleted before their comm socket is destroyed, the socket can
-    # be destroyed anyway.
-    if control_user is None:
-        if control_action != "--destroy":
-            generic_error("Specified user does not exist.")
-        else:
-            control_user = orig_control_user
+    if control_user is not None:
+        orig_control_user = control_user
+        control_user = pl.PrivleapCommon.normalize_user_id(control_user)
+        # Allow a username that doesn't exist to be passed when using --destroy,
+        # so if a user is deleted before their comm socket is destroyed, the
+        # socket can be destroyed anyway.
+        if control_user is None:
+            if control_action != "--destroy":
+                generic_error("Specified user does not exist.")
+            else:
+                control_user = orig_control_user
 
     start_control_session()
 
     if control_action == "--create":
+        assert control_user is not None
         handle_create_request(control_user)
-    else:
+    elif control_action == "--destroy":
+        assert control_user is not None
         handle_destroy_request(control_user)
+    else:
+        handle_reload_request()
 
 if __name__ == "__main__":
     main()

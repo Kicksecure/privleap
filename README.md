@@ -53,11 +53,11 @@ own privleap client or server, this should give you the information you need.
 The following dependencies must be installed on the host system to run the
 test suite:
 
-* [helper-scripts](https://github.com/Kicksecure/helper-scripts)
-* mmdebstrap
-* debhelper
-* python3
 * autopkgtest
+* debhelper
+* debian-archive-keyring
+* mmdebstrap
+* python3
 
 Additionally, the `/usr/bin/newuidmap` and `/usr/bin/newgidmap` 
 executables must be SUID-root.
