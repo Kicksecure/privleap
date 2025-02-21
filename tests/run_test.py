@@ -354,6 +354,8 @@ def run_leapctl_tests() -> None:
     leapctl_assert_command(["leapctl"],
         exit_code = 1,
         stdout_data = PlTestData.leapctl_help)
+    # ---
+
     logging.info("leapctl passed asserts: %s, failed asserts: %s",
         leapctl_asserts_passed, leapctl_asserts_failed)
 
@@ -642,6 +644,55 @@ def run_leaprun_tests() -> None:
     # ---
     leaprun_assert_function(leaprun_server_late_cutoff_test, "",
         "Leaprun server late cutoff test")
+    # ---
+    util.start_privleapd_subprocess([])
+    leaprun_assert_function(write_new_config_file, "added_actions_config_file",
+        "Write config file with added actions")
+    leaprun_assert_command(["leapctl", "--create", PlTestGlobal.test_username],
+        exit_code = 0,
+        stdout_data = PlTestData.test_username_socket_created)
+    leaprun_assert_command(["leapctl", "--reload"],
+        exit_code = 0,
+        stdout_data = b"privleapd configuration reload successful.\n")
+    # ---
+    leaprun_assert_command(["sudo", "-u", PlTestGlobal.test_username, "leaprun",
+        "test-act-added1"],
+        exit_code = 0,
+        stdout_data = b"test-act-added1\n")
+    leaprun_assert_command(["sudo", "-u", PlTestGlobal.test_username, "leaprun",
+        "test-act-added2"],
+        exit_code = 0,
+        stdout_data = b"test-act-added2\n")
+    # ---
+    leaprun_assert_function(try_remove_file,
+        str(Path(PlTestGlobal.privleap_conf_dir, "added_actions.conf")),
+        "Remove added actions config file")
+    leaprun_assert_command(["leapctl", "--reload"],
+        exit_code = 0,
+        stdout_data = b"privleapd configuration reload successful.\n")
+    # ---
+    leaprun_assert_command(["sudo", "-u", PlTestGlobal.test_username, "leaprun",
+        "test-act-added1"],
+        exit_code = 1,
+        stderr_data = b"ERROR: You are unauthorized to run action "
+            + b"'test-act-added1'.\n")
+    leaprun_assert_command(["sudo", "-u", PlTestGlobal.test_username, "leaprun",
+        "test-act-added2"],
+        exit_code = 1,
+        stderr_data = b"ERROR: You are unauthorized to run action "
+            + b"'test-act-added2'.\n")
+    # ---
+    leaprun_assert_function(write_new_config_file,
+        "added_actions_bad_config_file",
+        "Write bad config file with added actions")
+    leaprun_assert_command(["leapctl", "--reload"],
+        exit_code = 1,
+        stderr_data = b"ERROR: privleapd failed to reload configuration!\n")
+    leaprun_assert_function(try_remove_file,
+        str(Path(PlTestGlobal.privleap_conf_dir, "added_actions_bad.conf")),
+        "Remove bad added actions config file")
+    # ---
+
     logging.info("leaprun passed asserts: %s, failed asserts: %s",
         leaprun_asserts_passed, leaprun_asserts_failed)
 
@@ -660,10 +711,10 @@ def write_config_file_with_bad_name(bogus: str) -> bool:
     except Exception:
         return False
 
-def write_bad_config_file(bad_config_file: str) -> bool:
+def write_new_config_file(bad_config_file: str) -> bool:
     """
-    Writes a config file with invalid contents. This should crash privleapd. Can
-      write one of several specified config files.
+    Writes a config file other than the default unit-test.conf file. Used for
+      testing various things that involve changing configuration.
     """
 
     target_path: Path
@@ -693,6 +744,14 @@ def write_bad_config_file(bad_config_file: str) -> bool:
             target_path = Path(PlTestGlobal.privleap_conf_dir,
                 "invalidaction.conf")
             target_contents = PlTestData.invalid_action_config_file
+        case "added_actions_config_file":
+            target_path = Path(PlTestGlobal.privleap_conf_dir,
+                "added_actions.conf")
+            target_contents = PlTestData.added_actions_config_file
+        case "added_actions_bad_config_file":
+            target_path = Path(PlTestGlobal.privleap_conf_dir,
+                "added_actions_bad.conf")
+            target_contents = PlTestData.added_actions_bad_config_file
         case _:
             return False
 
@@ -1300,36 +1359,105 @@ def privleapd_send_grouprestrict_signal_and_bail_test(bogus: str) -> bool:
             return True
     return False
 
-def privleapd_send_invalid_bash_signal_test(bogus: str) -> bool:
+def privleapd_check_signal_response_test(test_type: str) -> bool:
     """
-    Test how privleapd handles a comm client that requests an action to be run
-      that has invalid Bash code as its command.
+    Test how privleapd handles a comm client that requests a specific action to
+      be run. General test function usable for basically any signal.
     """
 
-    if bogus != "":
+    expect_stdout_data: bytes = b""
+    expect_stderr_data: bytes = b""
+    expect_exitcode: int = 0
+    expect_unauthorized: bool = False
+    expect_privleapd_stderr: list[str] = []
+    test_action: str | None = None
+    match test_type:
+        case "test-act-invalid-bash":
+            expect_stderr_data = (b"/usr/bin/bash: line 1: ahem,: command not "
+                b"found\n")
+            expect_exitcode = 127
+            expect_privleapd_stderr = PlTestData.send_invalid_bash_signal_lines
+            test_action = "test-act-invalid-bash"
+        case "test-act-added1-success":
+            expect_stdout_data = b"test-act-added1\n"
+            expect_privleapd_stderr = PlTestData.test_act_added1_success_lines
+            test_action = "test-act-added1"
+        case "test-act-added2-success":
+            expect_stdout_data = b"test-act-added2\n"
+            expect_privleapd_stderr = PlTestData.test_act_added2_success_lines
+            test_action = "test-act-added2"
+        case "test-act-added1-failure":
+            expect_unauthorized = True
+            expect_privleapd_stderr = PlTestData.test_act_added1_failure_lines
+            test_action = "test-act-added1"
+        case "test-act-added2-failure":
+            expect_unauthorized = True
+            expect_privleapd_stderr = PlTestData.test_act_added2_failure_lines
+            test_action = "test-act-added2"
+        case "test-act-userpermit":
+            expect_stdout_data = b"test-act-userpermit\n"
+            expect_privleapd_stderr \
+                = PlTestData.test_act_userpermit_success_lines
+            test_action = "test-act-userpermit"
+
+    if test_action is None:
         return False
     util.discard_privleapd_stderr()
     comm_session: pl.PrivleapSession = pl.PrivleapSession(
         PlTestGlobal.test_username)
     comm_session.send_msg(pl.PrivleapCommClientSignalMsg(
-        "test-act-invalid-bash"))
+        test_action))
+    accumulated_stdout: bytes = b""
+    accumulated_stderr: bytes = b""
+    returned_exitcode: int = 0
+    returned_unauthorized: bool = False
     while True:
         try:
             comm_session_msg = comm_session.get_msg()
             if isinstance(comm_session_msg,
-                pl.PrivleapCommServerResultExitcodeMsg):
-                if comm_session_msg.exit_code != 127:
-                    logging.error(
-                        "Invalid Bash code did not exit with code 127!")
-                    return False
+                pl.PrivleapCommServerUnauthorizedMsg):
+                returned_unauthorized = True
                 break
+            if isinstance(comm_session_msg,
+                pl.PrivleapCommServerTriggerMsg):
+                continue
+            elif isinstance(comm_session_msg,
+                pl.PrivleapCommServerResultStdoutMsg):
+                accumulated_stdout += comm_session_msg.stdout_bytes
+            elif isinstance(comm_session_msg,
+                pl.PrivleapCommServerResultStderrMsg):
+                accumulated_stderr += comm_session_msg.stderr_bytes
+            elif isinstance(comm_session_msg,
+                pl.PrivleapCommServerResultExitcodeMsg):
+                returned_exitcode = comm_session_msg.exit_code
+                break
+            else:
+                logging.error("Unexpected message type "
+                    + f"{type(comm_session_msg)} retrieved!")
+                return False
         except Exception:
-            logging.error("Failed to find RESULT_EXITCODE message!")
+            logging.error("Failed to retrieve response message!")
             return False
-    if util.compare_privleapd_stderr(
-        PlTestData.send_invalid_bash_signal_lines):
-        return True
-    return False
+    assert_success: bool = True
+    if accumulated_stdout != expect_stdout_data:
+        logging.error("stdout mismatch!")
+        logging.error(f"Stdout: {accumulated_stdout}")
+        assert_success = False
+    if accumulated_stderr != expect_stderr_data:
+        logging.error("stderr mismatch!")
+        logging.error(f"Stderr: {accumulated_stderr}")
+        assert_success = False
+    if returned_exitcode != expect_exitcode:
+        logging.error(f"Exit code mismatch! Got code {returned_exitcode}")
+        assert_success = False
+    if returned_unauthorized != expect_unauthorized:
+        logging.error("Unauthorized message mismatch! Got unauthorized: "
+            + f"{returned_unauthorized}")
+        assert_success = False
+    if not util.compare_privleapd_stderr(
+        expect_privleapd_stderr):
+        assert_success = False
+    return assert_success
 
 def privleapd_send_valid_signal_and_bail_test(bogus: str) -> bool:
     """
@@ -1400,6 +1528,52 @@ def privleapd_send_random_garbage_test(bogus: str) -> bool:
         return True
     return False
 
+def privleapd_config_reload_test(bogus: str) -> bool:
+    """
+    Reloads privleapd's configuration, expecting it to succeed.
+    """
+
+    if bogus != "":
+        return False
+    util.discard_privleapd_stderr()
+    assert_success: bool = True
+    control_session: pl.PrivleapSession = pl.PrivleapSession(
+        is_control_session = True)
+    control_session.send_msg(pl.PrivleapControlClientReloadMsg())
+    control_server_msg: pl.PrivleapMsg = control_session.get_msg()
+    if not isinstance(control_server_msg,
+        pl.PrivleapControlServerOkMsg):
+        logging.error("privleapd returned unexpected message type: %s",
+            type(control_server_msg))
+        assert_success = False
+    if not util.compare_privleapd_stderr(
+        PlTestData.config_reload_success_lines):
+        assert_success = False
+    return assert_success
+
+def privleapd_config_reload_fail_test(bogus: str) -> bool:
+    """
+    Reloads privleapd's configuration, expecting it to fail.
+    """
+
+    if bogus != "":
+        return False
+    util.discard_privleapd_stderr()
+    assert_success: bool = True
+    control_session: pl.PrivleapSession = pl.PrivleapSession(
+        is_control_session = True)
+    control_session.send_msg(pl.PrivleapControlClientReloadMsg())
+    control_server_msg: pl.PrivleapMsg = control_session.get_msg()
+    if not isinstance(control_server_msg,
+        pl.PrivleapControlServerControlErrorMsg):
+        logging.error("privleapd returned unexpected message type: %s",
+            type(control_server_msg))
+        assert_success = False
+    if not util.compare_privleapd_stderr(
+        PlTestData.config_reload_failure_lines):
+        assert_success = False
+    return assert_success
+
 def privleapd_assert_command(command_data: list[str], exit_code: int,
     stdout_data: bytes = b"", stderr_data: bytes = b"") -> None:
     """
@@ -1442,7 +1616,6 @@ def run_privleapd_tests() -> None:
     """
 
     # ---
-    util.start_privleapd_subprocess([])
     privleapd_assert_function(privleapd_check_persistent_users_test, "",
         "Ensure all configured persistent users have comm sockets")
     # ---
@@ -1469,7 +1642,7 @@ def run_privleapd_tests() -> None:
         stderr_data = PlTestData.test_act_invalid_unauthorized)
     # ---
     util.stop_privleapd_subprocess()
-    privleapd_assert_function(write_bad_config_file, "crash_config_file",
+    privleapd_assert_function(write_new_config_file, "crash_config_file",
         "Write config file with invalid contents")
     privleapd_assert_function(privleapd_bad_config_file_test, "",
         "Test privleapd behavior with bad config file")
@@ -1480,7 +1653,8 @@ def run_privleapd_tests() -> None:
         str(Path(PlTestGlobal.privleap_conf_dir, "crash.conf")),
         "Remove config file with invalid contents")
     # ---
-    privleapd_assert_function(write_bad_config_file, "duplicate_action_config_file",
+    privleapd_assert_function(write_new_config_file,
+        "duplicate_action_config_file",
         "Write config file with duplicate action name")
     privleapd_assert_function(privleapd_duplicate_action_config_file_test, "",
         "Test privleapd behavior with duplicate action config file")
@@ -1488,7 +1662,7 @@ def run_privleapd_tests() -> None:
         str(Path(PlTestGlobal.privleap_conf_dir, "duplicate.conf")),
         "Remove config file with duplicate action name")
     # ---
-    privleapd_assert_function(write_bad_config_file, "wrongorder_config_file",
+    privleapd_assert_function(write_new_config_file, "wrongorder_config_file",
         "Write config file with badly ordered contents")
     privleapd_assert_function(privleapd_wrongorder_config_file_test, "",
         "Test privleapd behavior with badly ordered config file")
@@ -1496,7 +1670,7 @@ def run_privleapd_tests() -> None:
         str(Path(PlTestGlobal.privleap_conf_dir, "wrongorder.conf")),
         "Remove config file with badly ordered contents")
     # ---
-    privleapd_assert_function(write_bad_config_file,
+    privleapd_assert_function(write_new_config_file,
         "duplicate_keys_config_file",
         "Write config file with duplicate keys")
     privleapd_assert_function(privleapd_duplicate_keys_config_file_test, "",
@@ -1505,7 +1679,7 @@ def run_privleapd_tests() -> None:
         str(Path(PlTestGlobal.privleap_conf_dir, "dupkeys.conf")),
         "Remove config file with duplicate keys")
     # ---
-    privleapd_assert_function(write_bad_config_file,
+    privleapd_assert_function(write_new_config_file,
         "absent_command_directive_config_file",
         "Write config file with absent command directive")
     privleapd_assert_function(
@@ -1515,7 +1689,7 @@ def run_privleapd_tests() -> None:
         str(Path(PlTestGlobal.privleap_conf_dir, "absent.conf")),
         "Remove config file with absent command directive")
     # ---
-    privleapd_assert_function(write_bad_config_file,
+    privleapd_assert_function(write_new_config_file,
         "invalid_action_config_file",
         "Write config file with invalid action name")
     privleapd_assert_function(privleapd_invalid_action_config_file_test,
@@ -1600,14 +1774,17 @@ def run_privleapd_tests() -> None:
     privleapd_assert_function(privleapd_send_nonexistent_signal_and_bail_test,
         "", "Test privleapd nonexistent action signal with abrupt disconnect")
     # ---
-    privleapd_assert_function(privleapd_send_userrestrict_signal_and_bail_test,
+    privleapd_assert_function(
+        privleapd_send_userrestrict_signal_and_bail_test,
         "", "Test privleapd userrestrict signal with abrupt disconnect")
     # ---
-    privleapd_assert_function(privleapd_send_grouprestrict_signal_and_bail_test,
+    privleapd_assert_function(
+        privleapd_send_grouprestrict_signal_and_bail_test,
         "", "Test privleapd grouprestrict signal with abrupt disconnect")
     # ---
-    privleapd_assert_function(privleapd_send_invalid_bash_signal_test,
-        "", "Test privleapd's handling of invalid Bash in an action")
+    privleapd_assert_function(privleapd_check_signal_response_test,
+        "test-act-invalid-bash",
+        "Test privleapd's handling of invalid Bash in an action")
     # ---
     privleapd_assert_function(privleapd_send_valid_signal_and_bail_test,
         "", "Test privleapd valid signal with abrupt disconnect")
@@ -1617,7 +1794,8 @@ def run_privleapd_tests() -> None:
     # ---
     for i in range(0, len(PlTestData.invalid_ascii_list)):
         privleapd_assert_function(privleapd_invalid_ascii_test,
-            str(i), f"Test privleapd invalid ASCII handling (iteration {i+1})")
+            str(i),
+            f"Test privleapd invalid ASCII handling (iteration {i+1})")
     # ---
     privleapd_assert_command(["/usr/bin/privleapd", "-C"],
         exit_code = 0)
@@ -1634,6 +1812,64 @@ def run_privleapd_tests() -> None:
         exit_code = 1,
         stderr_data = PlTestData.privleapd_unrecognized_argument_escape)
     # ---
+    privleapd_assert_function(write_new_config_file,
+        "added_actions_config_file",
+        "Write config file with added actions")
+    privleapd_assert_function(privleapd_config_reload_test, "",
+        "Test privleapd restartless config reload, adding actions")
+    # ---
+    privleapd_assert_function(privleapd_check_signal_response_test,
+        "test-act-added1-success",
+        "Test privleapd when running a new signal after config reload")
+    # ---
+    privleapd_assert_function(privleapd_check_signal_response_test,
+        "test-act-added2-success",
+        "Test privleapd when running another new signal after config reload")
+    # ---
+    privleapd_assert_function(privleapd_check_signal_response_test,
+        "test-act-userpermit",
+        "Test privleapd when running old signal after config reload")
+    # ---
+    privleapd_assert_function(try_remove_file,
+        str(Path(PlTestGlobal.privleap_conf_dir, "added_actions.conf")),
+        "Remove added actions config file")
+    privleapd_assert_function(privleapd_config_reload_test, "",
+        "Test privleapd restartless config reload, removing actions")
+    # ---
+    privleapd_assert_function(privleapd_check_signal_response_test,
+        "test-act-added1-failure",
+        "Test privleapd when failing to run a new signal after config reload")
+    # ---
+    privleapd_assert_function(privleapd_check_signal_response_test,
+        "test-act-added2-failure",
+        "Test privleapd when failing to run another new signal after config"
+        + "reload")
+    # ---
+    privleapd_assert_function(privleapd_check_signal_response_test,
+        "test-act-userpermit",
+        "Test privleapd when running old signal after config reload")
+    # ---
+    privleapd_assert_function(write_new_config_file,
+        "added_actions_bad_config_file",
+        "Write bad config file with added actions")
+    privleapd_assert_function(privleapd_config_reload_fail_test, "",
+        "Test privleapd restartless config reload, invalid config")
+    # ---
+    privleapd_assert_function(privleapd_check_signal_response_test,
+        "test-act-added1-failure",
+        "Test privleapd when failing to run a new signal after config reload")
+    # ---
+    privleapd_assert_function(privleapd_check_signal_response_test,
+        "test-act-added2-failure",
+        "Test privleapd when failing to run another new signal after config"
+        + "reload")
+    # ---
+    privleapd_assert_function(privleapd_check_signal_response_test,
+        "test-act-userpermit",
+        "Test privleapd when running old signal after config reload")
+    privleapd_assert_function(try_remove_file,
+        str(Path(PlTestGlobal.privleap_conf_dir, "added_actions_bad.conf")),
+        "Remove bad added actions config file")
 
     logging.info("privleapd passed asserts: %s, failed asserts: %s",
         privleapd_asserts_passed, privleapd_asserts_failed)

@@ -532,6 +532,21 @@ Command=echo 'test-act-notabsent'
     invalid_action_config_file: str = """[test-@ct-invalidaction]
 Command=echo 'test-@ct-invalidaction'
 """
+    added_actions_config_file: str = """[test-act-added1]
+Command=echo 'test-act-added1'
+
+[test-act-added2]
+Command=echo 'test-act-added2'
+"""
+    added_actions_bad_config_file: str = """[test-act-added1]
+Command=echo 'test-act-added1'
+
+[test-act-added2]
+Command=echo 'test-act-added2'
+
+[test-act-added-bad]
+Commandecho 'test-act-added-bad'
+"""
     test_username_create_error: bytes \
         = (b"ERROR: privleapd encountered an error while creating a comm "
            b"socket for user '"
@@ -632,8 +647,9 @@ Command=echo 'test-@ct-invalidaction'
         = (b"Unrecognized argument '\\x1b[31mHi\\x1b[m', try 'privleapd "
            + b"--help' for usage info\n")
     bad_config_file_lines: list[str] = [
-        "parse_config_files: CRITICAL: Error parsing config: "
+        "parse_config_files: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax'\n",
+        "main: CRITICAL: Failed initial config load!\n"
     ]
     bad_config_file_check_lines: list[str] = [
         "/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax\n",
@@ -851,27 +867,63 @@ Command=echo 'test-@ct-invalidaction'
           "ValueError: recv_buf contains data past the last string\n" ]
     ]
     duplicate_config_file_lines: list[str] = [
-        "parse_config_files: CRITICAL: Error parsing config: "
+        "parse_config_files: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/unit-test.conf:51:error:Duplicate action "
-        + "found: 'test-act-sudopermit''\n"
+        + "found: 'test-act-sudopermit''\n",
+        "main: CRITICAL: Failed initial config load!\n"
     ]
     wrongorder_config_file_lines: list[str] = [
-        "parse_config_files: CRITICAL: Error parsing config: "
+        "parse_config_files: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/wrongorder.conf:1:error:Config line "
-        + "before header'\n"
+        + "before header'\n",
+        "main: CRITICAL: Failed initial config load!\n"
     ]
     duplicate_keys_config_file_lines: list[str] = [
-        "parse_config_files: CRITICAL: Error parsing config: "
+        "parse_config_files: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/dupkeys.conf:3:error:Multiple 'Command' "
-        + "keys in action 'test-act-dupkeys''\n"
+        + "keys in action 'test-act-dupkeys''\n",
+        "main: CRITICAL: Failed initial config load!\n"
     ]
     absent_command_directive_config_file_lines: list[str] = [
-        "parse_config_files: CRITICAL: Error parsing config: "
+        "parse_config_files: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/absent.conf:4:error:No command configured for "
-        + "action: 'test-act-absent''\n"
+        + "action: 'test-act-absent''\n",
+        "main: CRITICAL: Failed initial config load!\n"
     ]
     invalid_action_config_file_lines: list[str] = [
-        "parse_config_files: CRITICAL: Error parsing config: "
+        "parse_config_files: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/invalidaction.conf:1:error:Invalid action "
-        + "name: 'test-@ct-invalidaction''\n"
+        + "name: 'test-@ct-invalidaction''\n",
+        "main: CRITICAL: Failed initial config load!\n"
+    ]
+    config_reload_success_lines: list[str] = [
+        "handle_control_reload_msg: INFO: Handled RELOAD message, "
+        + "configuration reloaded\n",
+    ]
+    test_act_added1_success_lines: list[str] = [
+        "handle_comm_session: INFO: Triggered action 'test-act-added1'\n",
+        "send_action_results: INFO: Action 'test-act-added1' completed\n"
+    ]
+    test_act_added2_success_lines: list[str] = [
+        "handle_comm_session: INFO: Triggered action 'test-act-added2'\n",
+        "send_action_results: INFO: Action 'test-act-added2' completed\n"
+    ]
+    test_act_added1_failure_lines: list[str] = [
+        "auth_signal_request: WARNING: Could not find action "
+        + "'test-act-added1'\n",
+    ]
+    test_act_added2_failure_lines: list[str] = [
+        "auth_signal_request: WARNING: Could not find action "
+        + "'test-act-added2'\n",
+    ]
+    test_act_userpermit_success_lines: list[str] = [
+        "handle_comm_session: INFO: Triggered action 'test-act-userpermit'\n",
+        "send_action_results: INFO: Action 'test-act-userpermit' completed\n"
+    ]
+    config_reload_failure_lines: list[str] = [
+        "parse_config_files: ERROR: Error parsing config: "
+        + "'/etc/privleap/conf.d/added_actions_bad.conf:8:error:Invalid "
+        + "syntax'\n",
+        "handle_control_reload_msg: WARNING: Handled RELOAD message, "
+        + "configuration was invalid!\n",
     ]

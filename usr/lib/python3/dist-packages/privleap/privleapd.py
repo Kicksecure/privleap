@@ -196,7 +196,7 @@ def handle_control_reload_msg(control_session: pl.PrivleapSession) -> None:
         send_msg_safe(
             control_session, pl.PrivleapControlServerOkMsg())
     else:
-        logging.info("Handled RELOAD message, configuration was invalid!")
+        logging.warning("Handled RELOAD message, configuration was invalid!")
         send_msg_safe(
             control_session, pl.PrivleapControlServerControlErrorMsg())
 
@@ -660,7 +660,7 @@ def parse_config_files() -> bool:
                 if PrivleapdGlobal.check_config_mode:
                     print(config_result, file = sys.stderr)
                 else:
-                    logging.critical("Error parsing config: '%s'",
+                    logging.error("Error parsing config: '%s'",
                         config_result)
                 return False
             action_arr = config_result[0]
@@ -676,7 +676,7 @@ def parse_config_files() -> bool:
                 if PrivleapdGlobal.check_config_mode:
                     print(duplicate_action_error, file = sys.stderr)
                 else:
-                    logging.critical("Error parsing config: '%s'",
+                    logging.error("Error parsing config: '%s'",
                         duplicate_action_error)
                 return False
             for persistent_user_item in persistent_user_arr:
@@ -697,7 +697,7 @@ def parse_config_files() -> bool:
                 # It isn't an error for duplicate allowed users to be
                 # defined, we just skip over the duplicates.
         except Exception as e:
-            logging.critical("Failed to load config file '%s'!",
+            logging.error("Failed to load config file '%s'!",
                 str(config_file), exc_info = e)
             return False
     PrivleapdGlobal.action_list = temp_action_list
@@ -857,6 +857,7 @@ def main() -> NoReturn:
     verify_not_running_twice()
     cleanup_old_state_dir()
     if not parse_config_files():
+        logging.critical("Failed initial config load!")
         sys.exit(1)
     populate_state_dir()
     open_control_socket()
