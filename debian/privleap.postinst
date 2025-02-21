@@ -80,6 +80,7 @@ start_privleapd() {
       return 0
    fi
    if /usr/bin/privleapd --check-config ; then
+      ## debhelper uses '|| true' for systemctl start action so we should too.
       deb-systemd-invoke restart privleapd.service || true
       make_privleapd_comm_sockets_first_time_maybe
       restarted_once='yes'
