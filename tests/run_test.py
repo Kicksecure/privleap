@@ -752,6 +752,10 @@ def write_new_config_file(bad_config_file: str) -> bool:
             target_path = Path(PlTestGlobal.privleap_conf_dir,
                 "added_actions_bad.conf")
             target_contents = PlTestData.added_actions_bad_config_file
+        case "unrecognized_header_config_file":
+            target_path = Path(PlTestGlobal.privleap_conf_dir,
+                "unrec_header.conf")
+            target_contents = PlTestData.unrecognized_header_config_file
         case _:
             return False
 
@@ -781,16 +785,35 @@ def privleapd_check_persistent_users_test(bogus: str) -> bool:
             return False
     return True
 
-def privleapd_bad_config_file_test(bogus: str) -> bool:
+def privleapd_bad_config_file_test(test_type: str) -> bool:
     """
     Tests how privleapd handles a bad config file.
     """
 
-    if bogus != "":
-        return False
+    expect_privleapd_stderr: list[str] = []
+    match test_type:
+        case "bad_config_file":
+            expect_privleapd_stderr = PlTestData.bad_config_file_lines
+        case "duplicate_action_config_file":
+            expect_privleapd_stderr \
+                = PlTestData.duplicate_actions_config_file_lines
+        case "wrongorder_config_file":
+            expect_privleapd_stderr = PlTestData.wrongorder_config_file_lines
+        case "duplicate_keys_config_file":
+            expect_privleapd_stderr \
+                = PlTestData.duplicate_keys_config_file_lines
+        case "absent_command_directive_config_file":
+            expect_privleapd_stderr \
+                = PlTestData.absent_command_directive_config_file_lines
+        case "invalid_action_config_file":
+            expect_privleapd_stderr \
+                = PlTestData.invalid_action_config_file_lines
+        case "unrecognized_header_config_file":
+            expect_privleapd_stderr \
+                = PlTestData.unrecognized_header_config_file_lines
     util.start_privleapd_subprocess([], allow_error_output = True)
     if not util.compare_privleapd_stderr(
-        PlTestData.bad_config_file_lines):
+        expect_privleapd_stderr):
         stop_privleapd_subprocess()
         return False
     stop_privleapd_subprocess()
@@ -807,86 +830,6 @@ def privleapd_bad_config_file_check_test(bogus: str) -> bool:
         allow_error_output = True)
     if not util.compare_privleapd_stderr(
         PlTestData.bad_config_file_check_lines):
-        stop_privleapd_subprocess()
-        return False
-    stop_privleapd_subprocess()
-    return True
-
-def privleapd_duplicate_action_config_file_test(bogus: str) -> bool:
-    """
-    Tests how privleapd handles a config file containing a duplicate action
-      name.
-    """
-
-    if bogus != "":
-        return False
-    util.start_privleapd_subprocess([], allow_error_output = True)
-    if not util.compare_privleapd_stderr(
-        PlTestData.duplicate_config_file_lines):
-        stop_privleapd_subprocess()
-        return False
-    stop_privleapd_subprocess()
-    return True
-
-def privleapd_wrongorder_config_file_test(bogus: str) -> bool:
-    """
-    Tests how privleapd handles a config file that has the config contents
-      before the header.
-    """
-
-    if bogus != "":
-        return False
-    util.start_privleapd_subprocess([], allow_error_output = True)
-    if not util.compare_privleapd_stderr(
-        PlTestData.wrongorder_config_file_lines):
-        stop_privleapd_subprocess()
-        return False
-    stop_privleapd_subprocess()
-    return True
-
-def privleapd_duplicate_keys_config_file_test(bogus: str) -> bool:
-    """
-    Tests how privleapd handles a config file that specifies the same key more
-      than once.
-    """
-
-    if bogus != "":
-        return False
-    util.start_privleapd_subprocess([], allow_error_output = True)
-    if not util.compare_privleapd_stderr(
-        PlTestData.duplicate_keys_config_file_lines):
-        stop_privleapd_subprocess()
-        return False
-    stop_privleapd_subprocess()
-    return True
-
-def privleapd_absent_command_directive_config_file_test(bogus: str) -> bool:
-    """
-    Tests how privleapd handles a config file that specifies the same key more
-      than once.
-    """
-
-    if bogus != "":
-        return False
-    util.start_privleapd_subprocess([], allow_error_output = True)
-    if not util.compare_privleapd_stderr(
-        PlTestData.absent_command_directive_config_file_lines):
-        stop_privleapd_subprocess()
-        return False
-    stop_privleapd_subprocess()
-    return True
-
-def privleapd_invalid_action_config_file_test(bogus: str) -> bool:
-    """
-    Tests how privleapd handles a config file that specifies an invalid action
-      name.
-    """
-
-    if bogus != "":
-        return False
-    util.start_privleapd_subprocess([], allow_error_output = True)
-    if not util.compare_privleapd_stderr(
-        PlTestData.invalid_action_config_file_lines):
         stop_privleapd_subprocess()
         return False
     stop_privleapd_subprocess()
@@ -1432,8 +1375,8 @@ def privleapd_check_signal_response_test(test_type: str) -> bool:
                 returned_exitcode = comm_session_msg.exit_code
                 break
             else:
-                logging.error("Unexpected message type "
-                    + f"{type(comm_session_msg)} retrieved!")
+                logging.error("Unexpected message type '%s' retrieved!",
+                    type(comm_session_msg))
                 return False
         except Exception:
             logging.error("Failed to retrieve response message!")
@@ -1441,18 +1384,18 @@ def privleapd_check_signal_response_test(test_type: str) -> bool:
     assert_success: bool = True
     if accumulated_stdout != expect_stdout_data:
         logging.error("stdout mismatch!")
-        logging.error(f"Stdout: {accumulated_stdout}")
+        logging.error("Stdout: %s", accumulated_stdout)
         assert_success = False
     if accumulated_stderr != expect_stderr_data:
         logging.error("stderr mismatch!")
-        logging.error(f"Stderr: {accumulated_stderr}")
+        logging.error("Stderr: %s", accumulated_stderr)
         assert_success = False
     if returned_exitcode != expect_exitcode:
-        logging.error(f"Exit code mismatch! Got code {returned_exitcode}")
+        logging.error("Exit code mismatch! Got code %s", returned_exitcode)
         assert_success = False
     if returned_unauthorized != expect_unauthorized:
-        logging.error("Unauthorized message mismatch! Got unauthorized: "
-            + f"{returned_unauthorized}")
+        logging.error("Unauthorized message mismatch! Got unauthorized: %s",
+            returned_unauthorized)
         assert_success = False
     if not util.compare_privleapd_stderr(
         expect_privleapd_stderr):
@@ -1644,7 +1587,7 @@ def run_privleapd_tests() -> None:
     util.stop_privleapd_subprocess()
     privleapd_assert_function(write_new_config_file, "crash_config_file",
         "Write config file with invalid contents")
-    privleapd_assert_function(privleapd_bad_config_file_test, "",
+    privleapd_assert_function(privleapd_bad_config_file_test, "bad_config_file",
         "Test privleapd behavior with bad config file")
     # ---
     privleapd_assert_function(privleapd_bad_config_file_check_test, "",
@@ -1656,7 +1599,8 @@ def run_privleapd_tests() -> None:
     privleapd_assert_function(write_new_config_file,
         "duplicate_action_config_file",
         "Write config file with duplicate action name")
-    privleapd_assert_function(privleapd_duplicate_action_config_file_test, "",
+    privleapd_assert_function(privleapd_bad_config_file_test,
+        "duplicate_action_config_file",
         "Test privleapd behavior with duplicate action config file")
     privleapd_assert_function(try_remove_file,
         str(Path(PlTestGlobal.privleap_conf_dir, "duplicate.conf")),
@@ -1664,7 +1608,8 @@ def run_privleapd_tests() -> None:
     # ---
     privleapd_assert_function(write_new_config_file, "wrongorder_config_file",
         "Write config file with badly ordered contents")
-    privleapd_assert_function(privleapd_wrongorder_config_file_test, "",
+    privleapd_assert_function(privleapd_bad_config_file_test,
+        "wrongorder_config_file",
         "Test privleapd behavior with badly ordered config file")
     privleapd_assert_function(try_remove_file,
         str(Path(PlTestGlobal.privleap_conf_dir, "wrongorder.conf")),
@@ -1673,7 +1618,8 @@ def run_privleapd_tests() -> None:
     privleapd_assert_function(write_new_config_file,
         "duplicate_keys_config_file",
         "Write config file with duplicate keys")
-    privleapd_assert_function(privleapd_duplicate_keys_config_file_test, "",
+    privleapd_assert_function(privleapd_bad_config_file_test,
+        "duplicate_keys_config_file",
         "Test privleapd behavior with duplicate keys config file")
     privleapd_assert_function(try_remove_file,
         str(Path(PlTestGlobal.privleap_conf_dir, "dupkeys.conf")),
@@ -1682,9 +1628,9 @@ def run_privleapd_tests() -> None:
     privleapd_assert_function(write_new_config_file,
         "absent_command_directive_config_file",
         "Write config file with absent command directive")
-    privleapd_assert_function(
-        privleapd_absent_command_directive_config_file_test,
-        "", "Test privleapd behavior with absent command directive config file")
+    privleapd_assert_function(privleapd_bad_config_file_test,
+        "absent_command_directive_config_file",
+        "Test privleapd behavior with absent command directive config file")
     privleapd_assert_function(try_remove_file,
         str(Path(PlTestGlobal.privleap_conf_dir, "absent.conf")),
         "Remove config file with absent command directive")
@@ -1692,11 +1638,22 @@ def run_privleapd_tests() -> None:
     privleapd_assert_function(write_new_config_file,
         "invalid_action_config_file",
         "Write config file with invalid action name")
-    privleapd_assert_function(privleapd_invalid_action_config_file_test,
-        "", "Test privleapd behavior with invalid action name config file")
+    privleapd_assert_function(privleapd_bad_config_file_test,
+        "invalid_action_config_file",
+        "Test privleapd behavior with invalid action name config file")
     privleapd_assert_function(try_remove_file,
         str(Path(PlTestGlobal.privleap_conf_dir, "invalidaction.conf")),
         "Remove config file with invalid action name")
+    # ---
+    privleapd_assert_function(write_new_config_file,
+        "unrecognized_header_config_file",
+        "Write config file with unrecognized header")
+    privleapd_assert_function(privleapd_bad_config_file_test,
+        "unrecognized_header_config_file",
+        "Test privleapd behavior with unrecognized header config file")
+    privleapd_assert_function(try_remove_file,
+        str(Path(PlTestGlobal.privleap_conf_dir, "unrec_header.conf")),
+        "Remove config file with unrecognized header")
     # ---
     util.start_privleapd_subprocess([])
     privleapd_assert_function(privleapd_control_disconnect_test, "",
@@ -1870,6 +1827,7 @@ def run_privleapd_tests() -> None:
     privleapd_assert_function(try_remove_file,
         str(Path(PlTestGlobal.privleap_conf_dir, "added_actions_bad.conf")),
         "Remove bad added actions config file")
+    # ---
 
     logging.info("privleapd passed asserts: %s, failed asserts: %s",
         privleapd_asserts_passed, privleapd_asserts_failed)

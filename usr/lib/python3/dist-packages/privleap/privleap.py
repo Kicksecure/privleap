@@ -1005,15 +1005,13 @@ class PrivleapCommon:
                             assert current_action_name is not None
                             if current_action_command is None:
                                 return PrivleapCommon.find_bad_config_header(
-                                    config_file,
-                                    current_header_name,
+                                    config_file, current_header_name,
                                     "No command configured for action:")
                             if not PrivleapCommon.validate_id(
                                 current_action_name,
                                 PrivleapValidateType.SIGNAL_NAME):
                                 return PrivleapCommon.find_bad_config_header(
-                                    config_file,
-                                    current_header_name,
+                                    config_file, current_action_name,
                                     "Invalid action name:")
                             action_output_list.append(PrivleapAction(
                                 current_action_name,
@@ -1040,9 +1038,12 @@ class PrivleapCommon:
                     elif current_header_name == "allowed-users":
                         current_section_type \
                             = PrivleapConfigSection.ALLOWED_USERS
-                    else:
-                        current_action_name = current_header_name
+                    elif current_header_name[:7] == "action:":
+                        current_action_name = current_header_name[7:]
                         current_section_type = PrivleapConfigSection.ACTION
+                    else:
+                        return(f"{config_file}:{line_idx}:error:"
+                            f"Unrecognized header '{current_header_name}'")
                     continue
 
                 # Config lines are only valid if under a header, if we hit a
@@ -1136,16 +1137,14 @@ class PrivleapCommon:
         # The last action in the file may not be in the list yet, add it now
         # if needed
         if current_section_type == PrivleapConfigSection.ACTION:
-            assert current_header_name is not None
             assert current_action_name is not None
             if current_action_command is None:
                 return PrivleapCommon.find_bad_config_header(config_file,
-                    current_header_name,
-                    "No command configured for action:")
+                    current_action_name, "No command configured for action:")
             if not PrivleapCommon.validate_id(current_action_name,
                 PrivleapValidateType.SIGNAL_NAME):
                 return PrivleapCommon.find_bad_config_header(config_file,
-                    current_header_name, "Invalid action name:")
+                    current_action_name, "Invalid action name:")
             action_output_list.append(PrivleapAction(current_action_name,
                 current_action_command,
                 current_auth_users,
@@ -1169,7 +1168,7 @@ class PrivleapCommon:
             for line in conf_stream:
                 line_idx += 1
                 line = line.strip()
-                if line == f"[{target_header}]":
+                if line == f"[action:{target_header}]":
                     return(f"{config_file}:{line_idx}:error:{msg} "
                         f"'{target_header}'")
         return ""
