@@ -73,12 +73,12 @@ The following headers are recognized:
   multiple times in the section. The same user can be specified multiple
   times. It is an error to specify a non-existent user as persistent.
 
-* Action headers :
+* `[action:*]` :
   Description: Action headers define an action that can be run via privleapd.
-  Any header that is not `[allowed-users]` or `[persistent-users]` is
-  interpreted as an action header. Each action header must appear only once in
-  privleap's configuration, attempting to define two actions with the same
-  header is an error.
+  Headers that start with `action:` are interpreted as action
+  headers. The text after the `:` is interpreted as the action name.
+  Each action header must appear only once in privleap's configuration,
+  attempting to define two actions with the same header is an error.
 
   Keys:
 
@@ -105,6 +105,10 @@ take effect.
 
 If a configuration file contains an error, privleapd will fail to start.
 
+At least one of `AuthorizedUsers` or `AuthorizedGroups` must be defined
+for each action, with at least one user or group specified. An action with no
+authorized users or groups configured is considered invalid.
+
 ## EXAMPLE
 
 The following configuration file defines two actions, named `echo-hello` and
@@ -114,6 +118,7 @@ users:
 
     [echo-hello]
     Command=echo 'Hi!'
+    AuthorizedUsers=user,sysmaint
 
     [show-messagebus-id-info]
     Command=id

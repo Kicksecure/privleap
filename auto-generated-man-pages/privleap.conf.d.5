@@ -36,8 +36,8 @@ Keys:
 .IP
 \fBUser\fR: Specifies a user to mark as "persistent"\. This key may appear multiple times in the section\. The same user can be specified multiple times\. It is an error to specify a non\-existent user as persistent\.
 .TP
-Action headers
-Description: Action headers define an action that can be run via privleapd\. Any header that is not \fB[allowed\-users]\fR or \fB[persistent\-users]\fR is interpreted as an action header\. Each action header must appear only once in privleap's configuration, attempting to define two actions with the same header is an error\.
+\fB[action:*]\fR
+Description: Action headers define an action that can be run via privleapd\. Headers that start with \fBaction:\fR are interpreted as action headers\. The text after the \fB:\fR is interpreted as the action name\. Each action header must appear only once in privleap's configuration, attempting to define two actions with the same header is an error\.
 .IP
 Keys:
 .IP
@@ -54,12 +54,15 @@ Keys:
 privleapd must be restarted for any changes to the configuration directory to take effect\.
 .P
 If a configuration file contains an error, privleapd will fail to start\.
+.P
+At least one of \fBAuthorizedUsers\fR or \fBAuthorizedGroups\fR must be defined for each action, with at least one user or group specified\. An action with no authorized users or groups configured is considered invalid\.
 .SH "EXAMPLE"
 The following configuration file defines two actions, named \fBecho\-hello\fR and \fBshow\-messagebus\-id\-info\fR\. It also specifies that user \fBuser\fR is permitted to communicate with privleapd, and configures \fBroot\fR and \fBsdwdate\fR as persistent users:
 .IP "" 4
 .nf
 [echo\-hello]
 Command=echo 'Hi!'
+AuthorizedUsers=user,sysmaint
 
 [show\-messagebus\-id\-info]
 Command=id
