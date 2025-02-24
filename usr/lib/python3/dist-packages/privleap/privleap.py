@@ -866,6 +866,10 @@ class PrivleapAction:
             action_name, PrivleapValidateType.SIGNAL_NAME):
             raise ValueError(f"Action name '{action_name}' is invalid")
 
+        if ((auth_users is None or len(auth_users) == 0)
+            and (auth_groups is None or len(auth_groups) == 0)):
+            raise ValueError(f"No authorized users or groups provided!")
+
         if auth_users is not None:
             for raw_auth_user in auth_users:
                 auth_user: str | None = PrivleapCommon.normalize_user_id(
@@ -988,7 +992,7 @@ class PrivleapCommon:
         current_target_user: str | None = None
         current_target_group: str | None = None
         first_header_parsed: bool = False
-        with open(config_file, "r", encoding = "utf-8") as conf_stream:
+        with (open(config_file, "r", encoding = "utf-8") as conf_stream):
             for line in conf_stream:
                 line_idx += 1
                 line = line.strip()
@@ -1013,6 +1017,12 @@ class PrivleapCommon:
                                 return PrivleapCommon.find_bad_config_header(
                                     config_file, current_action_name,
                                     "Invalid action name:")
+                            if (len(current_auth_users) == 0
+                                and len(current_auth_groups) == 0):
+                                return PrivleapCommon.find_bad_config_header(
+                                    config_file, current_action_name,
+                                    "No authorized users or groups for "
+                                    "action:")
                             action_output_list.append(PrivleapAction(
                                 current_action_name,
                                 current_action_command,
@@ -1145,6 +1155,11 @@ class PrivleapCommon:
                 PrivleapValidateType.SIGNAL_NAME):
                 return PrivleapCommon.find_bad_config_header(config_file,
                     current_action_name, "Invalid action name:")
+            if (len(current_auth_users) == 0
+                and len(current_auth_groups) == 0):
+                return PrivleapCommon.find_bad_config_header(config_file,
+                    current_action_name,
+                    "No authorized users or groups for action:")
             action_output_list.append(PrivleapAction(current_action_name,
                 current_action_command,
                 current_auth_users,

@@ -756,6 +756,10 @@ def write_new_config_file(bad_config_file: str) -> bool:
             target_path = Path(PlTestGlobal.privleap_conf_dir,
                 "unrec_header.conf")
             target_contents = PlTestData.unrecognized_header_config_file
+        case "missing_auth_config_file":
+            target_path = Path(PlTestGlobal.privleap_conf_dir,
+                "missing_auth.conf")
+            target_contents = PlTestData.missing_auth_config_file
         case _:
             return False
 
@@ -811,6 +815,8 @@ def privleapd_bad_config_file_test(test_type: str) -> bool:
         case "unrecognized_header_config_file":
             expect_privleapd_stderr \
                 = PlTestData.unrecognized_header_config_file_lines
+        case "missing_auth_config_file":
+            expect_privleapd_stderr = PlTestData.missing_auth_config_file_lines
     util.start_privleapd_subprocess([], allow_error_output = True)
     if not util.compare_privleapd_stderr(
         expect_privleapd_stderr):
@@ -1654,6 +1660,15 @@ def run_privleapd_tests() -> None:
     privleapd_assert_function(try_remove_file,
         str(Path(PlTestGlobal.privleap_conf_dir, "unrec_header.conf")),
         "Remove config file with unrecognized header")
+    # ---
+    privleapd_assert_function(write_new_config_file,
+        "missing_auth_config_file", "Write config file with missing auth data")
+    privleapd_assert_function(privleapd_bad_config_file_test,
+        "missing_auth_config_file",
+        "Test privleapd behavior with missing auth data config file")
+    privleapd_assert_function(try_remove_file,
+        str(Path(PlTestGlobal.privleap_conf_dir, "missing_auth.conf")),
+        "Remove config file with missing auth data")
     # ---
     util.start_privleapd_subprocess([])
     privleapd_assert_function(privleapd_control_disconnect_test, "",

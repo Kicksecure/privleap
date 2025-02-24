@@ -401,6 +401,7 @@ class PlTestData:
 
     primary_test_config_file: str = f"""[action:test-act-free]
 Command=echo 'test-act-free'
+AuthorizedUsers={PlTestGlobal.test_username}
 
 [persistent-users]
 # UID 3 = sys
@@ -468,26 +469,33 @@ AuthorizedGroups=sys,messagebus
 
 [action:test-act-exit240]
 Command=echo 'test-act-exit240'; exit 240
+AuthorizedUsers={PlTestGlobal.test_username}
 
 [action:test-act-stderr]
 Command=1>&2 echo 'test-act-stderr'
+AuthorizedUsers={PlTestGlobal.test_username}
 
 [action:test-act-stdout-stderr-interleaved]
 Command=echo 'stdout00'; 1>&2 echo 'stderr00'; echo 'stdout01'; 1>&2 echo 'stderr01'
+AuthorizedUsers={PlTestGlobal.test_username}
 
 [action:test-act-invalid-bash]
 Command=ahem, this will not work
+AuthorizedUsers={PlTestGlobal.test_username}
 
 [action:test-act-target-user]
 Command=id
 TargetUser={PlTestGlobal.test_username}
+AuthorizedUsers={PlTestGlobal.test_username}
 
 [action:test-act-target-group]
 Command=id
 TargetGroup={PlTestGlobal.test_username}
+AuthorizedUsers=root
 
 [action:test-act-target-user-and-group]
 Command=id
+AuthorizedUsers={PlTestGlobal.test_username}
 TargetUser={PlTestGlobal.test_username}
 TargetGroup=root
 
@@ -497,6 +505,7 @@ AuthorizedUsers={PlTestGlobal.test_username},nonexistent
 
 [action:test-act-multi-equals]
 Command=echo abc=def
+AuthorizedUsers={PlTestGlobal.test_username}
 
 [persistent-users]
 User=messagebus
@@ -506,10 +515,12 @@ User=messagebus
 """
     invalid_filename_test_config_file: str = """[action:test-act-invalid]
 Command=echo 'test-act-invalid'
+AuthorizedUsers=root
 """
     # noinspection SpellCheckingInspection
     crash_config_file: str = """[action:test-act-crash]
 Commandecho 'test-act-crash'
+AuthorizedUsers=root
 """
     duplicate_action_config_file: str = """[action:test-act-sudopermit]
 Command=echo 'duplicate-test-act-sudopermit'
@@ -518,37 +529,50 @@ AuthorizedGroups=sudo
     wrongorder_config_file: str \
         = """Command=echo 'test-act-wrongorder'
 [action:test-act-wrongorder]
+AuthorizedUsers=root
 """
     duplicate_keys_config_file: str = """[action:test-act-dupkeys]
 Command=echo 'test-act-dupkeys'
 Command=echo 'oops'
+AuthorizedUsers=root
 """
     absent_command_directive_config_file: str = """[action:test-act-notabsent]
 Command=echo 'test-act-notabsent'
+AuthorizedUsers=root
 
 [action:test-act-absent]
 # Command=echo 'test-act-absent'
 """
     invalid_action_config_file: str = """[action:test-@ct-invalidaction]
 Command=echo 'test-@ct-invalidaction'
+AuthorizedUsers=root
 """
-    added_actions_config_file: str = """[action:test-act-added1]
+    added_actions_config_file: str = f"""[action:test-act-added1]
 Command=echo 'test-act-added1'
+AuthorizedUsers={PlTestGlobal.test_username}
 
 [action:test-act-added2]
 Command=echo 'test-act-added2'
+AuthorizedUsers={PlTestGlobal.test_username}
 """
-    added_actions_bad_config_file: str = """[action:test-act-added1]
+    added_actions_bad_config_file: str = f"""[action:test-act-added1]
 Command=echo 'test-act-added1'
+AuthorizedUsers={PlTestGlobal.test_username}
 
 [action:test-act-added2]
 Command=echo 'test-act-added2'
+AuthorizedUsers={PlTestGlobal.test_username}
 
 [action:test-act-added-bad]
 Commandecho 'test-act-added-bad'
+AuthorizedUsers={PlTestGlobal.test_username}
 """
     unrecognized_header_config_file: str = """[unrecognized-header]
 Command=echo 'unrecognized-header'
+AuthorizedUsers=root
+"""
+    missing_auth_config_file: str = """[action:test-act-missing-auth]
+Command=echo 'test-act-missing-auth'
 """
     test_username_create_error: bytes \
         = (b"ERROR: privleapd encountered an error while creating a comm "
@@ -871,7 +895,7 @@ Command=echo 'unrecognized-header'
     ]
     duplicate_actions_config_file_lines: list[str] = [
         "parse_config_files: ERROR: Error parsing config: "
-        + "'/etc/privleap/conf.d/unit-test.conf:51:error:Duplicate action "
+        + "'/etc/privleap/conf.d/unit-test.conf:52:error:Duplicate action "
         + "found: 'test-act-sudopermit''\n",
         "main: CRITICAL: Failed initial config load!\n"
     ]
@@ -889,7 +913,7 @@ Command=echo 'unrecognized-header'
     ]
     absent_command_directive_config_file_lines: list[str] = [
         "parse_config_files: ERROR: Error parsing config: "
-        + "'/etc/privleap/conf.d/absent.conf:4:error:No command configured for "
+        + "'/etc/privleap/conf.d/absent.conf:5:error:No command configured for "
         + "action: 'test-act-absent''\n",
         "main: CRITICAL: Failed initial config load!\n"
     ]
@@ -925,7 +949,7 @@ Command=echo 'unrecognized-header'
     ]
     config_reload_failure_lines: list[str] = [
         "parse_config_files: ERROR: Error parsing config: "
-        + "'/etc/privleap/conf.d/added_actions_bad.conf:8:error:Invalid "
+        + "'/etc/privleap/conf.d/added_actions_bad.conf:10:error:Invalid "
         + "syntax'\n",
         "handle_control_reload_msg: WARNING: Handled RELOAD message, "
         + "configuration was invalid!\n",
@@ -934,5 +958,11 @@ Command=echo 'unrecognized-header'
         "parse_config_files: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/unrec_header.conf:1:error:Unrecognized header "
         + "'unrecognized-header''\n",
+        "main: CRITICAL: Failed initial config load!\n"
+    ]
+    missing_auth_config_file_lines: list[str] = [
+        "parse_config_files: ERROR: Error parsing config: "
+        + "'/etc/privleap/conf.d/missing_auth.conf:1:error:No "
+        + "authorized users or groups for action: 'test-act-missing-auth''\n",
         "main: CRITICAL: Failed initial config load!\n"
     ]
