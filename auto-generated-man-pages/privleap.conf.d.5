@@ -60,11 +60,11 @@ At least one of \fBAuthorizedUsers\fR or \fBAuthorizedGroups\fR must be defined 
 The following configuration file defines two actions, named \fBecho\-hello\fR and \fBshow\-messagebus\-id\-info\fR\. It also specifies that user \fBuser\fR is permitted to communicate with privleapd, and configures \fBroot\fR and \fBsdwdate\fR as persistent users:
 .IP "" 4
 .nf
-[echo\-hello]
+[action:echo\-hello]
 Command=echo 'Hi!'
 AuthorizedUsers=user,sysmaint
 
-[show\-messagebus\-id\-info]
+[action:show\-messagebus\-id\-info]
 Command=id
 AuthorizedGroups=sudo
 TargetUser=messagebus

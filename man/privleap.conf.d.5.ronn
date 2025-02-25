@@ -116,11 +116,11 @@ The following configuration file defines two actions, named `echo-hello` and
 communicate with privleapd, and configures `root` and `sdwdate` as persistent
 users:
 
-    [echo-hello]
+    [action:echo-hello]
     Command=echo 'Hi!'
     AuthorizedUsers=user,sysmaint
 
-    [show-messagebus-id-info]
+    [action:show-messagebus-id-info]
     Command=id
     AuthorizedGroups=sudo
     TargetUser=messagebus
