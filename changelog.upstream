@@ -1,3 +1,28 @@
+commit 6154c25dc88d1b66f6db272ac79a84795781fb6b
+Merge: 905e31e 82b509c
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Mon Feb 24 01:23:27 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit 82b509c719f8d227b923a8d4ba328a994ea61e05
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sat Feb 22 21:20:24 2025 -0600
+
+    Fix documentation
+
+commit 415190bed64add132fdb38e886ce868286c4da77
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sat Feb 22 19:15:18 2025 -0600
+
+    Require all rules to configure authorized users and groups explicitly
+
+commit 905e31e0d70a143e0607a48b54e6d718afee5f4e
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Fri Feb 21 09:55:19 2025 +0000
+
+    bumped changelog version
+
 commit 2769869dcd85fe77591b6ed07df9d0bfcb5dc03e
 Author: Patrick Schleizer <adrelanos@whonix.org>
 Date:   Fri Feb 21 04:54:50 2025 -0500
