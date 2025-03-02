@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Tuple, cast, SupportsIndex, IO, NoReturn, Any
 
 import sdnotify # type: ignore
+import PAM # type: ignore
 # import privleap as pl
 import privleap.privleap as pl
 
@@ -237,7 +238,7 @@ def handle_control_session(control_socket: pl.PrivleapSocket) -> None:
         control_session.close_session()
 
 def run_action(desired_action: pl.PrivleapAction, calling_user: str) \
-    -> subprocess.Popen[bytes]:
+    -> Tuple[subprocess.Popen[bytes], Any]:
     # pylint: disable=consider-using-with
     # Rationale:
     #   consider-using-with: Not suitable for this use case.
@@ -289,6 +290,26 @@ def run_action(desired_action: pl.PrivleapAction, calling_user: str) \
     assert desired_action.action_command is not None
     assert target_user is not None
     assert target_group is not None
+
+    pam_obj: Any = PAM.pam()
+    pam_obj.start("privleapd")
+    pam_obj.set_item(PAM.PAM_USER, calling_user)
+    pam_obj.set_item(PAM.PAM_RUSER, calling_user)
+    try:
+        pam_obj.acct_mgmt()
+    except PAM.error as e:
+        if e.args[1] == PAM.PAM_NEW_AUTHTOK_REQD:
+            pass
+        else:
+            raise e
+    pam_obj.set_item(PAM.PAM_USER, target_user)
+    pam_obj.setcred(PAM.PAM_REINITIALIZE_CRED)
+    try:
+        pam_obj.open_session()
+    except Exception as e:
+        pam_obj.setcred(PAM.PAM_DELETE_CRED | PAM.PAM_SILENT)
+        raise e
+
     user_info: pwd.struct_passwd = pwd.getpwnam(target_user)
     action_env: dict[str, str] = os.environ.copy()
     action_env["HOME"] = user_info.pw_dir
@@ -308,7 +329,7 @@ def run_action(desired_action: pl.PrivleapAction, calling_user: str) \
         cwd = user_info.pw_dir)
     assert action_process.stdin is not None
     action_process.stdin.close()
-    return action_process
+    return action_process, pam_obj
 
 def get_signal_msg(comm_session: pl.PrivleapSession) \
     -> pl.PrivleapCommClientSignalMsg | None:
@@ -393,6 +414,7 @@ def authorize_user(action: pl.PrivleapAction,
     return PrivleapdAuthStatus.UNAUTHORIZED
 
 def send_action_results(comm_session: pl.PrivleapSession,
+    pam_obj: Any,
     action_name: str,
     action_process: subprocess.Popen[bytes]) -> None:
     """
@@ -437,6 +459,14 @@ def send_action_results(comm_session: pl.PrivleapSession,
         action_process.terminate()
         action_process.wait()
         # Process is done, send the exit code and clean up
+        try:
+            pam_obj.close_session(0)
+        except Exception as e:
+            logging.info("Error closing PAM session!", exc_info = e)
+        try:
+            pam_obj.setcred(PAM.PAM_DELETE_CRED | PAM.PAM_SILENT)
+        except Exception as e:
+            logging.info("Error cleaning up PAM credentials!", exc_info = e)
         logging.info("Action '%s' completed", action_name)
 
     send_msg_safe(comm_session, pl.PrivleapCommServerResultExitcodeMsg(
@@ -520,7 +550,9 @@ def handle_comm_session(comm_socket: pl.PrivleapSocket) -> None:
         assert desired_action.action_name is not None
 
         try:
-            action_process: subprocess.Popen[bytes] = run_action(desired_action,
+            action_process: subprocess.Popen[bytes]
+            pam_obj: Any
+            action_process, pam_obj = run_action(desired_action,
                 comm_session.user_name)
         except Exception as e:
             logging.error("Action '%s' authorized, but trigger failed!",
@@ -534,7 +566,7 @@ def handle_comm_session(comm_socket: pl.PrivleapSocket) -> None:
         # monitor and manage the child process, which is part of what
         # send_action_results() does.
         send_msg_safe(comm_session, pl.PrivleapCommServerTriggerMsg())
-        send_action_results(comm_session, desired_action.action_name,
+        send_action_results(comm_session, pam_obj, desired_action.action_name,
             action_process)
 
     finally:
@@ -625,6 +657,62 @@ def extend_action_list(action_arr: list[pl.PrivleapAction],
         target_arr.append(action_item)
     return None
 
+def parse_config_file(config_file: Path,
+    temp_action_list: list[pl.PrivleapAction],
+    temp_persistent_user_list: list[str],
+    temp_allowed_user_list: list[str])-> bool:
+    """
+    Parses a single config file.
+    """
+
+    config_result: pl.ConfigData | str
+    action_arr: list[pl.PrivleapAction]
+    persistent_user_arr: list[str]
+    allowed_user_arr: list[str]
+
+    config_result = pl.PrivleapCommon.parse_config_file(config_file)
+    if isinstance(config_result, str):
+        if PrivleapdGlobal.check_config_mode:
+            print(config_result, file = sys.stderr)
+        else:
+            logging.error("Error parsing config: '%s'",
+                config_result)
+        return False
+    action_arr = config_result[0]
+    persistent_user_arr = config_result[1]
+    allowed_user_arr = config_result[2]
+    duplicate_action_name: str | None = extend_action_list(
+        action_arr, temp_action_list)
+    if duplicate_action_name is not None:
+        duplicate_action_error \
+            = pl.PrivleapCommon.find_bad_config_header(
+                config_file, duplicate_action_name,
+                "Duplicate action found:")
+        if PrivleapdGlobal.check_config_mode:
+            print(duplicate_action_error, file = sys.stderr)
+        else:
+            logging.error("Error parsing config: '%s'",
+                duplicate_action_error)
+        return False
+    for persistent_user_item in persistent_user_arr:
+        # Note, parse_config_file() normalizes the usernames of
+        # persistent users for us.
+        append_if_not_in(persistent_user_item,
+            temp_persistent_user_list)
+        # Persistent users are automatically allowed users too.
+        append_if_not_in(persistent_user_item,
+            temp_allowed_user_list)
+        # It isn't an error for duplicate persistent users to be
+        # defined, we just skip over the duplicates.
+    for allowed_user_item in allowed_user_arr:
+        # Note, parse_config_file() normalizes the usernames of
+        # allowed users for us.
+        append_if_not_in(allowed_user_item,
+            temp_allowed_user_list)
+        # It isn't an error for duplicate allowed users to be
+        # defined, we just skip over the duplicates.
+    return True
+
 def parse_config_files() -> bool:
     """
     Parses all config files under /etc/privleap/conf.d.
@@ -650,52 +738,9 @@ def parse_config_files() -> bool:
             continue
 
         try:
-            config_result: pl.ConfigData | str
-            action_arr: list[pl.PrivleapAction]
-            persistent_user_arr: list[str]
-            allowed_user_arr: list[str]
-
-            config_result = pl.PrivleapCommon.parse_config_file(config_file)
-            if isinstance(config_result, str):
-                if PrivleapdGlobal.check_config_mode:
-                    print(config_result, file = sys.stderr)
-                else:
-                    logging.error("Error parsing config: '%s'",
-                        config_result)
+            if not parse_config_file(config_file, temp_action_list,
+                temp_persistent_user_list, temp_allowed_user_list):
                 return False
-            action_arr = config_result[0]
-            persistent_user_arr = config_result[1]
-            allowed_user_arr = config_result[2]
-            duplicate_action_name: str | None = extend_action_list(
-                action_arr, temp_action_list)
-            if duplicate_action_name is not None:
-                duplicate_action_error \
-                    = pl.PrivleapCommon.find_bad_config_header(
-                        config_file, duplicate_action_name,
-                        "Duplicate action found:")
-                if PrivleapdGlobal.check_config_mode:
-                    print(duplicate_action_error, file = sys.stderr)
-                else:
-                    logging.error("Error parsing config: '%s'",
-                        duplicate_action_error)
-                return False
-            for persistent_user_item in persistent_user_arr:
-                # Note, parse_config_file() normalizes the usernames of
-                # persistent users for us.
-                append_if_not_in(persistent_user_item,
-                    temp_persistent_user_list)
-                # Persistent users are automatically allowed users too.
-                append_if_not_in(persistent_user_item,
-                    temp_allowed_user_list)
-                # It isn't an error for duplicate persistent users to be
-                # defined, we just skip over the duplicates.
-            for allowed_user_item in allowed_user_arr:
-                # Note, parse_config_file() normalizes the usernames of
-                # allowed users for us.
-                append_if_not_in(allowed_user_item,
-                    temp_allowed_user_list)
-                # It isn't an error for duplicate allowed users to be
-                # defined, we just skip over the duplicates.
         except Exception as e:
             logging.error("Failed to load config file '%s'!",
                 str(config_file), exc_info = e)

@@ -3,7 +3,7 @@
 # Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
 # See the file COPYING for copying conditions.
 
-# pylint: disable=too-few-public-methods,  too-many-lines
+# pylint: disable=too-few-public-methods, too-many-lines
 # Rationale:
 #   too-few-public-methods: privleap's message handling design uses lots of
 #     small classes
@@ -571,11 +571,12 @@ class PrivleapSession:
 
         return output_list, blob
 
-    # pylint: disable=too-many-return-statements, too-many-branches
+    # pylint: disable=too-many-return-statements, too-many-branches, too-many-statements
     # Rationale:
-    #   too-many-return-statements, too-many-branches: This is essentially a
-    #     dispatch function, it shouldn't be split for readability's sake and it
-    #     can't use less return statements or branches.
+    #   too-many-return-statements, too-many-branches, too-many-statements: This
+    #     is essentially a dispatch function, it shouldn't be split for
+    #     readability's sake and it can't use less return statements or
+    #     branches.
     def get_msg(self) -> PrivleapMsg:
         """
         Gets a message from the backend socket and returns it as a PrivleapMsg
@@ -868,7 +869,7 @@ class PrivleapAction:
 
         if ((auth_users is None or len(auth_users) == 0)
             and (auth_groups is None or len(auth_groups) == 0)):
-            raise ValueError(f"No authorized users or groups provided!")
+            raise ValueError("No authorized users or groups provided!")
 
         if auth_users is not None:
             for raw_auth_user in auth_users:
@@ -961,14 +962,8 @@ class PrivleapCommon:
         return False
 
     @staticmethod
-    # pylint: disable=too-many-locals, too-many-branches, too-many-statements
-    # Rationale:
-    #   too-many-locals, too-many-branches, too-many-statements: This method
-    #     parses configuration data, splitting it up would be unreasonable and
-    #     make it more difficult to read. Each section of the config file has
-    #     quite a bit of data, so parsing is non-trivial.
-    # TODO: Changed my mind about splitting this up being a bad idea, try to
-    #   split it up if at all possible, this thing is getting way too big.
+    # pylint: disable=too-many-locals, too-many-branches, too-many-statements, too-many-return-statements
+    # TODO: Split this up somehow.
     def parse_config_file(config_file: Path) \
         -> ConfigData | str:
         """
@@ -992,7 +987,7 @@ class PrivleapCommon:
         current_target_user: str | None = None
         current_target_group: str | None = None
         first_header_parsed: bool = False
-        with (open(config_file, "r", encoding = "utf-8") as conf_stream):
+        with open(config_file, "r", encoding = "utf-8") as conf_stream:
             for line in conf_stream:
                 line_idx += 1
                 line = line.strip()

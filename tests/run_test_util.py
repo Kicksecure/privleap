@@ -674,7 +674,7 @@ Command=echo 'test-act-missing-auth'
         = (b"Unrecognized argument '\\x1b[31mHi\\x1b[m', try 'privleapd "
            + b"--help' for usage info\n")
     bad_config_file_lines: list[str] = [
-        "parse_config_files: ERROR: Error parsing config: "
+        "parse_config_file: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax'\n",
         "main: CRITICAL: Failed initial config load!\n"
     ]
@@ -894,31 +894,31 @@ Command=echo 'test-act-missing-auth'
           "ValueError: recv_buf contains data past the last string\n" ]
     ]
     duplicate_actions_config_file_lines: list[str] = [
-        "parse_config_files: ERROR: Error parsing config: "
+        "parse_config_file: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/unit-test.conf:52:error:Duplicate action "
         + "found: 'test-act-sudopermit''\n",
         "main: CRITICAL: Failed initial config load!\n"
     ]
     wrongorder_config_file_lines: list[str] = [
-        "parse_config_files: ERROR: Error parsing config: "
+        "parse_config_file: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/wrongorder.conf:1:error:Config line "
         + "before header'\n",
         "main: CRITICAL: Failed initial config load!\n"
     ]
     duplicate_keys_config_file_lines: list[str] = [
-        "parse_config_files: ERROR: Error parsing config: "
+        "parse_config_file: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/dupkeys.conf:3:error:Multiple 'Command' "
         + "keys in action 'test-act-dupkeys''\n",
         "main: CRITICAL: Failed initial config load!\n"
     ]
     absent_command_directive_config_file_lines: list[str] = [
-        "parse_config_files: ERROR: Error parsing config: "
+        "parse_config_file: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/absent.conf:5:error:No command configured for "
         + "action: 'test-act-absent''\n",
         "main: CRITICAL: Failed initial config load!\n"
     ]
     invalid_action_config_file_lines: list[str] = [
-        "parse_config_files: ERROR: Error parsing config: "
+        "parse_config_file: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/invalidaction.conf:1:error:Invalid action "
         + "name: 'test-@ct-invalidaction''\n",
         "main: CRITICAL: Failed initial config load!\n"
@@ -948,20 +948,20 @@ Command=echo 'test-act-missing-auth'
         "send_action_results: INFO: Action 'test-act-userpermit' completed\n"
     ]
     config_reload_failure_lines: list[str] = [
-        "parse_config_files: ERROR: Error parsing config: "
+        "parse_config_file: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/added_actions_bad.conf:10:error:Invalid "
         + "syntax'\n",
         "handle_control_reload_msg: WARNING: Handled RELOAD message, "
         + "configuration was invalid!\n",
     ]
     unrecognized_header_config_file_lines: list[str] = [
-        "parse_config_files: ERROR: Error parsing config: "
+        "parse_config_file: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/unrec_header.conf:1:error:Unrecognized header "
         + "'unrecognized-header''\n",
         "main: CRITICAL: Failed initial config load!\n"
     ]
     missing_auth_config_file_lines: list[str] = [
-        "parse_config_files: ERROR: Error parsing config: "
+        "parse_config_file: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/missing_auth.conf:1:error:No "
         + "authorized users or groups for action: 'test-act-missing-auth''\n",
         "main: CRITICAL: Failed initial config load!\n"

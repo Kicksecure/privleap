@@ -460,6 +460,10 @@ def leaprun_server_late_cutoff_test(bogus: str) -> bool:
             return True
     return False
 
+# pylint: disable=too-many-statements
+# Rationale:
+#   too-many-statements: This is a dispatch function for tests, cannot be split
+#     up.
 def run_leaprun_tests() -> None:
     """
     Runs all tests on the leaprun executable.
@@ -1308,6 +1312,56 @@ def privleapd_send_grouprestrict_signal_and_bail_test(bogus: str) -> bool:
             return True
     return False
 
+def privleapd_check_signal_response_helper(test_action: str) \
+    -> Tuple[bytes, bytes, int, bool, bool]:
+    """
+    Test how privleapd handles a comm client that requests a specific action to
+      be run. This function actually runs the action, and sends the result back
+      to privleapd_check_signal_response_test.
+    """
+
+    comm_session: pl.PrivleapSession = pl.PrivleapSession(
+        PlTestGlobal.test_username)
+    comm_session.send_msg(pl.PrivleapCommClientSignalMsg(
+        test_action))
+    accumulated_stdout: bytes = b""
+    accumulated_stderr: bytes = b""
+    returned_exitcode: int = 0
+    returned_unauthorized: bool = False
+    error_result: bool = False
+    while True:
+        try:
+            comm_session_msg = comm_session.get_msg()
+            if isinstance(comm_session_msg,
+                pl.PrivleapCommServerUnauthorizedMsg):
+                returned_unauthorized = True
+                break
+            if isinstance(comm_session_msg,
+                pl.PrivleapCommServerTriggerMsg):
+                continue
+
+            if isinstance(comm_session_msg,
+                pl.PrivleapCommServerResultStdoutMsg):
+                accumulated_stdout += comm_session_msg.stdout_bytes
+            elif isinstance(comm_session_msg,
+                pl.PrivleapCommServerResultStderrMsg):
+                accumulated_stderr += comm_session_msg.stderr_bytes
+            elif isinstance(comm_session_msg,
+                pl.PrivleapCommServerResultExitcodeMsg):
+                returned_exitcode = comm_session_msg.exit_code
+                break
+            else:
+                logging.error("Unexpected message type '%s' retrieved!",
+                    type(comm_session_msg))
+                error_result = True
+                break
+        except Exception:
+            logging.error("Failed to retrieve response message!")
+            error_result = True
+            break
+    return (accumulated_stdout, accumulated_stderr, returned_exitcode,
+        returned_unauthorized, error_result)
+
 def privleapd_check_signal_response_test(test_type: str) -> bool:
     """
     Test how privleapd handles a comm client that requests a specific action to
@@ -1352,42 +1406,20 @@ def privleapd_check_signal_response_test(test_type: str) -> bool:
     if test_action is None:
         return False
     util.discard_privleapd_stderr()
-    comm_session: pl.PrivleapSession = pl.PrivleapSession(
-        PlTestGlobal.test_username)
-    comm_session.send_msg(pl.PrivleapCommClientSignalMsg(
-        test_action))
-    accumulated_stdout: bytes = b""
-    accumulated_stderr: bytes = b""
-    returned_exitcode: int = 0
-    returned_unauthorized: bool = False
-    while True:
-        try:
-            comm_session_msg = comm_session.get_msg()
-            if isinstance(comm_session_msg,
-                pl.PrivleapCommServerUnauthorizedMsg):
-                returned_unauthorized = True
-                break
-            if isinstance(comm_session_msg,
-                pl.PrivleapCommServerTriggerMsg):
-                continue
-            elif isinstance(comm_session_msg,
-                pl.PrivleapCommServerResultStdoutMsg):
-                accumulated_stdout += comm_session_msg.stdout_bytes
-            elif isinstance(comm_session_msg,
-                pl.PrivleapCommServerResultStderrMsg):
-                accumulated_stderr += comm_session_msg.stderr_bytes
-            elif isinstance(comm_session_msg,
-                pl.PrivleapCommServerResultExitcodeMsg):
-                returned_exitcode = comm_session_msg.exit_code
-                break
-            else:
-                logging.error("Unexpected message type '%s' retrieved!",
-                    type(comm_session_msg))
-                return False
-        except Exception:
-            logging.error("Failed to retrieve response message!")
-            return False
+
+    accumulated_stdout: bytes
+    accumulated_stderr: bytes
+    returned_exitcode: int
+    returned_unauthorized: bool
+    error_result: bool
+    (accumulated_stdout, accumulated_stderr, returned_exitcode,
+        returned_unauthorized, error_result) \
+        = privleapd_check_signal_response_helper(test_action)
+
     assert_success: bool = True
+    if error_result:
+        logging.error("Error during signal test!")
+        assert_success = False
     if accumulated_stdout != expect_stdout_data:
         logging.error("stdout mismatch!")
         logging.error("Stdout: %s", accumulated_stdout)
