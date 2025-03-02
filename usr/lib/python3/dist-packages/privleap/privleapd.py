@@ -309,6 +309,7 @@ def run_action(desired_action: pl.PrivleapAction, calling_user: str) \
     except Exception as e:
         pam_obj.setcred(PAM.PAM_DELETE_CRED | PAM.PAM_SILENT)
         raise e
+    pam_env_list: list[str] = pam_obj.getenvlist()
 
     user_info: pwd.struct_passwd = pwd.getpwnam(target_user)
     action_env: dict[str, str] = os.environ.copy()
@@ -317,6 +318,9 @@ def run_action(desired_action: pl.PrivleapAction, calling_user: str) \
     action_env["SHELL"] = "/usr/bin/bash"
     action_env["PWD"] = user_info.pw_dir
     action_env["USER"] = user_info.pw_name
+    for env_var in pam_env_list:
+        env_var_parts = env_var.split("=", 1)
+        action_env[env_var_parts[0]] = env_var_parts[1]
     action_process: subprocess.Popen[bytes] = subprocess.Popen(
         ['/usr/bin/bash', '-c',
          desired_action.action_command],
