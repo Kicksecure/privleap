@@ -22,6 +22,7 @@ import privleap.privleap as pl
 
 Buffer = Union[bytes, bytearray, memoryview]
 
+
 # pylint: disable=too-few-public-methods
 # Rationale:
 #   too-few-public-methods: This class just stores global variables, it needs no
@@ -36,6 +37,7 @@ class LeaprunGlobal:
     signal_msg: pl.PrivleapCommClientSignalMsg | None = None
     comm_session: pl.PrivleapSession | None = None
 
+
 def cleanup_and_exit(exit_code: int) -> NoReturn:
     """
     Ensures any active session is closed, then exits.
@@ -45,17 +47,21 @@ def cleanup_and_exit(exit_code: int) -> NoReturn:
         LeaprunGlobal.comm_session.close_session()
     sys.exit(exit_code)
 
+
 def print_usage() -> NoReturn:
     """
     Prints usage information.
     """
 
-    print("""leaprun <signal_name>
+    print(
+        """leaprun <signal_name>
 
     signal_name : The name of the signal that leap should send. Sending a
                   signal with a particular name will request privleapd to
-                  trigger an action of the same name.""")
+                  trigger an action of the same name."""
+    )
     cleanup_and_exit(1)
+
 
 def generic_error(error_msg: str) -> NoReturn:
     """
@@ -65,15 +71,19 @@ def generic_error(error_msg: str) -> NoReturn:
     print(f"ERROR: {error_msg}", file=sys.stderr)
     cleanup_and_exit(1)
 
+
 def unexpected_msg_error(comm_msg: pl.PrivleapMsg) -> NoReturn:
     """
     Alerts about an unexpected message type being received from the server.
     """
 
-    print("ERROR: privleapd returned unexpected message as follows:",
-          file=sys.stderr)
+    print(
+        "ERROR: privleapd returned unexpected message as follows:",
+        file=sys.stderr,
+    )
     print(comm_msg.serialize(), file=sys.stderr)
     cleanup_and_exit(1)
+
 
 def create_signal_msg() -> None:
     """
@@ -82,11 +92,14 @@ def create_signal_msg() -> None:
 
     assert LeaprunGlobal.signal_name is not None
     try:
-        LeaprunGlobal.signal_msg \
-            = pl.PrivleapCommClientSignalMsg(LeaprunGlobal.signal_name)
+        LeaprunGlobal.signal_msg = pl.PrivleapCommClientSignalMsg(
+            LeaprunGlobal.signal_name
+        )
     except Exception:
-        generic_error(f"Signal name {repr(LeaprunGlobal.signal_name)} is "
-            "invalid!")
+        generic_error(
+            f"Signal name {repr(LeaprunGlobal.signal_name)} is " "invalid!"
+        )
+
 
 def start_comm_session() -> None:
     """
@@ -107,6 +120,7 @@ def start_comm_session() -> None:
     except Exception:
         generic_error("Could not connect to privleapd!")
 
+
 def send_signal() -> None:
     """
     Sends a signal to the server using the open comm session.
@@ -119,8 +133,11 @@ def send_signal() -> None:
         # noinspection PyUnboundLocalVariable
         LeaprunGlobal.comm_session.send_msg(LeaprunGlobal.signal_msg)
     except Exception:
-        generic_error("Could not request privleapd to run action "
-            f"{repr(LeaprunGlobal.signal_name)}!")
+        generic_error(
+            "Could not request privleapd to run action "
+            f"{repr(LeaprunGlobal.signal_name)}!"
+        )
+
 
 def handle_response() -> NoReturn:
     """
@@ -130,20 +147,25 @@ def handle_response() -> NoReturn:
     assert LeaprunGlobal.comm_session is not None
     assert LeaprunGlobal.signal_name is not None
     try:
-        comm_msg: pl.PrivleapMsg \
-            | pl.PrivleapCommServerResultStdoutMsg \
-            | pl.PrivleapCommServerResultStderrMsg \
-            | pl.PrivleapCommServerResultExitcodeMsg \
-            = LeaprunGlobal.comm_session.get_msg()
+        comm_msg: (
+            pl.PrivleapMsg
+            | pl.PrivleapCommServerResultStdoutMsg
+            | pl.PrivleapCommServerResultStderrMsg
+            | pl.PrivleapCommServerResultExitcodeMsg
+        ) = LeaprunGlobal.comm_session.get_msg()
     except Exception:
         generic_error("privleapd didn't return a valid response!")
 
     if isinstance(comm_msg, pl.PrivleapCommServerUnauthorizedMsg):
-        generic_error("You are unauthorized to run action "
-            f"{repr(LeaprunGlobal.signal_name)}.")
+        generic_error(
+            "You are unauthorized to run action "
+            f"{repr(LeaprunGlobal.signal_name)}."
+        )
     elif isinstance(comm_msg, pl.PrivleapCommServerTriggerErrorMsg):
-        generic_error("An error was encountered launching action "
-            f"{repr(LeaprunGlobal.signal_name)}.")
+        generic_error(
+            "An error was encountered launching action "
+            f"{repr(LeaprunGlobal.signal_name)}."
+        )
     elif isinstance(comm_msg, pl.PrivleapCommServerTriggerMsg):
         while True:
             try:
@@ -151,7 +173,8 @@ def handle_response() -> NoReturn:
             except Exception:
                 generic_error(
                     "Action triggered, but privleapd closed the connection "
-                     "before sending all output!")
+                    "before sending all output!"
+                )
 
             # noinspection PyUnboundLocalVariable
             if isinstance(comm_msg, pl.PrivleapCommServerResultStdoutMsg):
@@ -172,6 +195,7 @@ def handle_response() -> NoReturn:
         # noinspection PyUnboundLocalVariable
         unexpected_msg_error(comm_msg)
 
+
 def main() -> NoReturn:
     """
     Main function.
@@ -185,6 +209,7 @@ def main() -> NoReturn:
     start_comm_session()
     send_signal()
     handle_response()
+
 
 if __name__ == "__main__":
     main()
