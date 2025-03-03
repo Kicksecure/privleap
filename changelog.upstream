@@ -1,3 +1,47 @@
+commit 2170f8cdb6804c766ed66b8e5b355dc25a5eddf0
+Merge: 3df7b50 6de291f
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Mon Mar 3 05:41:19 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit 6de291fbae62b3ba7a0a879315feadb255c16f27
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Mar 2 16:41:47 2025 -0600
+
+    Format with `black -l80`
+
+commit 72f67b179aa3e735ebbf30f890cc0d7c11db5454
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Mar 2 16:13:57 2025 -0600
+
+    Make PAM environment variable integration work
+
+commit f84caaa87e5cd68a97260ad558eba0115be0717c
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Mar 2 14:57:08 2025 -0600
+
+    wip: add PAM integration, refactor to make pylint happier
+
+commit 88c067ca4c2c3d0b2ea8f2a24720479feb4308d5
+Merge: 4de00cb 3df7b50
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Tue Feb 25 20:46:47 2025 -0600
+
+    Merge branch 'master' of github.com:Kicksecure/privleap
+
+commit 4de00cb88b532741d21c481e20c1a7386d71fcd6
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Mon Feb 24 18:52:04 2025 -0600
+
+    Fix config example in privleapd.conf.d(5) manpage
+
+commit 3df7b5098eb5da66355b02b046b86ac4ec556430
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Mon Feb 24 07:48:03 2025 +0000
+
+    bumped changelog version
+
 commit 6154c25dc88d1b66f6db272ac79a84795781fb6b
 Merge: 905e31e 82b509c
 Author: Patrick Schleizer <adrelanos@whonix.org>
