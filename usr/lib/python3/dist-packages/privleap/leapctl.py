@@ -19,6 +19,7 @@ from typing import NoReturn
 # import privleap as pl
 import privleap.privleap as pl
 
+
 # pylint: disable=too-few-public-methods
 # Rationale:
 #   too-few-public-methods: This class just stores global variables, it needs no
@@ -31,6 +32,7 @@ class LeapctlGlobal:
 
     control_session: pl.PrivleapSession | None = None
 
+
 def cleanup_and_exit(exit_code: int) -> NoReturn:
     """
     Ensures any active session is closed, then exits.
@@ -40,12 +42,14 @@ def cleanup_and_exit(exit_code: int) -> NoReturn:
         LeapctlGlobal.control_session.close_session()
     sys.exit(exit_code)
 
+
 def print_usage() -> NoReturn:
     """
     Prints usage information.
     """
 
-    print("""leapctl <--create|--destroy> <user>
+    print(
+        """leapctl <--create|--destroy> <user>
 leapctl --reload
 
     --create : Specifies that leapctl should request a communication socket to
@@ -54,8 +58,10 @@ leapctl --reload
                 to be destroyed for the specified user.
     --reload : Instructs privleapd to reload configuration without restarting.
     user : The username or UID of the user account to create or destroy a
-           communication socket for.""")
+           communication socket for."""
+    )
     cleanup_and_exit(1)
+
 
 def generic_error(error_msg: str) -> NoReturn:
     """
@@ -65,15 +71,19 @@ def generic_error(error_msg: str) -> NoReturn:
     print(f"ERROR: {error_msg}", file=sys.stderr)
     cleanup_and_exit(1)
 
+
 def unexpected_msg_error(control_msg: pl.PrivleapMsg) -> NoReturn:
     """
     Alerts about an unexpected message type being received from the server.
     """
 
-    print("ERROR: privleapd returned unexpected message as follows:",
-        file=sys.stderr)
+    print(
+        "ERROR: privleapd returned unexpected message as follows:",
+        file=sys.stderr,
+    )
     print(control_msg.serialize(), file=sys.stderr)
     cleanup_and_exit(1)
+
 
 def start_control_session() -> None:
     """
@@ -82,9 +92,11 @@ def start_control_session() -> None:
 
     try:
         LeapctlGlobal.control_session = pl.PrivleapSession(
-            is_control_session = True)
+            is_control_session=True
+        )
     except Exception:
         generic_error("Could not connect to privleapd!")
+
 
 def handle_create_request(user_name: str) -> NoReturn:
     """
@@ -96,10 +108,10 @@ def handle_create_request(user_name: str) -> NoReturn:
 
     try:
         LeapctlGlobal.control_session.send_msg(
-            pl.PrivleapControlClientCreateMsg(user_name))
+            pl.PrivleapControlClientCreateMsg(user_name)
+        )
     except Exception:
-        generic_error(
-            "Could not request privleapd to create a comm socket!")
+        generic_error("Could not request privleapd to create a comm socket!")
 
     try:
         control_msg: pl.PrivleapMsg = LeapctlGlobal.control_session.get_msg()
@@ -113,15 +125,18 @@ def handle_create_request(user_name: str) -> NoReturn:
     elif isinstance(control_msg, pl.PrivleapControlServerControlErrorMsg):
         generic_error(
             "privleapd encountered an error while creating a comm socket "
-            f"for user {repr(user_name)}!")
+            f"for user {repr(user_name)}!"
+        )
     elif isinstance(control_msg, pl.PrivleapControlServerDisallowedUserMsg):
         generic_error(
-            f"User {repr(user_name)} is not permitted to have a comm socket!")
+            f"User {repr(user_name)} is not permitted to have a comm socket!"
+        )
     elif isinstance(control_msg, pl.PrivleapControlServerExistsMsg):
         print(f"Comm socket already exists for user {repr(user_name)}.")
         cleanup_and_exit(0)
     else:
         unexpected_msg_error(control_msg)
+
 
 def handle_destroy_request(user_name: str) -> NoReturn:
     """
@@ -134,10 +149,10 @@ def handle_destroy_request(user_name: str) -> NoReturn:
     try:
         # noinspection PyUnboundLocalVariable
         LeapctlGlobal.control_session.send_msg(
-            pl.PrivleapControlClientDestroyMsg(user_name))
+            pl.PrivleapControlClientDestroyMsg(user_name)
+        )
     except Exception:
-        generic_error(
-            "Could not request privleapd to destroy a comm socket!")
+        generic_error("Could not request privleapd to destroy a comm socket!")
 
     try:
         control_msg: pl.PrivleapMsg = LeapctlGlobal.control_session.get_msg()
@@ -151,19 +166,22 @@ def handle_destroy_request(user_name: str) -> NoReturn:
     elif isinstance(control_msg, pl.PrivleapControlServerControlErrorMsg):
         generic_error(
             "privleapd encountered an error while destroying a comm "
-            f"socket for user {repr(user_name)}!")
+            f"socket for user {repr(user_name)}!"
+        )
     elif isinstance(control_msg, pl.PrivleapControlServerNouserMsg):
         print(f"Comm socket does not exist for user {repr(user_name)}.")
         cleanup_and_exit(0)
     elif isinstance(control_msg, pl.PrivleapControlServerPersistentUserMsg):
-        print("Cannot destroy socket for persistent user "
-            f"{repr(user_name)}.")
+        print(
+            f"Cannot destroy socket for persistent user {repr(user_name)}."
+        )
         # It is not an error to try to destroy a socket for a persistent user,
         # since this may legitimately happen if someone logs in as a user that
         # happens to be persistent in privleap's config, and then logs out.
         cleanup_and_exit(0)
     else:
         unexpected_msg_error(control_msg)
+
 
 def handle_reload_request() -> NoReturn:
     """
@@ -174,10 +192,10 @@ def handle_reload_request() -> NoReturn:
 
     try:
         LeapctlGlobal.control_session.send_msg(
-            pl.PrivleapControlClientReloadMsg())
+            pl.PrivleapControlClientReloadMsg()
+        )
     except Exception:
-        generic_error(
-            "Could not request privleapd to reload configuration!")
+        generic_error("Could not request privleapd to reload configuration!")
 
     try:
         control_msg: pl.PrivleapMsg = LeapctlGlobal.control_session.get_msg()
@@ -191,6 +209,7 @@ def handle_reload_request() -> NoReturn:
         generic_error("privleapd failed to reload configuration!")
     else:
         unexpected_msg_error(control_msg)
+
 
 def main() -> NoReturn:
     """
@@ -232,6 +251,7 @@ def main() -> NoReturn:
         handle_destroy_request(control_user)
     else:
         handle_reload_request()
+
 
 if __name__ == "__main__":
     main()

@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Tuple, IO
 from datetime import datetime, timedelta
 
+
 class PlTestGlobal:
     """
     Global variables for privleap tests.
@@ -35,7 +36,9 @@ class PlTestGlobal:
     linebuf: str = ""
     privleap_conf_base_dir: Path = Path("/etc/privleap")
     privleap_conf_dir: Path = Path(f"{privleap_conf_base_dir}/conf.d")
-    privleap_conf_backup_dir: Path = Path(f"{privleap_conf_base_dir}/conf.d.bak")
+    privleap_conf_backup_dir: Path = Path(
+        f"{privleap_conf_base_dir}/conf.d.bak"
+    )
     privleapd_proc: subprocess.Popen[str] | None = None
     privleapd_test_ready_file: Path = Path("/tmp/privleapd-ready-for-test")
     test_username: str = "privleaptest"
@@ -48,10 +51,13 @@ class PlTestGlobal:
     no_service_handling = False
     all_asserts_passed = True
 
-SelectInfo = (Tuple[list[IO[bytes]], list[IO[bytes]], list[IO[bytes]]])
 
-def proc_try_readline(proc: subprocess.Popen[str], timeout: float,
-    read_stderr: bool = False) -> str | None:
+SelectInfo = Tuple[list[IO[bytes]], list[IO[bytes]], list[IO[bytes]]]
+
+
+def proc_try_readline(
+    proc: subprocess.Popen[str], timeout: float, read_stderr: bool = False
+) -> str | None:
     """
     Reads a line of test from the stdout or stderr of a process. Allows
       specifying a timeout for bailing out early. The stdout (or stderr)
@@ -63,8 +69,7 @@ def proc_try_readline(proc: subprocess.Popen[str], timeout: float,
 
     # If there's a line already in the buffer, find and return it.
     if "\n" in PlTestGlobal.linebuf:
-        linebuf_parts: list[str] = PlTestGlobal.linebuf.split("\n",
-            maxsplit = 1)
+        linebuf_parts: list[str] = PlTestGlobal.linebuf.split("\n", maxsplit=1)
         PlTestGlobal.linebuf = linebuf_parts[1]
         return linebuf_parts[0] + "\n"
 
@@ -77,7 +82,7 @@ def proc_try_readline(proc: subprocess.Popen[str], timeout: float,
     # Attempt to read from the stream, adding whatever is available from the
     # stream into a buffer.
     current_time: datetime = datetime.now()
-    end_time = current_time + timedelta(seconds = timeout)
+    end_time = current_time + timedelta(seconds=timeout)
     while True:
         try:
             PlTestGlobal.linebuf += target_stream.read()
@@ -91,14 +96,14 @@ def proc_try_readline(proc: subprocess.Popen[str], timeout: float,
         time.sleep(0.0001)
 
     # Retrieve a line from the buffer and return it.
-    linebuf_parts = PlTestGlobal.linebuf.split("\n",
-        maxsplit = 1)
+    linebuf_parts = PlTestGlobal.linebuf.split("\n", maxsplit=1)
     if len(linebuf_parts) == 2:
         PlTestGlobal.linebuf = linebuf_parts[1]
         return linebuf_parts[0] + "\n"
 
     # If there was no line to retrieve, return None.
     return None
+
 
 def ensure_running_as_root() -> None:
     """
@@ -110,6 +115,7 @@ def ensure_running_as_root() -> None:
         logging.error("The tests must run as root.")
         sys.exit(1)
 
+
 def ensure_path_lacks_files(path: Path) -> None:
     """
     Ensures all components of the provided path either do not exist or are
@@ -117,14 +123,19 @@ def ensure_path_lacks_files(path: Path) -> None:
     """
 
     if path.exists() and not path.is_dir():
-        logging.critical("Path '%s' contains a non-dir at '%s'!", str(path),
-            str(path))
+        logging.critical(
+            "Path '%s' contains a non-dir at '%s'!", str(path), str(path)
+        )
         sys.exit(1)
     for parent_path in path.parents:
         if parent_path.exists() and not parent_path.is_dir():
-            logging.critical("Path '%s' contains a non-dir at '%s'!", str(path),
-                str(parent_path))
+            logging.critical(
+                "Path '%s' contains a non-dir at '%s'!",
+                str(path),
+                str(parent_path),
+            )
             sys.exit(1)
+
 
 def setup_test_account(test_username: str, test_home_dir: Path) -> None:
     """
@@ -135,27 +146,32 @@ def setup_test_account(test_username: str, test_home_dir: Path) -> None:
     user_name_list: list[str] = [p.pw_name for p in pwd.getpwall()]
     if test_username not in user_name_list:
         try:
-            subprocess.run(["useradd", "-m", test_username],
-                check = True)
+            subprocess.run(["useradd", "-m", test_username], check=True)
         except Exception as e:
-            logging.critical("Could not create user '%s'!",
-                test_username, exc_info = e)
+            logging.critical(
+                "Could not create user '%s'!", test_username, exc_info=e
+            )
             sys.exit(1)
     user_gid: int = pwd.getpwnam(test_username).pw_gid
-    group_list: list[str] = [grp.getgrgid(gid).gr_name \
-        for gid in os.getgrouplist(test_username, user_gid)]
+    group_list: list[str] = [
+        grp.getgrgid(gid).gr_name
+        for gid in os.getgrouplist(test_username, user_gid)
+    ]
     if not "sudo" in group_list:
         try:
-            subprocess.run(["adduser", test_username, "sudo"],
-                check = True)
+            subprocess.run(["adduser", test_username, "sudo"], check=True)
         except Exception as e:
-            logging.critical("Could not add user '%s' to group 'sudo'!",
-                test_username, exc_info = e)
+            logging.critical(
+                "Could not add user '%s' to group 'sudo'!",
+                test_username,
+                exc_info=e,
+            )
             sys.exit(1)
     ensure_path_lacks_files(test_home_dir)
     if not test_home_dir.exists():
-        test_home_dir.mkdir(parents = True)
-        shutil.chown(test_home_dir, user = test_username, group = test_username)
+        test_home_dir.mkdir(parents=True)
+        shutil.chown(test_home_dir, user=test_username, group=test_username)
+
 
 def displace_old_privleap_config() -> None:
     """
@@ -164,16 +180,22 @@ def displace_old_privleap_config() -> None:
     """
 
     if PlTestGlobal.privleap_conf_backup_dir.exists():
-        logging.critical("Backup config dir at '%s' exist, please move or "
-        "remove it before continuing.",
-        str(PlTestGlobal.privleap_conf_backup_dir))
+        logging.critical(
+            "Backup config dir at '%s' exist, please move or remove it before "
+            "continuing.",
+            str(PlTestGlobal.privleap_conf_backup_dir),
+        )
         sys.exit(1)
     ensure_path_lacks_files(PlTestGlobal.privleap_conf_dir)
     ensure_path_lacks_files(PlTestGlobal.privleap_conf_backup_dir)
-    PlTestGlobal.privleap_conf_base_dir.mkdir(parents = True, exist_ok = True)
+    PlTestGlobal.privleap_conf_base_dir.mkdir(parents=True, exist_ok=True)
     if PlTestGlobal.privleap_conf_dir.exists():
-        shutil.move(PlTestGlobal.privleap_conf_dir, PlTestGlobal.privleap_conf_backup_dir)
-    PlTestGlobal.privleap_conf_dir.mkdir(parents = True, exist_ok = True)
+        shutil.move(
+            PlTestGlobal.privleap_conf_dir,
+            PlTestGlobal.privleap_conf_backup_dir,
+        )
+    PlTestGlobal.privleap_conf_dir.mkdir(parents=True, exist_ok=True)
+
 
 def restore_old_privleap_config() -> None:
     """
@@ -182,14 +204,18 @@ def restore_old_privleap_config() -> None:
 
     ensure_path_lacks_files(PlTestGlobal.privleap_conf_dir)
     ensure_path_lacks_files(PlTestGlobal.privleap_conf_backup_dir)
-    PlTestGlobal.privleap_conf_base_dir.mkdir(parents = True, exist_ok = True)
+    PlTestGlobal.privleap_conf_base_dir.mkdir(parents=True, exist_ok=True)
     if PlTestGlobal.privleap_conf_backup_dir.exists():
         if PlTestGlobal.privleap_conf_dir.exists():
             shutil.rmtree(PlTestGlobal.privleap_conf_dir)
-        shutil.move(PlTestGlobal.privleap_conf_backup_dir, PlTestGlobal.privleap_conf_dir)
+        shutil.move(
+            PlTestGlobal.privleap_conf_backup_dir,
+            PlTestGlobal.privleap_conf_dir,
+        )
     # Make sure the "real" config dir exists even if there wasn't a backup dir
     # to move into position
-    PlTestGlobal.privleap_conf_dir.mkdir(parents = True, exist_ok = True)
+    PlTestGlobal.privleap_conf_dir.mkdir(parents=True, exist_ok=True)
+
 
 def stop_privleapd_service() -> None:
     """
@@ -199,14 +225,15 @@ def stop_privleapd_service() -> None:
     if PlTestGlobal.no_service_handling:
         return
     try:
-        subprocess.run(["systemctl", "stop", "privleapd"], check = True)
+        subprocess.run(["systemctl", "stop", "privleapd"], check=True)
     except Exception as e:
-        logging.critical("Could not stop privleapd service!",
-            exc_info = e)
+        logging.critical("Could not stop privleapd service!", exc_info=e)
         sys.exit(1)
 
-def start_privleapd_subprocess(extra_args: list[str],
-    allow_error_output: bool = False) -> None:
+
+def start_privleapd_subprocess(
+    extra_args: list[str], allow_error_output: bool = False
+) -> None:
     """
     Launches privleapd as a subprocess so its output can be monitored by the
       tester.
@@ -220,20 +247,27 @@ def start_privleapd_subprocess(extra_args: list[str],
         full_args: list[str] = ["/usr/bin/privleapd", "--test"]
         for arg in extra_args:
             full_args.append(arg)
-        PlTestGlobal.privleapd_proc = subprocess.Popen(full_args,
-            stdout = subprocess.PIPE,
-            stderr = subprocess.PIPE,
-            encoding = "utf-8")
+        PlTestGlobal.privleapd_proc = subprocess.Popen(
+            full_args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+        )
     except Exception as e:
-        logging.critical("Could not start privleapd server!",
-            exc_info = e)
+        logging.critical("Could not start privleapd server!", exc_info=e)
     assert PlTestGlobal.privleapd_proc is not None
     assert PlTestGlobal.privleapd_proc.stdout is not None
     assert PlTestGlobal.privleapd_proc.stderr is not None
-    fcntl.fcntl(PlTestGlobal.privleapd_proc.stdout.fileno(),
-        fcntl.F_SETFL, os.O_NONBLOCK)
-    fcntl.fcntl(PlTestGlobal.privleapd_proc.stderr.fileno(),
-        fcntl.F_SETFL, os.O_NONBLOCK)
+    fcntl.fcntl(
+        PlTestGlobal.privleapd_proc.stdout.fileno(),
+        fcntl.F_SETFL,
+        os.O_NONBLOCK,
+    )
+    fcntl.fcntl(
+        PlTestGlobal.privleapd_proc.stderr.fileno(),
+        fcntl.F_SETFL,
+        os.O_NONBLOCK,
+    )
     if allow_error_output:
         time.sleep(PlTestGlobal.base_delay * 2)
     else:
@@ -246,19 +280,24 @@ def start_privleapd_subprocess(extra_args: list[str],
             privleapd_started_checks += 1
         PlTestGlobal.privleapd_test_ready_file.unlink()
         early_privleapd_output: str | None = proc_try_readline(
-            PlTestGlobal.privleapd_proc, PlTestGlobal.base_delay,
-            read_stderr = True)
+            PlTestGlobal.privleapd_proc,
+            PlTestGlobal.base_delay,
+            read_stderr=True,
+        )
         if early_privleapd_output is not None:
             logging.critical("privleapd returned error messages at startup!")
             while True:
                 logging.critical(early_privleapd_output)
                 early_privleapd_output = proc_try_readline(
-                    PlTestGlobal.privleapd_proc, PlTestGlobal.base_delay,
-                    read_stderr = True)
+                    PlTestGlobal.privleapd_proc,
+                    PlTestGlobal.base_delay,
+                    read_stderr=True,
+                )
                 if early_privleapd_output is None:
                     break
             sys.exit(1)
     PlTestGlobal.privleapd_running = True
+
 
 def stop_privleapd_subprocess() -> None:
     """
@@ -270,19 +309,25 @@ def stop_privleapd_subprocess() -> None:
         PlTestGlobal.privleapd_proc.kill()
         _ = PlTestGlobal.privleapd_proc.communicate()
     except Exception as e:
-        logging.critical("Could not kill privleapd!", exc_info = e)
+        logging.critical("Could not kill privleapd!", exc_info=e)
     time.sleep(PlTestGlobal.base_delay)
     PlTestGlobal.privleapd_running = False
 
-def assert_command_result(command_data: list[str], exit_code: int,
-    stdout_data: bytes = b"", stderr_data: bytes = b"") -> bool:
+
+def assert_command_result(
+    command_data: list[str],
+    exit_code: int,
+    stdout_data: bytes = b"",
+    stderr_data: bytes = b"",
+) -> bool:
     """
     Runs a command and ensures that the stdout, stderr, and exitcode match
       expected values.
     """
 
-    test_result: subprocess.CompletedProcess[bytes] \
-        = subprocess.run(command_data, check = False, capture_output = True)
+    test_result: subprocess.CompletedProcess[bytes] = subprocess.run(
+        command_data, check=False, capture_output=True
+    )
     logging.info("Ran command: %s", command_data)
     logging.info("Exit code: %s", test_result.returncode)
     logging.info("Stdout: %s", test_result.stdout)
@@ -301,24 +346,36 @@ def assert_command_result(command_data: list[str], exit_code: int,
         return False
     return True
 
+
 def write_privleap_test_config() -> None:
     """
     Writes test privleap config data. Includes one legitimate config file, one
       empty file, and one file that contains only comments.
     """
 
-    with open(Path(PlTestGlobal.privleap_conf_dir, "unit-test.conf"),
-        "w", encoding = "utf-8") as config_file:
+    with open(
+        Path(PlTestGlobal.privleap_conf_dir, "unit-test.conf"),
+        "w",
+        encoding="utf-8",
+    ) as config_file:
         config_file.write(PlTestData.primary_test_config_file)
-    with open(Path(PlTestGlobal.privleap_conf_dir, "comment-only.conf"),
-        "w", encoding = "utf-8") as config_file:
+    with open(
+        Path(PlTestGlobal.privleap_conf_dir, "comment-only.conf"),
+        "w",
+        encoding="utf-8",
+    ) as config_file:
         config_file.write(PlTestData.comment_only_config_file)
-    with open(Path(PlTestGlobal.privleap_conf_dir, "empty.conf"), "w",
-        encoding = "utf-8") as config_file:
+    with open(
+        Path(PlTestGlobal.privleap_conf_dir, "empty.conf"),
+        "w",
+        encoding="utf-8",
+    ) as config_file:
         config_file.write("\n")
 
-def compare_privleapd_stderr(assert_line_list: list[str], quiet: bool = False) \
-    -> bool:
+
+def compare_privleapd_stderr(
+    assert_line_list: list[str], quiet: bool = False
+) -> bool:
     """
     Compares the stdout output of privleapd with a string list, testing to see
       if each expected line has a corresponding returned line. The list of
@@ -330,8 +387,11 @@ def compare_privleapd_stderr(assert_line_list: list[str], quiet: bool = False) \
     read_lines: list[str] = []
     for line in assert_line_list:
         while True:
-            proc_line = proc_try_readline(PlTestGlobal.privleapd_proc,
-                PlTestGlobal.base_delay, read_stderr = True)
+            proc_line = proc_try_readline(
+                PlTestGlobal.privleapd_proc,
+                PlTestGlobal.base_delay,
+                read_stderr=True,
+            )
             if proc_line is None:
                 result_good = False
                 break
@@ -341,8 +401,11 @@ def compare_privleapd_stderr(assert_line_list: list[str], quiet: bool = False) \
             # If we get this far, line == proc_line
             break
     while True:
-        proc_line = proc_try_readline(PlTestGlobal.privleapd_proc,
-            PlTestGlobal.base_delay, read_stderr = True)
+        proc_line = proc_try_readline(
+            PlTestGlobal.privleapd_proc,
+            PlTestGlobal.base_delay,
+            read_stderr=True,
+        )
         if proc_line is None:
             break
         read_lines.append(proc_line)
@@ -353,6 +416,7 @@ def compare_privleapd_stderr(assert_line_list: list[str], quiet: bool = False) \
                 logging.error("%s", line)
     return result_good
 
+
 def discard_privleapd_stderr() -> None:
     """
     Ensures that the running privleapd's stdout stream has no pending contents.
@@ -361,10 +425,14 @@ def discard_privleapd_stderr() -> None:
     if PlTestGlobal.privleapd_running:
         assert PlTestGlobal.privleapd_proc is not None
         while True:
-            proc_line = proc_try_readline(PlTestGlobal.privleapd_proc,
-                PlTestGlobal.base_delay, read_stderr = True)
+            proc_line = proc_try_readline(
+                PlTestGlobal.privleapd_proc,
+                PlTestGlobal.base_delay,
+                read_stderr=True,
+            )
             if proc_line is None:
                 break
+
 
 def start_privleapd_service() -> None:
     """
@@ -375,11 +443,11 @@ def start_privleapd_service() -> None:
     if PlTestGlobal.no_service_handling:
         return
     try:
-        subprocess.run(["systemctl", "start", "privleapd"], check = True)
+        subprocess.run(["systemctl", "start", "privleapd"], check=True)
     except Exception as e:
-        logging.critical("Could not start privleapd service!",
-            exc_info = e)
+        logging.critical("Could not start privleapd service!", exc_info=e)
         sys.exit(1)
+
 
 def socket_send_raw_bytes(sock: socket.socket, buf: bytes) -> bool:
     """
@@ -393,6 +461,7 @@ def socket_send_raw_bytes(sock: socket.socket, buf: bytes) -> bool:
             return False
         buf_sent += last_sent
     return True
+
 
 class PlTestData:
     """
@@ -526,8 +595,7 @@ AuthorizedUsers=root
 Command=echo 'duplicate-test-act-sudopermit'
 AuthorizedGroups=sudo
 """
-    wrongorder_config_file: str \
-        = """Command=echo 'test-act-wrongorder'
+    wrongorder_config_file: str = """Command=echo 'test-act-wrongorder'
 [action:test-act-wrongorder]
 AuthorizedUsers=root
 """
@@ -574,109 +642,125 @@ AuthorizedUsers=root
     missing_auth_config_file: str = """[action:test-act-missing-auth]
 Command=echo 'test-act-missing-auth'
 """
-    test_username_create_error: bytes \
-        = (b"ERROR: privleapd encountered an error while creating a comm "
-           b"socket for user '"
-           + PlTestGlobal.test_username_bytes
-           + b"'!\n")
-    privleapd_invalid_response: bytes \
-        = b"ERROR: privleapd didn't return a valid response!\n"
-    specified_user_missing: bytes \
-        = b"ERROR: Specified user does not exist.\n"
-    nonexistent_socket_missing: bytes \
-        = b"Comm socket does not exist for user 'nonexistent'.\n"
-    apt_socket_created: bytes \
-        = b"Comm socket created for user '_apt'.\n"
-    apt_socket_destroyed: bytes \
-        = b"Comm socket destroyed for user '_apt'.\n"
-    test_username_socket_created: bytes \
-        = (b"Comm socket created for user '"
-           + PlTestGlobal.test_username_bytes
-           + b"'.\n")
-    test_username_socket_destroyed: bytes \
-        = (b"Comm socket destroyed for user '"
-           + PlTestGlobal.test_username_bytes
-           + b"'.\n")
-    test_username_socket_missing: bytes \
-        = (b"Comm socket does not exist for user '"
-           + PlTestGlobal.test_username_bytes
-           + b"'.\n")
-    test_username_socket_exists: bytes \
-        = (b"Comm socket already exists for user '"
-           + PlTestGlobal.test_username_bytes
-           + b"'.\n")
-    privleapd_connection_failed: bytes \
-        = b"ERROR: Could not connect to privleapd!\n"
-    root_create_error: bytes \
-        = (b"ERROR: privleapd encountered an error while creating a "
-           + b"comm socket for user 'root'!\n")
+    test_username_create_error: bytes = (
+        b"ERROR: privleapd encountered an error while creating a comm "
+        b"socket for user '" + PlTestGlobal.test_username_bytes + b"'!\n"
+    )
+    privleapd_invalid_response: bytes = (
+        b"ERROR: privleapd didn't return a valid response!\n"
+    )
+    specified_user_missing: bytes = b"ERROR: Specified user does not exist.\n"
+    nonexistent_socket_missing: bytes = (
+        b"Comm socket does not exist for user 'nonexistent'.\n"
+    )
+    apt_socket_created: bytes = b"Comm socket created for user '_apt'.\n"
+    apt_socket_destroyed: bytes = b"Comm socket destroyed for user '_apt'.\n"
+    test_username_socket_created: bytes = (
+        b"Comm socket created for user '"
+        + PlTestGlobal.test_username_bytes
+        + b"'.\n"
+    )
+    test_username_socket_destroyed: bytes = (
+        b"Comm socket destroyed for user '"
+        + PlTestGlobal.test_username_bytes
+        + b"'.\n"
+    )
+    test_username_socket_missing: bytes = (
+        b"Comm socket does not exist for user '"
+        + PlTestGlobal.test_username_bytes
+        + b"'.\n"
+    )
+    test_username_socket_exists: bytes = (
+        b"Comm socket already exists for user '"
+        + PlTestGlobal.test_username_bytes
+        + b"'.\n"
+    )
+    privleapd_connection_failed: bytes = (
+        b"ERROR: Could not connect to privleapd!\n"
+    )
+    root_create_error: bytes = (
+        b"ERROR: privleapd encountered an error while creating a "
+        + b"comm socket for user 'root'!\n"
+    )
     root_socket_created: bytes = b"Comm socket created for user 'root'.\n"
     root_socket_destroyed: bytes = b"Comm socket destroyed for user 'root'.\n"
-    leapctl_help: bytes \
-= (b"leapctl <--create|--destroy> <user>\n"
-+ b"leapctl --reload\n"
-+ b"\n"
-+ b"    --create : Specifies that leapctl should request a communication "
-+ b"socket to\n"
-+ b"               be created for the specified user.\n"
-+ b"    --destroy : Specifies that leapctl should request a communication "
-+ b"socket\n"
-+ b"                to be destroyed for the specified user.\n"
-+ b"    --reload : Instructs privleapd to reload configuration without "
-+ b"restarting.\n"
-+ b"    user : The username or UID of the user account to create or destroy a\n"
-+ b"           communication socket for.\n")
-    test_act_nonexistent_unauthorized: bytes \
-        = (b"ERROR: You are unauthorized to run action "
-           + b"'test-act-userrestrict'.\n")
-    test_act_grouprestrict_unauthorized: bytes \
-        = (b"ERROR: You are unauthorized to run action "
-           + b"'test-act-grouprestrict'.\n")
-    test_act_multiuser_permit_unauthorized: bytes \
-        = (b"ERROR: You are unauthorized to run action "
-           + b"'test-act-multiuser-permit'.\n")
-    test_act_multigroup_permit_unauthorized: bytes \
-        = (b"ERROR: You are unauthorized to run action "
-           + b"'test-act-multigroup-permit'.\n")
-    test_act_multiuser_multigroup_permit_unauthorized: bytes \
-        = (b"ERROR: You are unauthorized to run action "
-           + b"'test-act-multiuser-multigroup-permit'.\n")
-    test_act_target_user: bytes \
-        = (b"uid=1002("
-           + PlTestGlobal.test_username_bytes
-           + b") gid=1002("
-           + PlTestGlobal.test_username_bytes
-           + b") groups=1002("
-           + PlTestGlobal.test_username_bytes
-           + b"),0(root)\n")
-    test_act_target_group: bytes \
-        = (b"uid=0(root) gid=1002("
-           + PlTestGlobal.test_username_bytes
-           + b") groups=1002("
-           + PlTestGlobal.test_username_bytes
-           + b"),0(root)\n")
-    test_act_target_user_and_group: bytes \
-        = (b"uid=1002("
-           + PlTestGlobal.test_username_bytes
-           + b") gid=0(root) groups=0(root)\n")
-    privleapd_help: bytes \
-        = (b"privleapd: privleap backend server\n"
-           + b"Usage:\n"
-           + b"  privleapd [-C|--check-config] [-h|--help|-?]\n"
-           + b"Options:\n"
-           + b"  -C, --check-config: Check configuration for validity.\n"
-           + b"  -h, --help, -?: Print usage information.\n"
-           + b"If run without any options specified, the server will start "
-           + b"normally.\n")
-    privleapd_unrecognized_argument: bytes \
-        = b"Unrecognized argument '-z', try 'privleapd --help' for usage info\n"
-    privleapd_unrecognized_argument_escape: bytes \
-        = (b"Unrecognized argument '\\x1b[31mHi\\x1b[m', try 'privleapd "
-           + b"--help' for usage info\n")
+    leapctl_help: bytes = (
+        b"leapctl <--create|--destroy> <user>\n"
+        + b"leapctl --reload\n"
+        + b"\n"
+        + b"    --create : Specifies that leapctl should request a communication "
+        + b"socket to\n"
+        + b"               be created for the specified user.\n"
+        + b"    --destroy : Specifies that leapctl should request a communication "
+        + b"socket\n"
+        + b"                to be destroyed for the specified user.\n"
+        + b"    --reload : Instructs privleapd to reload configuration without "
+        + b"restarting.\n"
+        + b"    user : The username or UID of the user account to create or destroy a\n"
+        + b"           communication socket for.\n"
+    )
+    test_act_nonexistent_unauthorized: bytes = (
+        b"ERROR: You are unauthorized to run action "
+        + b"'test-act-userrestrict'.\n"
+    )
+    test_act_grouprestrict_unauthorized: bytes = (
+        b"ERROR: You are unauthorized to run action "
+        + b"'test-act-grouprestrict'.\n"
+    )
+    test_act_multiuser_permit_unauthorized: bytes = (
+        b"ERROR: You are unauthorized to run action "
+        + b"'test-act-multiuser-permit'.\n"
+    )
+    test_act_multigroup_permit_unauthorized: bytes = (
+        b"ERROR: You are unauthorized to run action "
+        + b"'test-act-multigroup-permit'.\n"
+    )
+    test_act_multiuser_multigroup_permit_unauthorized: bytes = (
+        b"ERROR: You are unauthorized to run action "
+        + b"'test-act-multiuser-multigroup-permit'.\n"
+    )
+    test_act_target_user: bytes = (
+        b"uid=1002("
+        + PlTestGlobal.test_username_bytes
+        + b") gid=1002("
+        + PlTestGlobal.test_username_bytes
+        + b") groups=1002("
+        + PlTestGlobal.test_username_bytes
+        + b"),0(root)\n"
+    )
+    test_act_target_group: bytes = (
+        b"uid=0(root) gid=1002("
+        + PlTestGlobal.test_username_bytes
+        + b") groups=1002("
+        + PlTestGlobal.test_username_bytes
+        + b"),0(root)\n"
+    )
+    test_act_target_user_and_group: bytes = (
+        b"uid=1002("
+        + PlTestGlobal.test_username_bytes
+        + b") gid=0(root) groups=0(root)\n"
+    )
+    privleapd_help: bytes = (
+        b"privleapd: privleap backend server\n"
+        + b"Usage:\n"
+        + b"  privleapd [-C|--check-config] [-h|--help|-?]\n"
+        + b"Options:\n"
+        + b"  -C, --check-config: Check configuration for validity.\n"
+        + b"  -h, --help, -?: Print usage information.\n"
+        + b"If run without any options specified, the server will start "
+        + b"normally.\n"
+    )
+    privleapd_unrecognized_argument: bytes = (
+        b"Unrecognized argument '-z', try 'privleapd --help' for usage info\n"
+    )
+    privleapd_unrecognized_argument_escape: bytes = (
+        b"Unrecognized argument '\\x1b[31mHi\\x1b[m', try 'privleapd "
+        + b"--help' for usage info\n"
+    )
     bad_config_file_lines: list[str] = [
-        "parse_config_files: ERROR: Error parsing config: "
+        "parse_config_file: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax'\n",
-        "main: CRITICAL: Failed initial config load!\n"
+        "main: CRITICAL: Failed initial config load!\n",
     ]
     bad_config_file_check_lines: list[str] = [
         "/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax\n",
@@ -684,7 +768,7 @@ Command=echo 'test-act-missing-auth'
     control_disconnect_lines: list[str] = [
         "handle_control_session: ERROR: Could not get message from client!\n",
         "Traceback (most recent call last):\n",
-        "ConnectionAbortedError: Connection unexpectedly closed\n"
+        "ConnectionAbortedError: Connection unexpectedly closed\n",
     ]
     control_create_invalid_user_socket_lines: list[str] = [
         "handle_control_create_msg: WARNING: User 'nonexistent' does not "
@@ -695,7 +779,7 @@ Command=echo 'test-act-missing-auth'
         + "exist\n",
         "send_msg_safe: ERROR: Could not send 'CONTROL_ERROR'\n",
         "Traceback (most recent call last):\n",
-        "BrokenPipeError: [Errno 32] Broken pipe\n"
+        "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
     destroy_invalid_user_socket_lines: list[str] = [
         "handle_control_destroy_msg: INFO: Handled DESTROY message for user "
@@ -705,19 +789,19 @@ Command=echo 'test-act-missing-auth'
         "handle_control_create_msg: INFO: Handled CREATE message for user "
         + f"'{PlTestGlobal.test_username}', socket created\n",
         "handle_control_create_msg: INFO: Handled CREATE message for user "
-        + f"'{PlTestGlobal.test_username}', socket already exists\n"
+        + f"'{PlTestGlobal.test_username}', socket already exists\n",
     ]
     create_existing_user_socket_and_bail_lines: list[str] = [
         "handle_control_create_msg: INFO: Handled CREATE message for user "
         + f"'{PlTestGlobal.test_username}', socket already exists\n",
         "send_msg_safe: ERROR: Could not send 'EXISTS'\n",
-        "BrokenPipeError: [Errno 32] Broken pipe\n"
+        "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
     create_blocked_user_socket_lines: list[str] = [
         "handle_control_create_msg: ERROR: Failed to create socket for user "
         + f"'{PlTestGlobal.test_username}'!\n",
         "Traceback (most recent call last):\n",
-        "OSError: [Errno 98] Address already in use\n"
+        "OSError: [Errno 98] Address already in use\n",
     ]
     create_blocked_user_socket_and_bail_lines: list[str] = [
         "handle_control_create_msg: ERROR: Failed to create socket for "
@@ -730,53 +814,56 @@ Command=echo 'test-act-missing-auth'
         + "occurred:\n",
         "Traceback (most recent call last):\n",
         "BrokenPipeError: [Errno 32] Broken pipe\n",
-        ]
+    ]
     destroy_missing_user_socket_lines: list[str] = [
         "handle_control_destroy_msg: WARNING: Handling DESTROY, no socket to "
         + f"delete at '/run/privleapd/comm/{PlTestGlobal.test_username}'\n",
         "handle_control_destroy_msg: INFO: Handled DESTROY message for user "
-        + f"'{PlTestGlobal.test_username}', socket destroyed\n"
+        + f"'{PlTestGlobal.test_username}', socket destroyed\n",
     ]
     destroy_user_socket_and_bail_lines: list[str] = [
         "handle_control_destroy_msg: INFO: Handled DESTROY message for "
         + f"user '{PlTestGlobal.test_username}', socket destroyed\n",
         "send_msg_safe: ERROR: Could not send 'OK'\n",
         "Traceback (most recent call last):\n",
-        "BrokenPipeError: [Errno 32] Broken pipe\n"
+        "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
-    privleapd_verify_not_running_twice_fail: bytes \
-        = (b"verify_not_running_twice: CRITICAL: Cannot run two "
-           + b"privleapd processes at the same time!\n")
-    privleapd_ensure_running_as_root_fail: bytes \
-        = b"ensure_running_as_root: CRITICAL: privleapd must run as root!\n"
-    test_act_invalid_unauthorized: bytes \
-        = b"ERROR: You are unauthorized to run action 'test-act-invalid'.\n"
+    privleapd_verify_not_running_twice_fail: bytes = (
+        b"verify_not_running_twice: CRITICAL: Cannot run two "
+        + b"privleapd processes at the same time!\n"
+    )
+    privleapd_ensure_running_as_root_fail: bytes = (
+        b"ensure_running_as_root: CRITICAL: privleapd must run as root!\n"
+    )
+    test_act_invalid_unauthorized: bytes = (
+        b"ERROR: You are unauthorized to run action 'test-act-invalid'.\n"
+    )
     destroy_bad_user_socket_and_bail_lines: list[str] = [
         "handle_control_destroy_msg: INFO: Handled DESTROY message for user "
         + f"'{PlTestGlobal.test_username}', socket did not exist\n",
         "send_msg_safe: ERROR: Could not send 'NOUSER'\n",
         "Traceback (most recent call last):\n",
-        "BrokenPipeError: [Errno 32] Broken pipe\n"
+        "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
     send_invalid_control_message_lines: list[str] = [
         "handle_control_session: ERROR: Could not get message from client!\n",
         "Traceback (most recent call last):\n",
-        "ValueError: Invalid message type 'BOB' for socket\n"
+        "ValueError: Invalid message type 'BOB' for socket\n",
     ]
     send_corrupted_control_message_lines: list[str] = [
         "handle_control_session: ERROR: Could not get message from client!\n",
         "Traceback (most recent call last):\n",
-        "ValueError: recv_buf contains data past the last string\n"
+        "ValueError: recv_buf contains data past the last string\n",
     ]
     bail_comm_lines: list[str] = [
         "get_signal_msg: ERROR: Could not get message from client!\n",
         "Traceback (most recent call last):\n",
-        "ConnectionAbortedError: Connection unexpectedly closed\n"
+        "ConnectionAbortedError: Connection unexpectedly closed\n",
     ]
     send_invalid_comm_message_lines: list[str] = [
         "get_signal_msg: ERROR: Could not get message from client!\n",
         "Traceback (most recent call last):\n",
-        "ValueError: Invalid message type 'BOB' for socket\n"
+        "ValueError: Invalid message type 'BOB' for socket\n",
     ]
     send_nonexistent_signal_and_bail_lines_part1: list[str] = [
         "auth_signal_request: WARNING: Could not find action 'nonexistent'\n",
@@ -784,7 +871,7 @@ Command=echo 'test-act-missing-auth'
     unauthorized_broken_pipe_lines: list[str] = [
         "send_msg_safe: ERROR: Could not send 'UNAUTHORIZED'\n",
         "Traceback (most recent call last):\n",
-        "BrokenPipeError: [Errno 32] Broken pipe\n"
+        "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
     send_userrestrict_signal_and_bail_lines_part1: list[str] = [
         f"auth_signal_request: WARNING: User '{PlTestGlobal.test_username}' is "
@@ -796,12 +883,12 @@ Command=echo 'test-act-missing-auth'
     ]
     send_invalid_bash_signal_lines: list[str] = [
         "handle_comm_session: INFO: Triggered action 'test-act-invalid-bash'\n",
-        "send_action_results: INFO: Action 'test-act-invalid-bash' completed\n"
+        "send_action_results: INFO: Action 'test-act-invalid-bash' completed\n",
     ]
     send_valid_signal_and_bail_lines: list[str] = [
         "handle_comm_session: INFO: Triggered action 'test-act-free'\n",
         "send_msg_safe: ERROR: Could not send 'TRIGGER'\n",
-        "BrokenPipeError: [Errno 32] Broken pipe\n"
+        "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
     send_random_garbage_lines: list[str] = [
         "get_signal_msg: ERROR: Could not get message from client!\n",
@@ -827,101 +914,141 @@ Command=echo 'test-act-missing-auth'
         b"\x00\x00\x00\x0ESIGNAL \x7FPARAM1",
         b"\x00\x00\x00\x0ESIGNAL PAR\x7FAM1",
         b"\x00\x00\x00\x0DSIGNAL PARAM1",
-        b"\x00\x00\x00\x0ESIGNAL  PARAM1"
+        b"\x00\x00\x00\x0ESIGNAL  PARAM1",
     ]
     # TODO: Any good way to avoid all the repetition?
     invalid_ascii_lines_list: list[list[str]] = [
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid byte found in ASCII string data\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid byte found in ASCII string data\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid byte found in ASCII string data\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid byte found in ASCII string data\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid byte found in ASCII string data\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid byte found in ASCII string data\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid byte found in ASCII string data\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid byte found in ASCII string data\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid byte found in ASCII string data\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid message type 'TEST' for socket\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid byte found in ASCII string data\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid byte found in ASCII string data\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid byte found in ASCII string data\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid byte found in ASCII string data\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid byte found in ASCII string data\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid byte found in ASCII string data\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid byte found in ASCII string data\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid byte found in ASCII string data\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: Invalid byte found in ASCII string data\n" ],
-        [ "auth_signal_request: WARNING: Could not find action 'PARAM1'\n" ],
-        [ "get_signal_msg: ERROR: Could not get message from client!\n",
-          "Traceback (most recent call last):\n",
-          "ValueError: recv_buf contains data past the last string\n" ]
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid byte found in ASCII string data\n",
+        ],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid byte found in ASCII string data\n",
+        ],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid byte found in ASCII string data\n",
+        ],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid byte found in ASCII string data\n",
+        ],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid byte found in ASCII string data\n",
+        ],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid byte found in ASCII string data\n",
+        ],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid byte found in ASCII string data\n",
+        ],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid byte found in ASCII string data\n",
+        ],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid byte found in ASCII string data\n",
+        ],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid message type 'TEST' for socket\n",
+        ],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid byte found in ASCII string data\n",
+        ],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid byte found in ASCII string data\n",
+        ],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid byte found in ASCII string data\n",
+        ],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid byte found in ASCII string data\n",
+        ],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid byte found in ASCII string data\n",
+        ],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid byte found in ASCII string data\n",
+        ],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid byte found in ASCII string data\n",
+        ],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid byte found in ASCII string data\n",
+        ],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: Invalid byte found in ASCII string data\n",
+        ],
+        ["auth_signal_request: WARNING: Could not find action 'PARAM1'\n"],
+        [
+            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "Traceback (most recent call last):\n",
+            "ValueError: recv_buf contains data past the last string\n",
+        ],
     ]
     duplicate_actions_config_file_lines: list[str] = [
-        "parse_config_files: ERROR: Error parsing config: "
+        "parse_config_file: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/unit-test.conf:52:error:Duplicate action "
         + "found: 'test-act-sudopermit''\n",
-        "main: CRITICAL: Failed initial config load!\n"
+        "main: CRITICAL: Failed initial config load!\n",
     ]
     wrongorder_config_file_lines: list[str] = [
-        "parse_config_files: ERROR: Error parsing config: "
+        "parse_config_file: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/wrongorder.conf:1:error:Config line "
         + "before header'\n",
-        "main: CRITICAL: Failed initial config load!\n"
+        "main: CRITICAL: Failed initial config load!\n",
     ]
     duplicate_keys_config_file_lines: list[str] = [
-        "parse_config_files: ERROR: Error parsing config: "
+        "parse_config_file: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/dupkeys.conf:3:error:Multiple 'Command' "
         + "keys in action 'test-act-dupkeys''\n",
-        "main: CRITICAL: Failed initial config load!\n"
+        "main: CRITICAL: Failed initial config load!\n",
     ]
     absent_command_directive_config_file_lines: list[str] = [
-        "parse_config_files: ERROR: Error parsing config: "
+        "parse_config_file: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/absent.conf:5:error:No command configured for "
         + "action: 'test-act-absent''\n",
-        "main: CRITICAL: Failed initial config load!\n"
+        "main: CRITICAL: Failed initial config load!\n",
     ]
     invalid_action_config_file_lines: list[str] = [
-        "parse_config_files: ERROR: Error parsing config: "
+        "parse_config_file: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/invalidaction.conf:1:error:Invalid action "
         + "name: 'test-@ct-invalidaction''\n",
-        "main: CRITICAL: Failed initial config load!\n"
+        "main: CRITICAL: Failed initial config load!\n",
     ]
     config_reload_success_lines: list[str] = [
         "handle_control_reload_msg: INFO: Handled RELOAD message, "
@@ -929,11 +1056,11 @@ Command=echo 'test-act-missing-auth'
     ]
     test_act_added1_success_lines: list[str] = [
         "handle_comm_session: INFO: Triggered action 'test-act-added1'\n",
-        "send_action_results: INFO: Action 'test-act-added1' completed\n"
+        "send_action_results: INFO: Action 'test-act-added1' completed\n",
     ]
     test_act_added2_success_lines: list[str] = [
         "handle_comm_session: INFO: Triggered action 'test-act-added2'\n",
-        "send_action_results: INFO: Action 'test-act-added2' completed\n"
+        "send_action_results: INFO: Action 'test-act-added2' completed\n",
     ]
     test_act_added1_failure_lines: list[str] = [
         "auth_signal_request: WARNING: Could not find action "
@@ -945,24 +1072,24 @@ Command=echo 'test-act-missing-auth'
     ]
     test_act_userpermit_success_lines: list[str] = [
         "handle_comm_session: INFO: Triggered action 'test-act-userpermit'\n",
-        "send_action_results: INFO: Action 'test-act-userpermit' completed\n"
+        "send_action_results: INFO: Action 'test-act-userpermit' completed\n",
     ]
     config_reload_failure_lines: list[str] = [
-        "parse_config_files: ERROR: Error parsing config: "
+        "parse_config_file: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/added_actions_bad.conf:10:error:Invalid "
         + "syntax'\n",
         "handle_control_reload_msg: WARNING: Handled RELOAD message, "
         + "configuration was invalid!\n",
     ]
     unrecognized_header_config_file_lines: list[str] = [
-        "parse_config_files: ERROR: Error parsing config: "
+        "parse_config_file: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/unrec_header.conf:1:error:Unrecognized header "
         + "'unrecognized-header''\n",
-        "main: CRITICAL: Failed initial config load!\n"
+        "main: CRITICAL: Failed initial config load!\n",
     ]
     missing_auth_config_file_lines: list[str] = [
-        "parse_config_files: ERROR: Error parsing config: "
+        "parse_config_file: ERROR: Error parsing config: "
         + "'/etc/privleap/conf.d/missing_auth.conf:1:error:No "
         + "authorized users or groups for action: 'test-act-missing-auth''\n",
-        "main: CRITICAL: Failed initial config load!\n"
+        "main: CRITICAL: Failed initial config load!\n",
     ]
