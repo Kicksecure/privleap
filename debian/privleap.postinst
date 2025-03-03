@@ -85,7 +85,7 @@ start_privleapd() {
       make_privleapd_comm_sockets_first_time_maybe
       restarted_once='yes'
    else
-      1>&2 echo -e "${red}${bold}WARNING: privleap configuration invalid. Not restarting privleapd.${nocolor}"
+      1>&2 echo -e "${red}${bold}WARNING: privleap configuration invalid. Not restarting privleapd. Run configuration check using: privleapd --check-config${nocolor}"
    fi
 }
 
