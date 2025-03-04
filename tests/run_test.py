@@ -434,7 +434,7 @@ def run_leapctl_tests() -> None:
     # ---
     leapctl_assert_command(
         ["leapctl", "--create", "man"],
-        exit_code=1,
+        exit_code=2,
         stderr_data=b"ERROR: User 'man' is not permitted to have a comm socket!\n",
     )
     # ---
