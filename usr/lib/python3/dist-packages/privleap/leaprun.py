@@ -201,9 +201,16 @@ def main() -> NoReturn:
     Main function.
     """
 
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2:
         print_usage()
-    LeaprunGlobal.signal_name = sys.argv[1]
+    if sys.argv[1] == "--":
+        if len(sys.argv) != 3:
+            print_usage()
+        LeaprunGlobal.signal_name = sys.argv[2]
+    else:
+        if len(sys.argv) != 2:
+            print_usage()
+        LeaprunGlobal.signal_name = sys.argv[1]
 
     create_signal_msg()
     start_comm_session()

@@ -1054,6 +1054,19 @@ def run_leaprun_tests() -> None:
         "Remove bad added actions config file",
     )
     # ---
+    leaprun_assert_command(
+        [
+            "sudo",
+            "-u",
+            PlTestGlobal.test_username,
+            "leaprun",
+            "--",
+            "test-act-grouppermit-userrestrict",
+        ],
+        exit_code=0,
+        stdout_data=b"test-act-grouppermit-userrestrict\n",
+    )
+    # ---
 
     logging.info(
         "leaprun passed asserts: %s, failed asserts: %s",
