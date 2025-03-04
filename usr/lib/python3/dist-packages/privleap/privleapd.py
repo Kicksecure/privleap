@@ -355,7 +355,7 @@ def run_action(
         env_var_parts = env_var.split("=", 1)
         action_env[env_var_parts[0]] = env_var_parts[1]
     action_process: subprocess.Popen[bytes] = subprocess.Popen(
-        ["/usr/bin/bash", "-c", desired_action.action_command],
+        ["/usr/bin/bash", "-c", "--", desired_action.action_command],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         stdin=subprocess.PIPE,
