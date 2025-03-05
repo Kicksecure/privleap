@@ -1,3 +1,46 @@
+commit 372443fcb5fc563449655ba27dc4b89623391acd
+Merge: 50fc358 a22b63d
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Wed Mar 5 05:46:51 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit a22b63d4190cf8b52fb8727560f4113f80da36b2
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Tue Mar 4 17:09:39 2025 -0600
+
+    Don't trigger login sessions when running actions
+
+commit e7b396d6edc693eb42039f3191e2103ac137312d
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Mon Mar 3 20:55:33 2025 -0600
+
+    black reformatting
+
+commit b4a84a8660fe8a5380e42b9df930ac718cb2dd34
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Mon Mar 3 20:55:04 2025 -0600
+
+    Add auto leapctl service restart except in cases where a user is not permitted to have a comm socket, update docs
+
+commit 0db59e476e606481b979331060a3cc53cd73da99
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Mon Mar 3 20:07:42 2025 -0600
+
+    Support end-of-options parameter in leaprun
+
+commit 61da84d033c23c74840ae953409a2c09475a0b9c
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Mon Mar 3 20:01:27 2025 -0600
+
+    Use end-of-options when calling bash from privleapd
+
+commit 50fc35853209716c601f70b7f6a044476a62c224
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Mon Mar 3 11:24:44 2025 +0000
+
+    bumped changelog version
+
 commit bb63601cd324ccd1eb8871c6d18a0938a5eca776
 Author: Patrick Schleizer <adrelanos@whonix.org>
 Date:   Mon Mar 3 06:24:06 2025 -0500
