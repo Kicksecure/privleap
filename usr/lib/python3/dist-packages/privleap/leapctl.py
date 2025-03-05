@@ -63,13 +63,13 @@ leapctl --reload
     cleanup_and_exit(1)
 
 
-def generic_error(error_msg: str) -> NoReturn:
+def generic_error(error_msg: str, exit_int: int = 1) -> NoReturn:
     """
     Prints an error, then cleans up and exits.
     """
 
     print(f"ERROR: {error_msg}", file=sys.stderr)
-    cleanup_and_exit(1)
+    cleanup_and_exit(exit_int)
 
 
 def unexpected_msg_error(control_msg: pl.PrivleapMsg) -> NoReturn:
@@ -129,7 +129,8 @@ def handle_create_request(user_name: str) -> NoReturn:
         )
     elif isinstance(control_msg, pl.PrivleapControlServerDisallowedUserMsg):
         generic_error(
-            f"User {repr(user_name)} is not permitted to have a comm socket!"
+            f"User {repr(user_name)} is not permitted to have a comm socket!",
+            2,
         )
     elif isinstance(control_msg, pl.PrivleapControlServerExistsMsg):
         print(f"Comm socket already exists for user {repr(user_name)}.")
@@ -172,9 +173,7 @@ def handle_destroy_request(user_name: str) -> NoReturn:
         print(f"Comm socket does not exist for user {repr(user_name)}.")
         cleanup_and_exit(0)
     elif isinstance(control_msg, pl.PrivleapControlServerPersistentUserMsg):
-        print(
-            f"Cannot destroy socket for persistent user {repr(user_name)}."
-        )
+        print(f"Cannot destroy socket for persistent user {repr(user_name)}.")
         # It is not an error to try to destroy a socket for a persistent user,
         # since this may legitimately happen if someone logs in as a user that
         # happens to be persistent in privleap's config, and then logs out.

@@ -24,6 +24,8 @@ See privleap\-conf\.d(5)\.
 0: The requested operation was successful, or did not need to be done\.
 .P
 1: The requested operation failed\.
+.P
+2: privleapd was requested to create a socket for a user, but the specified user is not permitted to have a comm socket\.
 .SH "EXAMPLES"
 Create a communication socket for user \fBuser\fR:
 .P

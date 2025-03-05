@@ -3,8 +3,6 @@
 
 [Unit]
 Description=leapctl - Enable access to privleap for each user
-StartLimitIntervalSec=10
-StartLimitBurst=3
 Requires=privleapd.service user@.service
 
 [Service]
@@ -12,6 +10,9 @@ Type=oneshot
 RemainAfterExit=true
 ExecStart=/usr/bin/leapctl --create %i
 ExecStop=/usr/bin/leapctl --destroy %i
+Restart=on-failure
+RestartPreventExitStatus=2
+RestartSec=20
 
 [Install]
 WantedBy=user@.service

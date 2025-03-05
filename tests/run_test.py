@@ -434,7 +434,7 @@ def run_leapctl_tests() -> None:
     # ---
     leapctl_assert_command(
         ["leapctl", "--create", "man"],
-        exit_code=1,
+        exit_code=2,
         stderr_data=b"ERROR: User 'man' is not permitted to have a comm socket!\n",
     )
     # ---
@@ -1052,6 +1052,19 @@ def run_leaprun_tests() -> None:
         try_remove_file,
         str(Path(PlTestGlobal.privleap_conf_dir, "added_actions_bad.conf")),
         "Remove bad added actions config file",
+    )
+    # ---
+    leaprun_assert_command(
+        [
+            "sudo",
+            "-u",
+            PlTestGlobal.test_username,
+            "leaprun",
+            "--",
+            "test-act-grouppermit-userrestrict",
+        ],
+        exit_code=0,
+        stdout_data=b"test-act-grouppermit-userrestrict\n",
     )
     # ---
 
