@@ -1,3 +1,22 @@
+commit aaae14df8e1d81dc6cbef3fe883e6e443d5beaab
+Merge: 5c7a542 78698e8
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Mon Mar 10 02:32:29 2025 -0400
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit 78698e8ae40d2b5ea3e0f11e32f8ffe0b2e6793e
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Mar 7 13:09:36 2025 -0600
+
+    Don't show unnecessary configuration warnings in the middle of a config migration
+
+commit 5c7a5428c9a9edebad37e90ee114c6dad34d7976
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Wed Mar 5 11:14:15 2025 +0000
+
+    bumped changelog version
+
 commit 372443fcb5fc563449655ba27dc4b89623391acd
 Merge: 50fc358 a22b63d
 Author: Patrick Schleizer <adrelanos@whonix.org>
