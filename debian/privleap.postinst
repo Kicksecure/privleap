@@ -71,6 +71,7 @@ start_privleapd() {
    ## deb-systemd-invoke isn't clever enough to know for sure if systemctl is
    ## even present on the system, see
    ## https://github.com/ArrayBolt3/privleap/issues/7#issuecomment-2663055757
+   warn_on_bad_config="$1"
    if [ "${restarted_once}" = 'yes' ]; then
       true "INFO: restarted_once=yes"
       return 0
@@ -79,13 +80,16 @@ start_privleapd() {
       true "INFO: systemctl command unavailable."
       return 0
    fi
-   if privleapd --check-config ; then
+   if config_check_result="$(privleapd --check-config 2>&1)"; then
       ## debhelper uses '|| true' for systemctl start action so we should too.
       deb-systemd-invoke restart privleapd.service || true
       make_privleapd_comm_sockets_first_time_maybe
       restarted_once='yes'
    else
-      1>&2 echo -e "${red}${bold}WARNING: privleap configuration invalid. Not restarting privleapd. Run configuration check using: privleapd --check-config${nocolor}"
+      if [ "${warn_on_bad_config}" = 'y' ]; then
+         1>&2 echo "${config_check_result}"
+         1>&2 echo -e "${red}${bold}WARNING: privleap configuration invalid. Not restarting privleapd. Run configuration check using: privleapd --check-config${nocolor}"
+      fi
    fi
 }
 
@@ -93,14 +97,14 @@ case "$1" in
    configure)
       deb-systemd-helper enable privleapd.service
       deb-systemd-helper enable leapctl@.service
-      start_privleapd
+      start_privleapd 'n'
    ;;
 
    abort-upgrade|abort-remove|abort-deconfigure)
    ;;
 
    triggered)
-      start_privleapd
+      start_privleapd 'y'
    ;;
 
    *)
