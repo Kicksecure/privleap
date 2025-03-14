@@ -3,11 +3,12 @@
 ## Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
 ## See the file COPYING for copying conditions.
 
-# pylint: disable=broad-exception-caught,too-few-public-methods
+# pylint: disable=broad-exception-caught,too-few-public-methods,too-many-lines
 # Rationale:
 #   broad-exception-caught: We use broad exception catching for general-purpose
 #     error handlers.
 #   too-few-public-methods: Global variable class uses no methods intentionally.
+#   too-many-lines: Splitting this up is not a priority at the moment.
 
 """
 run_test_util.py - Utility functions for run_test.py.
