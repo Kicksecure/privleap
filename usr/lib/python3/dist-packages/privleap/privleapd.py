@@ -27,7 +27,6 @@ from pathlib import Path
 from typing import Tuple, cast, SupportsIndex, IO, NoReturn, Any
 
 import sdnotify  # type: ignore
-import PAM  # type: ignore
 
 # import privleap as pl
 import privleap.privleap as pl
@@ -271,7 +270,7 @@ def handle_control_session(control_socket: pl.PrivleapSocket) -> None:
 
 def run_action(
     desired_action: pl.PrivleapAction, calling_user: str
-) -> Tuple[subprocess.Popen[bytes], Any]:
+) -> subprocess.Popen[bytes]:
     # pylint: disable=consider-using-with
     # Rationale:
     #   consider-using-with: Not suitable for this use case.
@@ -324,49 +323,24 @@ def run_action(
     assert target_user is not None
     assert target_group is not None
 
-    pam_obj: Any = PAM.pam()
-    pam_obj.start("privleapd")
-    pam_obj.set_item(PAM.PAM_USER, calling_user)
-    pam_obj.set_item(PAM.PAM_RUSER, calling_user)
-    try:
-        pam_obj.acct_mgmt()
-    except PAM.error as e:
-        if e.args[1] == PAM.PAM_NEW_AUTHTOK_REQD:
-            pass
-        else:
-            raise e
-    pam_obj.set_item(PAM.PAM_USER, target_user)
-    pam_obj.setcred(PAM.PAM_REINITIALIZE_CRED)
-    try:
-        pam_obj.open_session()
-    except Exception as e:
-        pam_obj.setcred(PAM.PAM_DELETE_CRED | PAM.PAM_SILENT)
-        raise e
-    pam_env_list: list[str] = pam_obj.getenvlist()
-
-    user_info: pwd.struct_passwd = pwd.getpwnam(target_user)
-    action_env: dict[str, str] = os.environ.copy()
-    action_env["HOME"] = user_info.pw_dir
-    action_env["LOGNAME"] = user_info.pw_name
-    action_env["SHELL"] = "/usr/bin/bash"
-    action_env["PWD"] = user_info.pw_dir
-    action_env["USER"] = user_info.pw_name
-    for env_var in pam_env_list:
-        env_var_parts = env_var.split("=", 1)
-        action_env[env_var_parts[0]] = env_var_parts[1]
     action_process: subprocess.Popen[bytes] = subprocess.Popen(
-        ["/usr/bin/bash", "-c", "--", desired_action.action_command],
+        [
+            "/usr/libexec/privleap/shim.py",
+            calling_user,
+            target_user,
+            target_group,
+            "/usr/bin/bash",
+            "-c",
+            "--",
+            desired_action.action_command,
+        ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         stdin=subprocess.PIPE,
-        user=target_user,
-        group=target_group,
-        env=action_env,
-        cwd=user_info.pw_dir,
     )
     assert action_process.stdin is not None
     action_process.stdin.close()
-    return action_process, pam_obj
+    return action_process
 
 
 def get_signal_msg(
@@ -462,7 +436,6 @@ def authorize_user(
 
 def send_action_results(
     comm_session: pl.PrivleapSession,
-    pam_obj: Any,
     action_name: str,
     action_process: subprocess.Popen[bytes],
 ) -> None:
@@ -512,14 +485,6 @@ def send_action_results(
         action_process.terminate()
         action_process.wait()
         # Process is done, send the exit code and clean up
-        try:
-            pam_obj.close_session(0)
-        except Exception as e:
-            logging.info("Error closing PAM session!", exc_info=e)
-        try:
-            pam_obj.setcred(PAM.PAM_DELETE_CRED | PAM.PAM_SILENT)
-        except Exception as e:
-            logging.info("Error cleaning up PAM credentials!", exc_info=e)
         logging.info("Action '%s' completed", action_name)
 
     send_msg_safe(
@@ -615,10 +580,7 @@ def handle_comm_session(comm_socket: pl.PrivleapSocket) -> None:
 
         try:
             action_process: subprocess.Popen[bytes]
-            pam_obj: Any
-            action_process, pam_obj = run_action(
-                desired_action, comm_session.user_name
-            )
+            action_process = run_action(desired_action, comm_session.user_name)
         except Exception as e:
             logging.error(
                 "Action '%s' authorized, but trigger failed!",
@@ -635,7 +597,7 @@ def handle_comm_session(comm_socket: pl.PrivleapSocket) -> None:
         # send_action_results() does.
         send_msg_safe(comm_session, pl.PrivleapCommServerTriggerMsg())
         send_action_results(
-            comm_session, pam_obj, desired_action.action_name, action_process
+            comm_session, desired_action.action_name, action_process
         )
 
     finally:
