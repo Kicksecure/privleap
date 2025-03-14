@@ -4,6 +4,7 @@
 [Unit]
 Description=leapctl - Enable access to privleap for each user
 Requires=privleapd.service user@.service
+After=privleapd.service user@.service
 
 [Service]
 Type=oneshot
