@@ -9,7 +9,14 @@
 #     exceptions in each instance to ensure the process exits with a special
 #     exit code in these instances.
 
-"""shim.py - PAM integration shim for privleap."""
+"""shim.py - PAM integration shim for privleap. This exists to allow privleap
+actions to integrate seamlessly with PAM, allowing each action to have
+environment variables and umask customized by PAM without conflicting with other
+actions that may be starting simultaneously. Originally this logic was
+implemented as part of privleapd itself, but because umask changes are applied
+at the process level (not the thread level), PAM was modifying the umask for
+privleapd as a whole, which could cause issues. This shim provides a layer of
+separation between privleapd and PAM."""
 
 import sys
 import pwd
