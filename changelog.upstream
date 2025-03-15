@@ -1,3 +1,46 @@
+commit 69017c3871df3613c054052fdfad63485b28118f
+Merge: ea0de35 abf878d
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Mar 15 05:23:14 2025 -0400
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit abf878dfe55d49bb930fdbba2ed9542db9d4aa93
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Mar 14 19:03:39 2025 -0500
+
+    Change 'user' to 'account' where appropriate, add usernames to action-related log messages
+
+commit 03a2f1f93fd5d5df339a58a24b6de8106631c73b
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Mar 14 17:06:19 2025 -0500
+
+    Improve shim documentation
+
+commit 159460e1ea722e1b1fc3594c52d9c4715b0dbd5d
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Mar 14 17:02:42 2025 -0500
+
+    pylint override
+
+commit 971bfcf06c9b8b3db5b297dab0d4ebb3607b79ca
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Mar 14 16:57:16 2025 -0500
+
+    Fix umask handling
+
+commit c1e9730e5ff3988db610d5603f1b14d8e16ebd2d
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Mar 14 15:30:49 2025 -0500
+
+    Prevent leapctl services from starting too early
+
+commit ea0de35ec045bd3a6f76614dd2c9114671608eb9
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Mon Mar 10 07:42:11 2025 +0000
+
+    bumped changelog version
+
 commit aaae14df8e1d81dc6cbef3fe883e6e443d5beaab
 Merge: 5c7a542 78698e8
 Author: Patrick Schleizer <adrelanos@whonix.org>
