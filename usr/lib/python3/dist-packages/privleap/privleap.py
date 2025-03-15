@@ -366,7 +366,7 @@ class PrivleapSession:
                 session_info = PrivleapCommon.normalize_user_id(session_info)
                 if session_info is None:
                     raise ValueError(
-                        f"User '{orig_session_info}' does not exist."
+                        f"Account '{orig_session_info}' does not exist."
                     )
 
                 self.user_name = session_info
@@ -387,7 +387,9 @@ class PrivleapSession:
                 orig_user_name: str = user_name
                 user_name = PrivleapCommon.normalize_user_id(user_name)
                 if user_name is None:
-                    raise ValueError(f"User '{orig_user_name}' does not exist.")
+                    raise ValueError(
+                        f"Account '{orig_user_name}' does not exist."
+                    )
 
             self.backend_socket = session_info
             self.user_name = user_name
@@ -858,14 +860,16 @@ class PrivleapSocket:
             orig_user_name: str = user_name
             user_name = PrivleapCommon.normalize_user_id(user_name)
             if user_name is None:
-                raise ValueError(f"User '{orig_user_name}' does not exist.")
+                raise ValueError(f"Account '{orig_user_name}' does not exist.")
 
             try:
                 user_info: pwd.struct_passwd = pwd.getpwnam(user_name)
                 target_uid: int = user_info.pw_uid
                 target_gid: int = user_info.pw_gid
             except Exception as e:
-                raise ValueError(f"User '{user_name}' does not exist.") from e
+                raise ValueError(
+                    f"Account '{user_name}' does not exist."
+                ) from e
 
             self.backend_socket = socket.socket(family=socket.AF_UNIX)
             socket_path = Path(PrivleapCommon.comm_dir, user_name)
@@ -970,7 +974,7 @@ class PrivleapAction:
             target_user = PrivleapCommon.normalize_user_id(target_user)
             if target_user is None:
                 raise ValueError(
-                    f"User '{orig_target_user}' specified by field "
+                    f"Account '{orig_target_user}' specified by field "
                     f"'TargetUser' of action '{action_name}' does not "
                     "exist!"
                 )
@@ -980,7 +984,7 @@ class PrivleapAction:
             target_group = PrivleapCommon.normalize_user_id(target_group)
             if target_group is None:
                 raise ValueError(
-                    f"User '{orig_target_group}' specified by field "
+                    f"Group '{orig_target_group}' specified by field "
                     f"'TargetGroup' of action '{action_name}' does not "
                     "exist!"
                 )
@@ -1170,7 +1174,7 @@ class PrivleapCommon:
                         else:
                             return (
                                 f"{config_file}:{line_idx}:error:"
-                                "Requested persistent user"
+                                "Requested persistent user account "
                                 f"'{orig_config_val}' does not exist"
                             )
                     else:
