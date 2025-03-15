@@ -150,7 +150,7 @@ def setup_test_account(test_username: str, test_home_dir: Path) -> None:
             subprocess.run(["useradd", "-m", test_username], check=True)
         except Exception as e:
             logging.critical(
-                "Could not create user '%s'!", test_username, exc_info=e
+                "Could not create account '%s'!", test_username, exc_info=e
             )
             sys.exit(1)
     user_gid: int = pwd.getpwnam(test_username).pw_gid
@@ -163,7 +163,7 @@ def setup_test_account(test_username: str, test_home_dir: Path) -> None:
             subprocess.run(["adduser", test_username, "sudo"], check=True)
         except Exception as e:
             logging.critical(
-                "Could not add user '%s' to group 'sudo'!",
+                "Could not add account '%s' to group 'sudo'!",
                 test_username,
                 exc_info=e,
             )
@@ -645,34 +645,36 @@ Command=echo 'test-act-missing-auth'
 """
     test_username_create_error: bytes = (
         b"ERROR: privleapd encountered an error while creating a comm "
-        b"socket for user '" + PlTestGlobal.test_username_bytes + b"'!\n"
+        b"socket for account '" + PlTestGlobal.test_username_bytes + b"'!\n"
     )
     privleapd_invalid_response: bytes = (
         b"ERROR: privleapd didn't return a valid response!\n"
     )
-    specified_user_missing: bytes = b"ERROR: Specified user does not exist.\n"
-    nonexistent_socket_missing: bytes = (
-        b"Comm socket does not exist for user 'nonexistent'.\n"
+    specified_user_missing: bytes = (
+        b"ERROR: Specified user account does not exist.\n"
     )
-    apt_socket_created: bytes = b"Comm socket created for user '_apt'.\n"
-    apt_socket_destroyed: bytes = b"Comm socket destroyed for user '_apt'.\n"
+    nonexistent_socket_missing: bytes = (
+        b"Comm socket does not exist for account 'nonexistent'.\n"
+    )
+    apt_socket_created: bytes = b"Comm socket created for account '_apt'.\n"
+    apt_socket_destroyed: bytes = b"Comm socket destroyed for account '_apt'.\n"
     test_username_socket_created: bytes = (
-        b"Comm socket created for user '"
+        b"Comm socket created for account '"
         + PlTestGlobal.test_username_bytes
         + b"'.\n"
     )
     test_username_socket_destroyed: bytes = (
-        b"Comm socket destroyed for user '"
+        b"Comm socket destroyed for account '"
         + PlTestGlobal.test_username_bytes
         + b"'.\n"
     )
     test_username_socket_missing: bytes = (
-        b"Comm socket does not exist for user '"
+        b"Comm socket does not exist for account '"
         + PlTestGlobal.test_username_bytes
         + b"'.\n"
     )
     test_username_socket_exists: bytes = (
-        b"Comm socket already exists for user '"
+        b"Comm socket already exists for account '"
         + PlTestGlobal.test_username_bytes
         + b"'.\n"
     )
@@ -681,20 +683,22 @@ Command=echo 'test-act-missing-auth'
     )
     root_create_error: bytes = (
         b"ERROR: privleapd encountered an error while creating a "
-        + b"comm socket for user 'root'!\n"
+        + b"comm socket for account 'root'!\n"
     )
-    root_socket_created: bytes = b"Comm socket created for user 'root'.\n"
-    root_socket_destroyed: bytes = b"Comm socket destroyed for user 'root'.\n"
+    root_socket_created: bytes = b"Comm socket created for account 'root'.\n"
+    root_socket_destroyed: bytes = (
+        b"Comm socket destroyed for account 'root'.\n"
+    )
     leapctl_help: bytes = (
         b"leapctl <--create|--destroy> <user>\n"
         + b"leapctl --reload\n"
         + b"\n"
         + b"    --create : Specifies that leapctl should request a communication "
         + b"socket to\n"
-        + b"               be created for the specified user.\n"
+        + b"               be created for the specified user account.\n"
         + b"    --destroy : Specifies that leapctl should request a communication "
         + b"socket\n"
-        + b"                to be destroyed for the specified user.\n"
+        + b"                to be destroyed for the specified user account.\n"
         + b"    --reload : Instructs privleapd to reload configuration without "
         + b"restarting.\n"
         + b"    user : The username or UID of the user account to create or destroy a\n"
@@ -772,41 +776,41 @@ Command=echo 'test-act-missing-auth'
         "ConnectionAbortedError: Connection unexpectedly closed\n",
     ]
     control_create_invalid_user_socket_lines: list[str] = [
-        "handle_control_create_msg: WARNING: User 'nonexistent' does not "
+        "handle_control_create_msg: WARNING: Account 'nonexistent' does not "
         + "exist\n"
     ]
     create_invalid_user_socket_and_bail_lines: list[str] = [
-        "handle_control_create_msg: WARNING: User 'nonexistent' does not "
+        "handle_control_create_msg: WARNING: Account 'nonexistent' does not "
         + "exist\n",
         "send_msg_safe: ERROR: Could not send 'CONTROL_ERROR'\n",
         "Traceback (most recent call last):\n",
         "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
     destroy_invalid_user_socket_lines: list[str] = [
-        "handle_control_destroy_msg: INFO: Handled DESTROY message for user "
+        "handle_control_destroy_msg: INFO: Handled DESTROY message for account "
         + "'nonexistent', socket did not exist\n"
     ]
     create_user_socket_lines: list[str] = [
-        "handle_control_create_msg: INFO: Handled CREATE message for user "
+        "handle_control_create_msg: INFO: Handled CREATE message for account "
         + f"'{PlTestGlobal.test_username}', socket created\n",
-        "handle_control_create_msg: INFO: Handled CREATE message for user "
+        "handle_control_create_msg: INFO: Handled CREATE message for account "
         + f"'{PlTestGlobal.test_username}', socket already exists\n",
     ]
     create_existing_user_socket_and_bail_lines: list[str] = [
-        "handle_control_create_msg: INFO: Handled CREATE message for user "
+        "handle_control_create_msg: INFO: Handled CREATE message for account "
         + f"'{PlTestGlobal.test_username}', socket already exists\n",
         "send_msg_safe: ERROR: Could not send 'EXISTS'\n",
         "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
     create_blocked_user_socket_lines: list[str] = [
-        "handle_control_create_msg: ERROR: Failed to create socket for user "
+        "handle_control_create_msg: ERROR: Failed to create socket for account "
         + f"'{PlTestGlobal.test_username}'!\n",
         "Traceback (most recent call last):\n",
         "OSError: [Errno 98] Address already in use\n",
     ]
     create_blocked_user_socket_and_bail_lines: list[str] = [
         "handle_control_create_msg: ERROR: Failed to create socket for "
-        + f"user '{PlTestGlobal.test_username}'!\n",
+        + f"account '{PlTestGlobal.test_username}'!\n",
         "Traceback (most recent call last):\n",
         "OSError: [Errno 98] Address already in use\n",
         "send_msg_safe: ERROR: Could not send 'CONTROL_ERROR'\n",
@@ -819,12 +823,12 @@ Command=echo 'test-act-missing-auth'
     destroy_missing_user_socket_lines: list[str] = [
         "handle_control_destroy_msg: WARNING: Handling DESTROY, no socket to "
         + f"delete at '/run/privleapd/comm/{PlTestGlobal.test_username}'\n",
-        "handle_control_destroy_msg: INFO: Handled DESTROY message for user "
+        "handle_control_destroy_msg: INFO: Handled DESTROY message for account "
         + f"'{PlTestGlobal.test_username}', socket destroyed\n",
     ]
     destroy_user_socket_and_bail_lines: list[str] = [
         "handle_control_destroy_msg: INFO: Handled DESTROY message for "
-        + f"user '{PlTestGlobal.test_username}', socket destroyed\n",
+        + f"account '{PlTestGlobal.test_username}', socket destroyed\n",
         "send_msg_safe: ERROR: Could not send 'OK'\n",
         "Traceback (most recent call last):\n",
         "BrokenPipeError: [Errno 32] Broken pipe\n",
@@ -840,7 +844,7 @@ Command=echo 'test-act-missing-auth'
         b"ERROR: You are unauthorized to run action 'test-act-invalid'.\n"
     )
     destroy_bad_user_socket_and_bail_lines: list[str] = [
-        "handle_control_destroy_msg: INFO: Handled DESTROY message for user "
+        "handle_control_destroy_msg: INFO: Handled DESTROY message for account "
         + f"'{PlTestGlobal.test_username}', socket did not exist\n",
         "send_msg_safe: ERROR: Could not send 'NOUSER'\n",
         "Traceback (most recent call last):\n",
@@ -867,7 +871,8 @@ Command=echo 'test-act-missing-auth'
         "ValueError: Invalid message type 'BOB' for socket\n",
     ]
     send_nonexistent_signal_and_bail_lines_part1: list[str] = [
-        "auth_signal_request: WARNING: Could not find action 'nonexistent'\n",
+        "auth_signal_request: WARNING: Could not find action 'nonexistent' "
+        + f"requested by account '{PlTestGlobal.test_username}'\n",
     ]
     unauthorized_broken_pipe_lines: list[str] = [
         "send_msg_safe: ERROR: Could not send 'UNAUTHORIZED'\n",
@@ -875,19 +880,22 @@ Command=echo 'test-act-missing-auth'
         "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
     send_userrestrict_signal_and_bail_lines_part1: list[str] = [
-        f"auth_signal_request: WARNING: User '{PlTestGlobal.test_username}' is "
+        f"auth_signal_request: WARNING: Account '{PlTestGlobal.test_username}' is "
         + "not authorized to run action 'test-act-userrestrict'\n",
     ]
     send_grouprestrict_signal_and_bail_lines_part1: list[str] = [
-        f"auth_signal_request: WARNING: User '{PlTestGlobal.test_username}' is "
+        f"auth_signal_request: WARNING: Account '{PlTestGlobal.test_username}' is "
         + "not authorized to run action 'test-act-grouprestrict'\n",
     ]
     send_invalid_bash_signal_lines: list[str] = [
-        "handle_comm_session: INFO: Triggered action 'test-act-invalid-bash'\n",
-        "send_action_results: INFO: Action 'test-act-invalid-bash' completed\n",
+        "handle_comm_session: INFO: Triggered action 'test-act-invalid-bash' "
+        + f"for account '{PlTestGlobal.test_username}'\n",
+        "send_action_results: INFO: Action 'test-act-invalid-bash' requested "
+        + f"by account '{PlTestGlobal.test_username}' completed\n",
     ]
     send_valid_signal_and_bail_lines: list[str] = [
-        "handle_comm_session: INFO: Triggered action 'test-act-free'\n",
+        "handle_comm_session: INFO: Triggered action 'test-act-free' "
+        + f"for account '{PlTestGlobal.test_username}'\n",
         "send_msg_safe: ERROR: Could not send 'TRIGGER'\n",
         "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
@@ -1014,7 +1022,10 @@ Command=echo 'test-act-missing-auth'
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
-        ["auth_signal_request: WARNING: Could not find action 'PARAM1'\n"],
+        [
+            "auth_signal_request: WARNING: Could not find action 'PARAM1' "
+            + f"requested by account '{PlTestGlobal.test_username}'\n"
+        ],
         [
             "get_signal_msg: ERROR: Could not get message from client!\n",
             "Traceback (most recent call last):\n",
@@ -1056,24 +1067,32 @@ Command=echo 'test-act-missing-auth'
         + "configuration reloaded\n",
     ]
     test_act_added1_success_lines: list[str] = [
-        "handle_comm_session: INFO: Triggered action 'test-act-added1'\n",
-        "send_action_results: INFO: Action 'test-act-added1' completed\n",
+        "handle_comm_session: INFO: Triggered action 'test-act-added1' "
+        + f"for account '{PlTestGlobal.test_username}'\n",
+        "send_action_results: INFO: Action 'test-act-added1' requested "
+        + f"by account '{PlTestGlobal.test_username}' completed\n",
     ]
     test_act_added2_success_lines: list[str] = [
-        "handle_comm_session: INFO: Triggered action 'test-act-added2'\n",
-        "send_action_results: INFO: Action 'test-act-added2' completed\n",
+        "handle_comm_session: INFO: Triggered action 'test-act-added2' "
+        + f"for account '{PlTestGlobal.test_username}'\n",
+        "send_action_results: INFO: Action 'test-act-added2' requested "
+        + f"by account '{PlTestGlobal.test_username}' completed\n",
     ]
     test_act_added1_failure_lines: list[str] = [
         "auth_signal_request: WARNING: Could not find action "
-        + "'test-act-added1'\n",
+        + "'test-act-added1' requested by account "
+        + f"'{PlTestGlobal.test_username}'\n",
     ]
     test_act_added2_failure_lines: list[str] = [
         "auth_signal_request: WARNING: Could not find action "
-        + "'test-act-added2'\n",
+        + "'test-act-added2' requested by account "
+        + f"'{PlTestGlobal.test_username}'\n",
     ]
     test_act_userpermit_success_lines: list[str] = [
-        "handle_comm_session: INFO: Triggered action 'test-act-userpermit'\n",
-        "send_action_results: INFO: Action 'test-act-userpermit' completed\n",
+        "handle_comm_session: INFO: Triggered action 'test-act-userpermit' "
+        + f"for account '{PlTestGlobal.test_username}'\n",
+        "send_action_results: INFO: Action 'test-act-userpermit' requested "
+        + f"by account '{PlTestGlobal.test_username}' completed\n",
     ]
     config_reload_failure_lines: list[str] = [
         "parse_config_file: ERROR: Error parsing config: "

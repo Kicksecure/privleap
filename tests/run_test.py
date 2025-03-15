@@ -379,12 +379,12 @@ def run_leapctl_tests() -> None:
     leapctl_assert_command(
         ["leapctl", "--create", "1"],
         exit_code=0,
-        stdout_data=b"Comm socket created for user 'daemon'.\n",
+        stdout_data=b"Comm socket created for account 'daemon'.\n",
     )
     leapctl_assert_command(
         ["leapctl", "--destroy", "1"],
         exit_code=0,
-        stdout_data=b"Comm socket destroyed for user 'daemon'.\n",
+        stdout_data=b"Comm socket destroyed for account 'daemon'.\n",
     )
     # ---
     leapctl_assert_command(
@@ -406,7 +406,7 @@ def run_leapctl_tests() -> None:
     leapctl_assert_command(
         ["leapctl", "--destroy", "sys"],
         exit_code=0,
-        stdout_data=b"Cannot destroy socket for persistent user 'sys'.\n",
+        stdout_data=b"Cannot destroy socket for persistent account 'sys'.\n",
     )
     # ---
     util.stop_privleapd_subprocess()
@@ -419,7 +419,7 @@ def run_leapctl_tests() -> None:
     leapctl_assert_command(
         ["leapctl", "--create", "deleteme"],
         exit_code=0,
-        stdout_data=b"Comm socket created for user 'deleteme'.\n",
+        stdout_data=b"Comm socket created for account 'deleteme'.\n",
     )
     leapctl_assert_function(
         leapctl_delete_deleteme_user,
@@ -429,19 +429,19 @@ def run_leapctl_tests() -> None:
     leapctl_assert_command(
         ["leapctl", "--destroy", "deleteme"],
         exit_code=0,
-        stdout_data=b"Comm socket destroyed for user 'deleteme'.\n",
+        stdout_data=b"Comm socket destroyed for account 'deleteme'.\n",
     )
     # ---
     leapctl_assert_command(
         ["leapctl", "--create", "man"],
         exit_code=2,
-        stderr_data=b"ERROR: User 'man' is not permitted to have a comm socket!\n",
+        stderr_data=b"ERROR: Account 'man' is not permitted to have a comm socket!\n",
     )
     # ---
     leapctl_assert_command(
         ["leapctl", "--create", "root"],
         exit_code=0,
-        stdout_data=b"Comm socket created for user 'root'.\n",
+        stdout_data=b"Comm socket created for account 'root'.\n",
     )
     # ---
     util.stop_privleapd_subprocess()

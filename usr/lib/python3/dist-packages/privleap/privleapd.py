@@ -95,7 +95,7 @@ def handle_control_create_msg(
         control_msg.user_name
     )
     if user_name is None:
-        logging.warning("User '%s' does not exist", control_msg.user_name)
+        logging.warning("Account '%s' does not exist", control_msg.user_name)
         send_msg_safe(
             control_session, pl.PrivleapControlServerControlErrorMsg()
         )
@@ -103,7 +103,7 @@ def handle_control_create_msg(
 
     if user_name not in PrivleapdGlobal.allowed_user_list:
         logging.warning(
-            "User '%s' is not allowed to have a comm socket", user_name
+            "Account '%s' is not allowed to have a comm socket", user_name
         )
         send_msg_safe(
             control_session, pl.PrivleapControlServerDisallowedUserMsg()
@@ -114,7 +114,7 @@ def handle_control_create_msg(
         if sock.user_name == user_name:
             # User already has an open socket
             logging.info(
-                "Handled CREATE message for user '%s', socket already "
+                "Handled CREATE message for account '%s', socket already "
                 "exists",
                 user_name,
             )
@@ -127,13 +127,13 @@ def handle_control_create_msg(
         )
         PrivleapdGlobal.socket_list.append(comm_socket)
         logging.info(
-            "Handled CREATE message for user '%s', socket created", user_name
+            "Handled CREATE message for account '%s', socket created", user_name
         )
         send_msg_safe(control_session, pl.PrivleapControlServerOkMsg())
         return
     except Exception as e:
         logging.error(
-            "Failed to create socket for user '%s'!", user_name, exc_info=e
+            "Failed to create socket for account '%s'!", user_name, exc_info=e
         )
         send_msg_safe(
             control_session, pl.PrivleapControlServerControlErrorMsg()
@@ -165,7 +165,7 @@ def handle_control_destroy_msg(
         user_name = control_msg.user_name
     if user_name in PrivleapdGlobal.persistent_user_list:
         logging.info(
-            "Handled DESTROY message for user '%s', user is persistent, so "
+            "Handled DESTROY message for account '%s', account is persistent, so "
             "socket not destroyed",
             user_name,
         )
@@ -200,14 +200,16 @@ def handle_control_destroy_msg(
     if remove_sock_idx is not None:
         PrivleapdGlobal.socket_list.pop(cast(SupportsIndex, remove_sock_idx))
         logging.info(
-            "Handled DESTROY message for user '%s', socket destroyed", user_name
+            "Handled DESTROY message for account '%s', socket destroyed",
+            user_name,
         )
         send_msg_safe(control_session, pl.PrivleapControlServerOkMsg())
         return
 
     # remove_sock_idx is None.
     logging.info(
-        "Handled DESTROY message for user '%s', socket did not exist", user_name
+        "Handled DESTROY message for account '%s', socket did not exist",
+        user_name,
     )
     send_msg_safe(control_session, pl.PrivleapControlServerNouserMsg())
     return
@@ -485,7 +487,11 @@ def send_action_results(
         action_process.terminate()
         action_process.wait()
         # Process is done, send the exit code and clean up
-        logging.info("Action '%s' completed", action_name)
+        logging.info(
+            "Action '%s' requested by account '%s' completed",
+            action_name,
+            comm_session.user_name,
+        )
 
     send_msg_safe(
         comm_session,
@@ -523,19 +529,23 @@ def auth_signal_request(
 
     if auth_result != PrivleapdAuthStatus.AUTHORIZED:
         if auth_result is None:
-            logging.warning("Could not find action '%s'", comm_msg.signal_name)
+            logging.warning(
+                "Could not find action '%s' requested by account '%s'",
+                comm_msg.signal_name,
+                comm_session.user_name,
+            )
         else:
             assert desired_action is not None
             assert desired_action.action_name is not None
             if auth_result == PrivleapdAuthStatus.USER_MISSING:
                 logging.warning(
-                    "User '%s' does not exist, cannot run action '%s'",
+                    "Account '%s' does not exist, cannot run action '%s'",
                     comm_session.user_name,
                     desired_action.action_name,
                 )
             elif auth_result == PrivleapdAuthStatus.UNAUTHORIZED:
                 logging.warning(
-                    "User '%s' is not authorized to run action '%s'",
+                    "Account '%s' is not authorized to run action '%s'",
                     comm_session.user_name,
                     desired_action.action_name,
                 )
@@ -583,14 +593,19 @@ def handle_comm_session(comm_socket: pl.PrivleapSocket) -> None:
             action_process = run_action(desired_action, comm_session.user_name)
         except Exception as e:
             logging.error(
-                "Action '%s' authorized, but trigger failed!",
+                "Action '%s' authorized for account '%s', but trigger failed!",
                 desired_action.action_name,
+                comm_session.user_name,
                 exc_info=e,
             )
             send_msg_safe(comm_session, pl.PrivleapCommServerTriggerErrorMsg())
             return
 
-        logging.info("Triggered action '%s'", desired_action.action_name)
+        logging.info(
+            "Triggered action '%s' for account '%s'",
+            desired_action.action_name,
+            comm_session.user_name,
+        )
 
         # We don't bail out if this message send fails, since we still need to
         # monitor and manage the child process, which is part of what
@@ -885,7 +900,7 @@ def open_persistent_comm_sockets() -> None:
             # to break unless necessary.
         except Exception as e:
             logging.error(
-                "Failed to create persistent socket for user '%s'!",
+                "Failed to create persistent socket for account '%s'!",
                 user_name,
                 exc_info=e,
             )

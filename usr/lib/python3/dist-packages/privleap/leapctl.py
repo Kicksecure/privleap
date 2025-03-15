@@ -53,9 +53,9 @@ def print_usage() -> NoReturn:
 leapctl --reload
 
     --create : Specifies that leapctl should request a communication socket to
-               be created for the specified user.
+               be created for the specified user account.
     --destroy : Specifies that leapctl should request a communication socket
-                to be destroyed for the specified user.
+                to be destroyed for the specified user account.
     --reload : Instructs privleapd to reload configuration without restarting.
     user : The username or UID of the user account to create or destroy a
            communication socket for."""
@@ -120,20 +120,20 @@ def handle_create_request(user_name: str) -> NoReturn:
 
     # noinspection PyUnboundLocalVariable
     if isinstance(control_msg, pl.PrivleapControlServerOkMsg):
-        print(f"Comm socket created for user {repr(user_name)}.")
+        print(f"Comm socket created for account {repr(user_name)}.")
         cleanup_and_exit(0)
     elif isinstance(control_msg, pl.PrivleapControlServerControlErrorMsg):
         generic_error(
             "privleapd encountered an error while creating a comm socket "
-            f"for user {repr(user_name)}!"
+            f"for account {repr(user_name)}!"
         )
     elif isinstance(control_msg, pl.PrivleapControlServerDisallowedUserMsg):
         generic_error(
-            f"User {repr(user_name)} is not permitted to have a comm socket!",
+            f"Account {repr(user_name)} is not permitted to have a comm socket!",
             2,
         )
     elif isinstance(control_msg, pl.PrivleapControlServerExistsMsg):
-        print(f"Comm socket already exists for user {repr(user_name)}.")
+        print(f"Comm socket already exists for account {repr(user_name)}.")
         cleanup_and_exit(0)
     else:
         unexpected_msg_error(control_msg)
@@ -162,18 +162,20 @@ def handle_destroy_request(user_name: str) -> NoReturn:
 
     # noinspection PyUnboundLocalVariable
     if isinstance(control_msg, pl.PrivleapControlServerOkMsg):
-        print(f"Comm socket destroyed for user {repr(user_name)}.")
+        print(f"Comm socket destroyed for account {repr(user_name)}.")
         cleanup_and_exit(0)
     elif isinstance(control_msg, pl.PrivleapControlServerControlErrorMsg):
         generic_error(
             "privleapd encountered an error while destroying a comm "
-            f"socket for user {repr(user_name)}!"
+            f"socket for account {repr(user_name)}!"
         )
     elif isinstance(control_msg, pl.PrivleapControlServerNouserMsg):
-        print(f"Comm socket does not exist for user {repr(user_name)}.")
+        print(f"Comm socket does not exist for account {repr(user_name)}.")
         cleanup_and_exit(0)
     elif isinstance(control_msg, pl.PrivleapControlServerPersistentUserMsg):
-        print(f"Cannot destroy socket for persistent user {repr(user_name)}.")
+        print(
+            f"Cannot destroy socket for persistent account {repr(user_name)}."
+        )
         # It is not an error to try to destroy a socket for a persistent user,
         # since this may legitimately happen if someone logs in as a user that
         # happens to be persistent in privleap's config, and then logs out.
@@ -236,7 +238,7 @@ def main() -> NoReturn:
         # socket can be destroyed anyway.
         if control_user is None:
             if control_action != "--destroy":
-                generic_error("Specified user does not exist.")
+                generic_error("Specified user account does not exist.")
             else:
                 control_user = orig_control_user
 
