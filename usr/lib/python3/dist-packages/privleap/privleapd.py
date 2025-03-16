@@ -238,7 +238,9 @@ def handle_control_session(control_socket: pl.PrivleapSocket) -> None:
     try:
         control_session: pl.PrivleapSession = control_socket.get_session()
     except Exception as e:
-        logging.error("Could not start session with client!", exc_info=e)
+        logging.error(
+            "Could not start control session with client!", exc_info=e
+        )
         return
 
     try:
@@ -251,7 +253,7 @@ def handle_control_session(control_socket: pl.PrivleapSocket) -> None:
         try:
             control_msg = control_session.get_msg()
         except Exception as e:
-            logging.error("Could not get message from client!", exc_info=e)
+            logging.error("Could not get message from control client!", exc_info=e)
             return
 
         if isinstance(control_msg, pl.PrivleapControlClientCreateMsg):
@@ -356,14 +358,19 @@ def get_signal_msg(
     try:
         comm_msg = comm_session.get_msg()
     except Exception as e:
-        logging.error("Could not get message from client!", exc_info=e)
+        logging.error(
+            "Could not get message from client run by account '%s'!",
+            comm_session.user_name,
+            exc_info=e,
+        )
         return None
 
     if not isinstance(comm_msg, pl.PrivleapCommClientSignalMsg):
         # Illegal message, a SIGNAL needs to be the first message.
         logging.warning(
-            "Did not read SIGNAL as first message, forcibly "
-            "closing connection."
+            "Did not read SIGNAL as first message from client run by account "
+            "'%s', forcibly closing connection.",
+            comm_session.user_name,
         )
         return None
 
@@ -568,7 +575,11 @@ def handle_comm_session(comm_socket: pl.PrivleapSocket) -> None:
     try:
         comm_session: pl.PrivleapSession = comm_socket.get_session()
     except Exception as e:
-        logging.error("Could not start session with client!", exc_info=e)
+        logging.error(
+            "Could not start comm session with client run by account '%s'!",
+            comm_socket.user_name,
+            exc_info=e,
+        )
         return
 
     assert comm_session.user_name is not None

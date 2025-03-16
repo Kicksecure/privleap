@@ -56,7 +56,7 @@ def print_usage() -> NoReturn:
     print(
         """leaprun <signal_name>
 
-    signal_name : The name of the signal that leap should send. Sending a
+    signal_name : The name of the signal that leaprun should send. Sending a
                   signal with a particular name will request privleapd to
                   trigger an action of the same name."""
     )
@@ -97,7 +97,7 @@ def create_signal_msg() -> None:
         )
     except Exception:
         generic_error(
-            f"Signal name {repr(LeaprunGlobal.signal_name)} is " "invalid!"
+            f"Signal name {repr(LeaprunGlobal.signal_name)} is invalid!"
         )
 
 
