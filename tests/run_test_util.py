@@ -771,7 +771,7 @@ Command=echo 'test-act-missing-auth'
         "/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax\n",
     ]
     control_disconnect_lines: list[str] = [
-        "handle_control_session: ERROR: Could not get message from client!\n",
+        "handle_control_session: ERROR: Could not get message from control client!\n",
         "Traceback (most recent call last):\n",
         "ConnectionAbortedError: Connection unexpectedly closed\n",
     ]
@@ -851,22 +851,24 @@ Command=echo 'test-act-missing-auth'
         "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
     send_invalid_control_message_lines: list[str] = [
-        "handle_control_session: ERROR: Could not get message from client!\n",
+        "handle_control_session: ERROR: Could not get message from control client!\n",
         "Traceback (most recent call last):\n",
         "ValueError: Invalid message type 'BOB' for socket\n",
     ]
     send_corrupted_control_message_lines: list[str] = [
-        "handle_control_session: ERROR: Could not get message from client!\n",
+        "handle_control_session: ERROR: Could not get message from control client!\n",
         "Traceback (most recent call last):\n",
         "ValueError: recv_buf contains data past the last string\n",
     ]
     bail_comm_lines: list[str] = [
-        "get_signal_msg: ERROR: Could not get message from client!\n",
+        "get_signal_msg: ERROR: Could not get message from client run by account "
+        + f"'{PlTestGlobal.test_username}'!\n",
         "Traceback (most recent call last):\n",
         "ConnectionAbortedError: Connection unexpectedly closed\n",
     ]
     send_invalid_comm_message_lines: list[str] = [
-        "get_signal_msg: ERROR: Could not get message from client!\n",
+        "get_signal_msg: ERROR: Could not get message from client run by account "
+        + f"'{PlTestGlobal.test_username}'!\n",
         "Traceback (most recent call last):\n",
         "ValueError: Invalid message type 'BOB' for socket\n",
     ]
@@ -900,7 +902,8 @@ Command=echo 'test-act-missing-auth'
         "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
     send_random_garbage_lines: list[str] = [
-        "get_signal_msg: ERROR: Could not get message from client!\n",
+        "get_signal_msg: ERROR: Could not get message from client "
+        + f"run by account '{PlTestGlobal.test_username}'!\n",
     ]
     invalid_ascii_list: list[bytes] = [
         b"\x00\x00\x00\x05\x1BTEST",
@@ -928,97 +931,116 @@ Command=echo 'test-act-missing-auth'
     # TODO: Any good way to avoid all the repetition?
     invalid_ascii_lines_list: list[list[str]] = [
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid message type 'TEST' for socket\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
@@ -1027,7 +1049,8 @@ Command=echo 'test-act-missing-auth'
             + f"requested by account '{PlTestGlobal.test_username}'\n"
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client!\n",
+            "get_signal_msg: ERROR: Could not get message from client "
+            + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: recv_buf contains data past the last string\n",
         ],
