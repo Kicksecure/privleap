@@ -474,6 +474,7 @@ def leaprun_assert_command(
     exit_code: int,
     stdout_data: bytes = b"",
     stderr_data: bytes = b"",
+    filter_func: Callable[[bytes, bool], bytes] | None = None,
 ) -> None:
     """
     Runs a command for leaprun tests, testing the output against expected values
@@ -483,7 +484,7 @@ def leaprun_assert_command(
     global leaprun_asserts_passed
     global leaprun_asserts_failed
     if util.assert_command_result(
-        command_data, exit_code, stdout_data, stderr_data
+        command_data, exit_code, stdout_data, stderr_data, filter_func
     ):
         logging.info("Assert passed: %s", command_data)
         leaprun_asserts_passed += 1
@@ -593,6 +594,32 @@ def leaprun_server_late_cutoff_test(bogus: str) -> bool:
         if leaprun_result[1] == PlTestData.privleapd_invalid_response:
             return True
     return False
+
+
+def leaprun_filter_env_var_test_stdout(
+    stdout_data: bytes, is_stdout: bool
+) -> bytes:
+    """
+    Filters out non-deterministic environment variables from the output of the
+      leaprun env var tests.
+    """
+
+    if not is_stdout:
+        return stdout_data
+    stdout_parts: list[bytes] = stdout_data.split(b"\n")
+    stdout_parts_out: list[bytes] = []
+    for stdout_part in stdout_parts:
+        if stdout_part == b"":
+            continue
+        if (
+            stdout_part.startswith(b"ADTTMP=")
+            or stdout_part.startswith(b"AUTOPKGTEST_ARTIFACTS=")
+            or stdout_part.startswith(b"AUTOPKGTEST_TMP=")
+            or stdout_part.startswith(b"ADT_ARTIFACTS=")
+        ):
+            continue
+        stdout_parts_out.append(stdout_part)
+    return b"\n".join(stdout_parts_out) + b"\n"
 
 
 # pylint: disable=too-many-statements
@@ -949,6 +976,32 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=b"stdout00\nstdout01\n",
         stderr_data=b"stderr00\nstderr01\n",
+    )
+    # ---
+    leaprun_assert_command(
+        [
+            "sudo",
+            "-u",
+            PlTestGlobal.test_username,
+            "leaprun",
+            "test-act-rootdata",
+        ],
+        exit_code=0,
+        stdout_data=PlTestData.test_act_rootdata,
+        filter_func=leaprun_filter_env_var_test_stdout,
+    )
+    # ---
+    leaprun_assert_command(
+        [
+            "sudo",
+            "-u",
+            PlTestGlobal.test_username,
+            "leaprun",
+            "test-act-userdata",
+        ],
+        exit_code=0,
+        stdout_data=PlTestData.test_act_userdata,
+        filter_func=leaprun_filter_env_var_test_stdout,
     )
     # ---
     util.stop_privleapd_subprocess()

@@ -25,7 +25,7 @@ import time
 import socket
 import fcntl
 from pathlib import Path
-from typing import Tuple, IO
+from typing import Tuple, IO, Callable
 from datetime import datetime, timedelta
 
 
@@ -320,6 +320,7 @@ def assert_command_result(
     exit_code: int,
     stdout_data: bytes = b"",
     stderr_data: bytes = b"",
+    filter_func: Callable[[bytes, bool], bytes] | None = None,
 ) -> bool:
     """
     Runs a command and ensures that the stdout, stderr, and exitcode match
@@ -334,13 +335,21 @@ def assert_command_result(
     logging.info("Stdout: %s", test_result.stdout)
     logging.info("Stderr: %s", test_result.stderr)
     assert_failed: bool = False
+    if filter_func is None:
+        stdout_result = test_result.stdout
+        stderr_result = test_result.stderr
+    else:
+        stdout_result = filter_func(test_result.stdout, True)
+        stderr_result = filter_func(test_result.stderr, False)
+        logging.info("Filtered stdout: %s", stdout_result)
+        logging.info("Filtered stderr: %s", stderr_result)
     if exit_code != test_result.returncode:
         logging.error("Exit code assert failed, expected: %s", exit_code)
         assert_failed = True
-    if stdout_data != test_result.stdout:
+    if stdout_data != stdout_result:
         logging.error("Stdout assert failed, expected: %s", stdout_data)
         assert_failed = True
-    if stderr_data != test_result.stderr:
+    if stderr_data != stderr_result:
         logging.error("Stderr assert failed, expected: %s", stderr_data)
         assert_failed = True
     if assert_failed:
@@ -577,6 +586,15 @@ AuthorizedUsers={PlTestGlobal.test_username},nonexistent
 Command=echo abc=def
 AuthorizedUsers={PlTestGlobal.test_username}
 
+[action:test-act-rootdata]
+Command=pwd; id; env
+AuthorizedUsers={PlTestGlobal.test_username}
+
+[action:test-act-userdata]
+Command=pwd; id; env
+AuthorizedUsers={PlTestGlobal.test_username}
+TargetUser={PlTestGlobal.test_username}
+
 [persistent-users]
 User=messagebus
 """
@@ -744,6 +762,45 @@ Command=echo 'test-act-missing-auth'
         b"uid=1002("
         + PlTestGlobal.test_username_bytes
         + b") gid=0(root) groups=0(root)\n"
+    )
+    test_act_rootdata: bytes = (
+        b"/root\n"
+        + b"uid=0(root) gid=0(root) groups=0(root)\n"
+        + b"SHELL=/usr/bin/bash\n"
+        + b"AUTOPKGTEST_NORMAL_USER=unshare\n"
+        + b"PWD=/root\n"
+        + b"LOGNAME=root\n"
+        + b"HOME=/root\n"
+        + b"LANG=C.UTF-8\n"
+        + b"USER=root\n"
+        + b"DEB_BUILD_OPTIONS=parallel=2\n"
+        + b"ADT_NORMAL_USER=unshare\n"
+        + b"SHLVL=1\n"
+        + b"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"
+        + b"MAIL=/var/mail/root\n"
+        + b"DEBIAN_FRONTEND=noninteractive\n"
+        + b"OLDPWD=/\n"
+        + b"_=/usr/bin/env\n"
+    )
+    test_act_userdata: bytes = (
+        b"/home/privleaptest\n"
+        + b"uid=1002(privleaptest) gid=1002(privleaptest) "
+        + b"groups=1002(privleaptest),0(root)\n"
+        + b"SHELL=/usr/bin/bash\n"
+        + b"AUTOPKGTEST_NORMAL_USER=unshare\n"
+        + b"PWD=/home/privleaptest\n"
+        + b"LOGNAME=privleaptest\n"
+        + b"HOME=/home/privleaptest\n"
+        + b"LANG=C.UTF-8\n"
+        + b"USER=privleaptest\n"
+        + b"DEB_BUILD_OPTIONS=parallel=2\n"
+        + b"ADT_NORMAL_USER=unshare\n"
+        + b"SHLVL=1\n"
+        + b"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"
+        + b"MAIL=/var/mail/root\n"
+        + b"DEBIAN_FRONTEND=noninteractive\n"
+        + b"OLDPWD=/\n"
+        + b"_=/usr/bin/env\n"
     )
     privleapd_help: bytes = (
         b"privleapd: privleap backend server\n"

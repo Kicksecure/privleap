@@ -37,7 +37,7 @@ target_group: str = sys.argv[3]
 command_arr: list[str] = sys.argv[4:]
 
 try:
-    user_info: pwd.struct_passwd = pwd.getpwnam(calling_user)
+    target_user_info: pwd.struct_passwd = pwd.getpwnam(target_user)
     _: Any = pwd.getpwnam(target_user)
     _ = grp.getgrnam(target_group)
 except Exception:
@@ -64,16 +64,16 @@ except Exception:
 pam_env_list: list[str] = pam_obj.getenvlist()
 
 action_env: dict[str, str] = os.environ.copy()
-action_env["HOME"] = user_info.pw_dir
-action_env["LOGNAME"] = user_info.pw_name
+action_env["HOME"] = target_user_info.pw_dir
+action_env["LOGNAME"] = target_user_info.pw_name
 action_env["SHELL"] = "/usr/bin/bash"
-action_env["PWD"] = user_info.pw_dir
-action_env["USER"] = user_info.pw_name
+action_env["PWD"] = target_user_info.pw_dir
+action_env["USER"] = target_user_info.pw_name
 for env_var in pam_env_list:
     env_var_parts: list[str] = env_var.split("=", 1)
     action_env[env_var_parts[0]] = env_var_parts[1]
 
-target_cwd: str = user_info.pw_dir
+target_cwd: str = target_user_info.pw_dir
 if not Path(target_cwd).is_dir():
     target_cwd = "/"
 
