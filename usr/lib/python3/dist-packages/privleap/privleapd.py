@@ -3,10 +3,11 @@
 # Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
 # See the file COPYING for copying conditions.
 
-# pylint: disable=broad-exception-caught
+# pylint: disable=broad-exception-caught, too-many-lines
 # Rationale:
 #   broad-exception-caught: except blocks are intended to catch all possible
 #     exceptions in each instance to prevent server crashes.
+#   too-many-lines: Splitting this up would make it less readable at this point.
 
 """privleapd.py - privleap background process."""
 
@@ -253,7 +254,9 @@ def handle_control_session(control_socket: pl.PrivleapSocket) -> None:
         try:
             control_msg = control_session.get_msg()
         except Exception as e:
-            logging.error("Could not get message from control client!", exc_info=e)
+            logging.error(
+                "Could not get message from control client!", exc_info=e
+            )
             return
 
         if isinstance(control_msg, pl.PrivleapControlClientCreateMsg):
