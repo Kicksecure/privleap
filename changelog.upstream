@@ -1,3 +1,22 @@
+commit 77828a5ce40d1bbc81e39c4dc62949dc6ca33c76
+Merge: 4c35d5a e8d7023
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Tue Mar 18 06:48:16 2025 -0400
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit e8d7023b44d770d7b9c76ff217b975da0e9d0d05
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Mon Mar 17 21:25:39 2025 -0500
+
+    Fix shim environment bug, add tests to prevent similar bugs in the future
+
+commit 4c35d5a6937f12676c2215d5668e284943c83353
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Mon Mar 17 08:53:20 2025 +0000
+
+    bumped changelog version
+
 commit b5a97dca7dbf2095c94733e36cdb2508b6779ffa
 Merge: e6bc770 b9ea564
 Author: Patrick Schleizer <adrelanos@whonix.org>
