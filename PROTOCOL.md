@@ -116,6 +116,8 @@ socket:
 
 * `SIGNAL <signal_name>` - Sends a signal to `privleapd`, requesting the
   triggering of the action corresponding to `<signal_name>`.
+* `ACCESS_CHECK <signal_name>` - Queries privleapd to determine if the caller
+  is authorized to trigger the action corresponding to `<signal_name>`.
 
 `privleapd` can send the following messages, which clients must be able to
 understand:
@@ -143,23 +145,27 @@ understand:
   previous `SIGNAL` message has completed execution, and that it exited with
   code `<exit_code>`. `<exit_code>` is a string representing a decimal integer
   between 0 and 255.
-* `UNAUTHORIZED` - Indicates that the user attempting to trigger the specified
-  action is not authorized to do so, or that the signal send by the client has
-  no matching action. This response intentionally does not tell the client
-  whether they simply aren't allowed to perform the action, or whether the
-  action doesn't even exist.
+* `AUTHORIZED` - Indicates that the user who sent an `ACCESS_CHECK` query is
+  authorized to run the action specified by the `ACCESS_CHECK` message.
+* `UNAUTHORIZED` - Indicates that the user attempting to trigger or query the 
+  specified action is not authorized to trigger that action, or that the
+  signal sent by the client has no matching action. This response 
+  intentionally does not tell the client whether they simply aren't allowed
+  to perform the action, or whether the action doesn't even exist.
 
 `privleapd` will only parse the first one of each of the above client-sent
 messages per session. `privleapd` will terminate the session immediately after
-sending `UNAUTHORIZED`, or immediately after sending `RESULT_EXITCODE`.
-privleapd *may* send multiple `RESULT_STDOUT` and `RESULT_STDERR` messages in a
+sending `AUTHORIZED`, `UNAUTHORIZED`, or `RESULT_EXITCODE`. privleapd 
+*may* send multiple `RESULT_STDOUT` and `RESULT_STDERR` messages in a
 single session.
 
 In actual operation, the client (most likely `leaprun`) is expected to open a
-session with `privleapd` and send a `SIGNAL` message. If the user is
-authorized to trigger the action corresponding to this signal, `privleapd`
-will respond with `TRIGGER` upon triggering the action, then will send
-`RESULT_STDOUT` and `RESULT_STDERR` once the action completes.
+session with `privleapd` and send either a `SIGNAL` or `ACCESS_CHECK` message.
+If the user is authorized to trigger the action specified in the message,
+`privleapd` will respond with either `AUTHORIZED` in reply to an
+`ACCESS_CHECK`, or `TRIGGER` in response to a `SIGNAL`. If privleapd is 
+running an action, it will send `RESULT_STDOUT` and `RESULT_STDERR` messages
+as the action runs so the caller can see the output of the action.
 
 ## Potential future development:
 
