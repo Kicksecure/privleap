@@ -33,6 +33,7 @@ from typing import NoReturn, Tuple, IO, TypeAlias
 from collections.abc import Callable
 
 # import privleap as pl
+
 import privleap.privleap as pl
 import run_test_util as util
 from run_test_util import stop_privleapd_subprocess
@@ -379,12 +380,12 @@ def run_leapctl_tests() -> None:
     leapctl_assert_command(
         ["leapctl", "--create", "1"],
         exit_code=0,
-        stdout_data=b"Comm socket created for account 'daemon'.\n",
+        stdout_data=PlTestData.daemon_socket_created,
     )
     leapctl_assert_command(
         ["leapctl", "--destroy", "1"],
         exit_code=0,
-        stdout_data=b"Comm socket destroyed for account 'daemon'.\n",
+        stdout_data=PlTestData.daemon_socket_destroyed,
     )
     # ---
     leapctl_assert_command(
@@ -406,7 +407,7 @@ def run_leapctl_tests() -> None:
     leapctl_assert_command(
         ["leapctl", "--destroy", "sys"],
         exit_code=0,
-        stdout_data=b"Cannot destroy socket for persistent account 'sys'.\n",
+        stdout_data=PlTestData.cannot_destroy_persistent_sys_socket,
     )
     # ---
     util.stop_privleapd_subprocess()
@@ -419,7 +420,7 @@ def run_leapctl_tests() -> None:
     leapctl_assert_command(
         ["leapctl", "--create", "deleteme"],
         exit_code=0,
-        stdout_data=b"Comm socket created for account 'deleteme'.\n",
+        stdout_data=PlTestData.deleteme_socket_created,
     )
     leapctl_assert_function(
         leapctl_delete_deleteme_user,
@@ -429,19 +430,19 @@ def run_leapctl_tests() -> None:
     leapctl_assert_command(
         ["leapctl", "--destroy", "deleteme"],
         exit_code=0,
-        stdout_data=b"Comm socket destroyed for account 'deleteme'.\n",
+        stdout_data=PlTestData.deleteme_socket_destroyed,
     )
     # ---
     leapctl_assert_command(
         ["leapctl", "--create", "man"],
         exit_code=2,
-        stderr_data=b"ERROR: Account 'man' is not permitted to have a comm socket!\n",
+        stderr_data=PlTestData.man_socket_not_permitted,
     )
     # ---
     leapctl_assert_command(
         ["leapctl", "--create", "root"],
         exit_code=0,
-        stdout_data=b"Comm socket created for account 'root'.\n",
+        stdout_data=PlTestData.root_socket_created,
     )
     # ---
     util.stop_privleapd_subprocess()
@@ -666,8 +667,7 @@ def run_leaprun_tests() -> None:
             "test-act-nonexistent",
         ],
         exit_code=1,
-        stderr_data=b"ERROR: You are unauthorized to run action "
-        + b"'test-act-nonexistent'.\n",
+        stderr_data=PlTestData.test_act_nonexistent_unauthorized,
     )
     # ---
     leaprun_assert_command(
@@ -679,7 +679,7 @@ def run_leaprun_tests() -> None:
             "test-act-userrestrict",
         ],
         exit_code=1,
-        stderr_data=PlTestData.test_act_nonexistent_unauthorized,
+        stderr_data=PlTestData.test_act_userrestrict_unauthorized,
     )
     # ---
     leaprun_assert_command(
@@ -1002,6 +1002,46 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=PlTestData.test_act_userdata,
         filter_func=leaprun_filter_env_var_test_stdout,
+    )
+    # ---
+    leaprun_assert_command(
+        [
+            "sudo",
+            "-u",
+            PlTestGlobal.test_username,
+            "leaprun",
+            "--check",
+            "test-act-free",
+        ],
+        exit_code=0,
+        stdout_data=PlTestData.test_act_free_authorized,
+    )
+    # ---
+    leaprun_assert_command(
+        [
+            "sudo",
+            "-u",
+            PlTestGlobal.test_username,
+            "leaprun",
+            "-c",
+            "--",
+            "test-act-free",
+        ],
+        exit_code=0,
+        stdout_data=PlTestData.test_act_free_authorized,
+    )
+    # ---
+    leaprun_assert_command(
+        [
+            "sudo",
+            "-u",
+            PlTestGlobal.test_username,
+            "leaprun",
+            "--check",
+            "test-act-userrestrict",
+        ],
+        exit_code=1,
+        stderr_data=PlTestData.test_act_userrestrict_unauthorized,
     )
     # ---
     util.stop_privleapd_subprocess()
@@ -2002,6 +2042,58 @@ def privleapd_send_valid_signal_and_bail_test(bogus: str) -> bool:
     return False
 
 
+def privleapd_allowed_action_access_check_test(bogus: str) -> bool:
+    """
+    Test how privleapd handles a comm client that checks if they are allowed to
+      run an action that they are allowed to run.
+    """
+
+    if bogus != "":
+        return False
+    util.discard_privleapd_stderr()
+    assert_success: bool = True
+    comm_session: pl.PrivleapSession = pl.PrivleapSession(
+        PlTestGlobal.test_username
+    )
+    comm_session.send_msg(pl.PrivleapCommClientAccessCheckMsg("test-act-free"))
+    comm_session_msg: pl.PrivleapMsg = comm_session.get_msg()
+    if not isinstance(comm_session_msg, pl.PrivleapCommServerAuthorizedMsg):
+        logging.error("Incorrect reply to access check!")
+        assert_success = False
+    if not util.compare_privleapd_stderr(
+        PlTestData.allowed_action_access_check_lines
+    ):
+        assert_success = False
+    return assert_success
+
+
+def privleapd_disallowed_action_access_check_test(bogus: str) -> bool:
+    """
+    Test how privleapd handles a comm client that checks if they are allowed to
+      run an action that they are allowed to run.
+    """
+
+    if bogus != "":
+        return False
+    util.discard_privleapd_stderr()
+    assert_success: bool = True
+    comm_session: pl.PrivleapSession = pl.PrivleapSession(
+        PlTestGlobal.test_username
+    )
+    comm_session.send_msg(
+        pl.PrivleapCommClientAccessCheckMsg("test-act-userrestrict")
+    )
+    comm_session_msg: pl.PrivleapMsg = comm_session.get_msg()
+    if not isinstance(comm_session_msg, pl.PrivleapCommServerUnauthorizedMsg):
+        logging.error("Incorrect reply to access check!")
+        assert_success = False
+    if not util.compare_privleapd_stderr(
+        PlTestData.disallowed_action_access_check_lines
+    ):
+        assert_success = False
+    return assert_success
+
+
 def privleapd_invalid_ascii_test(idx_str: str) -> bool:
     """
     Test how privleapd handles a comm client that sends well-formed messages
@@ -2496,6 +2588,18 @@ def run_privleapd_tests() -> None:
         privleapd_send_valid_signal_and_bail_test,
         "",
         "Test privleapd valid signal with abrupt disconnect",
+    )
+    # ---
+    privleapd_assert_function(
+        privleapd_allowed_action_access_check_test,
+        "",
+        "Test privleapd access check with allowed action",
+    )
+    # ---
+    privleapd_assert_function(
+        privleapd_disallowed_action_access_check_test,
+        "",
+        "Test privleapd access check with disallowed action",
     )
     # ---
     privleapd_assert_function(

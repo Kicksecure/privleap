@@ -18,6 +18,7 @@ import getpass
 from typing import cast, Union, NoReturn
 
 # import privleap as pl
+
 import privleap.privleap as pl
 
 Buffer = Union[bytes, bytearray, memoryview]
@@ -34,7 +35,12 @@ class LeaprunGlobal:
     """
 
     signal_name: str | None = None
-    signal_msg: pl.PrivleapCommClientSignalMsg | None = None
+    check_mode: bool = False
+    output_msg: (
+        pl.PrivleapCommClientSignalMsg
+        | pl.PrivleapCommClientAccessCheckMsg
+        | None
+    ) = None
     comm_session: pl.PrivleapSession | None = None
 
 
@@ -85,16 +91,21 @@ def unexpected_msg_error(comm_msg: pl.PrivleapMsg) -> NoReturn:
     cleanup_and_exit(1)
 
 
-def create_signal_msg() -> None:
+def create_output_msg() -> None:
     """
-    Creates a signal message from a signal name.
+    Creates an output message from a signal name.
     """
 
     assert LeaprunGlobal.signal_name is not None
     try:
-        LeaprunGlobal.signal_msg = pl.PrivleapCommClientSignalMsg(
-            LeaprunGlobal.signal_name
-        )
+        if LeaprunGlobal.check_mode:
+            LeaprunGlobal.output_msg = pl.PrivleapCommClientAccessCheckMsg(
+                LeaprunGlobal.signal_name
+            )
+        else:
+            LeaprunGlobal.output_msg = pl.PrivleapCommClientSignalMsg(
+                LeaprunGlobal.signal_name
+            )
     except Exception:
         generic_error(
             f"Signal name {repr(LeaprunGlobal.signal_name)} is invalid!"
@@ -121,22 +132,28 @@ def start_comm_session() -> None:
         generic_error("Could not connect to privleapd!")
 
 
-def send_signal() -> None:
+def send_output_msg() -> None:
     """
     Sends a signal to the server using the open comm session.
     """
 
     assert LeaprunGlobal.comm_session is not None
     assert LeaprunGlobal.signal_name is not None
-    assert LeaprunGlobal.signal_msg is not None
+    assert LeaprunGlobal.output_msg is not None
     try:
         # noinspection PyUnboundLocalVariable
-        LeaprunGlobal.comm_session.send_msg(LeaprunGlobal.signal_msg)
+        LeaprunGlobal.comm_session.send_msg(LeaprunGlobal.output_msg)
     except Exception:
-        generic_error(
-            "Could not request privleapd to run action "
-            f"{repr(LeaprunGlobal.signal_name)}!"
-        )
+        if LeaprunGlobal.check_mode:
+            generic_error(
+                "Could not query privleapd for authorization to run action "
+                f"{repr(LeaprunGlobal.signal_name)}!"
+            )
+        else:
+            generic_error(
+                "Could not request privleapd to run action "
+                f"{repr(LeaprunGlobal.signal_name)}!"
+            )
 
 
 def handle_response() -> NoReturn:
@@ -161,39 +178,53 @@ def handle_response() -> NoReturn:
             "You are unauthorized to run action "
             f"{repr(LeaprunGlobal.signal_name)}."
         )
-    elif isinstance(comm_msg, pl.PrivleapCommServerTriggerErrorMsg):
-        generic_error(
-            "An error was encountered launching action "
+
+    if LeaprunGlobal.check_mode:
+        print(
+            "You are authorized to run action "
             f"{repr(LeaprunGlobal.signal_name)}."
         )
-    elif isinstance(comm_msg, pl.PrivleapCommServerTriggerMsg):
-        while True:
-            try:
-                comm_msg = LeaprunGlobal.comm_session.get_msg()
-            except Exception:
-                generic_error(
-                    "Action triggered, but privleapd closed the connection "
-                    "before sending all output!"
-                )
-
-            # noinspection PyUnboundLocalVariable
-            if isinstance(comm_msg, pl.PrivleapCommServerResultStdoutMsg):
-                # noinspection PyUnboundLocalVariable
-                _ = sys.stdout.buffer.write(cast(Buffer, comm_msg.stdout_bytes))
-            elif isinstance(comm_msg, pl.PrivleapCommServerResultStderrMsg):
-                # noinspection PyUnboundLocalVariable
-                _ = sys.stderr.buffer.write(cast(Buffer, comm_msg.stderr_bytes))
-            elif isinstance(comm_msg, pl.PrivleapCommServerResultExitcodeMsg):
-                # noinspection PyUnboundLocalVariable
-                assert comm_msg.exit_code is not None
-                cleanup_and_exit(comm_msg.exit_code)
-            else:
-                # noinspection PyUnboundLocalVariable
-                unexpected_msg_error(comm_msg)
-
+        sys.exit(0)
     else:
-        # noinspection PyUnboundLocalVariable
-        unexpected_msg_error(comm_msg)
+        if isinstance(comm_msg, pl.PrivleapCommServerTriggerErrorMsg):
+            generic_error(
+                "An error was encountered launching action "
+                f"{repr(LeaprunGlobal.signal_name)}."
+            )
+        elif isinstance(comm_msg, pl.PrivleapCommServerTriggerMsg):
+            while True:
+                try:
+                    comm_msg = LeaprunGlobal.comm_session.get_msg()
+                except Exception:
+                    generic_error(
+                        "Action triggered, but privleapd closed the connection "
+                        "before sending all output!"
+                    )
+
+                # noinspection PyUnboundLocalVariable
+                if isinstance(comm_msg, pl.PrivleapCommServerResultStdoutMsg):
+                    # noinspection PyUnboundLocalVariable
+                    _ = sys.stdout.buffer.write(
+                        cast(Buffer, comm_msg.stdout_bytes)
+                    )
+                elif isinstance(comm_msg, pl.PrivleapCommServerResultStderrMsg):
+                    # noinspection PyUnboundLocalVariable
+                    _ = sys.stderr.buffer.write(
+                        cast(Buffer, comm_msg.stderr_bytes)
+                    )
+                elif isinstance(
+                    comm_msg, pl.PrivleapCommServerResultExitcodeMsg
+                ):
+                    # noinspection PyUnboundLocalVariable
+                    assert comm_msg.exit_code is not None
+                    cleanup_and_exit(comm_msg.exit_code)
+                else:
+                    # noinspection PyUnboundLocalVariable
+                    unexpected_msg_error(comm_msg)
+
+        else:
+            # noinspection PyUnboundLocalVariable
+            unexpected_msg_error(comm_msg)
 
 
 def main() -> NoReturn:
@@ -201,20 +232,23 @@ def main() -> NoReturn:
     Main function.
     """
 
-    if len(sys.argv) < 2:
-        print_usage()
-    if sys.argv[1] == "--":
-        if len(sys.argv) != 3:
+    end_of_options = False
+    for arg in sys.argv[1:]:
+        if arg in ("-c", "--check") and not end_of_options:
+            LeaprunGlobal.check_mode = True
+        elif (arg == "--") and not end_of_options:
+            end_of_options = True
+        elif LeaprunGlobal.signal_name is not None:
             print_usage()
-        LeaprunGlobal.signal_name = sys.argv[2]
-    else:
-        if len(sys.argv) != 2:
-            print_usage()
-        LeaprunGlobal.signal_name = sys.argv[1]
+        else:
+            LeaprunGlobal.signal_name = arg
 
-    create_signal_msg()
+    if LeaprunGlobal.signal_name is None:
+        print_usage()
+
+    create_output_msg()
     start_comm_session()
-    send_signal()
+    send_output_msg()
     handle_response()
 
 

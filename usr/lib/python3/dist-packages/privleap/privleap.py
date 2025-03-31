@@ -231,6 +231,29 @@ class PrivleapCommClientSignalMsg(PrivleapMsg):
         return f"{self.name} {self.signal_name}".encode("utf-8")
 
 
+class PrivleapCommClientAccessCheckMsg(PrivleapMsg):
+    """
+    Privleap message.
+
+    Sent from client to server.
+
+    Queries the server to see if the client is authorized to trigger the
+    named action.
+    """
+
+    name = "ACCESS_CHECK"
+
+    def __init__(self, signal_name: str):
+        if not PrivleapCommon.validate_id(
+            signal_name, PrivleapValidateType.SIGNAL_NAME
+        ):
+            raise ValueError("Specified signal name is invalid.")
+        self.signal_name: str = signal_name
+
+    def serialize(self) -> bytes:
+        return f"{self.name} {self.signal_name}".encode("utf-8")
+
+
 class PrivleapCommServerTriggerMsg(PrivleapMsg):
     """
     Privleap message.
@@ -308,6 +331,18 @@ class PrivleapCommServerResultExitcodeMsg(PrivleapMsg):
 
     def serialize(self) -> bytes:
         return f"{self.name} {str(self.exit_code)}".encode("utf-8")
+
+
+class PrivleapCommServerAuthorizedMsg(PrivleapMsg):
+    """
+    Privleap message.
+
+    Sent from server to client.
+
+    Indicates that the user is authorized to run the queried action.
+    """
+
+    name = "AUTHORIZED"
 
 
 class PrivleapCommServerUnauthorizedMsg(PrivleapMsg):
@@ -703,6 +738,11 @@ class PrivleapSession:
                     recv_buf, str_count=1, blob_at_end=False
                 )
                 return PrivleapCommClientSignalMsg(param_list[0])
+            if msg_type_str == "ACCESS_CHECK":
+                param_list, _ = self.__parse_msg_parameters(
+                    recv_buf, str_count=1, blob_at_end=False
+                )
+                return PrivleapCommClientAccessCheckMsg(param_list[0])
             raise ValueError(
                 f"Invalid message type '{msg_type_str}' for socket"
             )
@@ -737,6 +777,11 @@ class PrivleapSession:
                 recv_buf, str_count=1, blob_at_end=False
             )
             return PrivleapCommServerResultExitcodeMsg(int(param_list[0]))
+        if msg_type_str == "AUTHORIZED":
+            self.__parse_msg_parameters(
+                recv_buf, str_count=0, blob_at_end=False
+            )
+            return PrivleapCommServerAuthorizedMsg()
         if msg_type_str == "UNAUTHORIZED":
             self.__parse_msg_parameters(
                 recv_buf, str_count=0, blob_at_end=False
@@ -802,11 +847,15 @@ class PrivleapSession:
                 PrivleapCommServerResultStdoutMsg,
                 PrivleapCommServerResultStderrMsg,
                 PrivleapCommServerResultExitcodeMsg,
+                PrivleapCommServerAuthorizedMsg,
                 PrivleapCommServerUnauthorizedMsg,
             ):
                 raise ValueError("Invalid message type for socket.")
         else:
-            if msg_obj_type != PrivleapCommClientSignalMsg:
+            if msg_obj_type not in (
+                PrivleapCommClientSignalMsg,
+                PrivleapCommClientAccessCheckMsg,
+            ):
                 raise ValueError("Invalid message type for socket.")
 
         self.__send_msg(msg_obj)

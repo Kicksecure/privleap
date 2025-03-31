@@ -701,11 +701,29 @@ Command=echo 'test-act-missing-auth'
     )
     root_create_error: bytes = (
         b"ERROR: privleapd encountered an error while creating a "
-        + b"comm socket for account 'root'!\n"
+        b"comm socket for account 'root'!\n"
     )
     root_socket_created: bytes = b"Comm socket created for account 'root'.\n"
     root_socket_destroyed: bytes = (
         b"Comm socket destroyed for account 'root'.\n"
+    )
+    daemon_socket_created: bytes = (
+        b"Comm socket created for account 'daemon'.\n"
+    )
+    daemon_socket_destroyed: bytes = (
+        b"Comm socket destroyed for account 'daemon'.\n"
+    )
+    cannot_destroy_persistent_sys_socket: bytes = (
+        b"Cannot destroy socket for persistent account 'sys'.\n"
+    )
+    deleteme_socket_created: bytes = (
+        b"Comm socket created for account 'deleteme'.\n"
+    )
+    deleteme_socket_destroyed: bytes = (
+        b"Comm socket destroyed for account 'deleteme'.\n"
+    )
+    man_socket_not_permitted: bytes = (
+        b"ERROR: Account 'man' is not permitted to have a comm socket!\n"
     )
     leapctl_help: bytes = (
         b"leapctl <--create|--destroy> <user>\n"
@@ -722,25 +740,32 @@ Command=echo 'test-act-missing-auth'
         + b"    user : The username or UID of the user account to create or destroy a\n"
         + b"           communication socket for.\n"
     )
-    test_act_nonexistent_unauthorized: bytes = (
+    test_act_free_authorized: bytes = (
+        b"You are authorized to run action 'test-act-free'.\n"
+    )
+    test_act_userrestrict_unauthorized: bytes = (
         b"ERROR: You are unauthorized to run action "
-        + b"'test-act-userrestrict'.\n"
+        b"'test-act-userrestrict'.\n"
     )
     test_act_grouprestrict_unauthorized: bytes = (
         b"ERROR: You are unauthorized to run action "
-        + b"'test-act-grouprestrict'.\n"
+        b"'test-act-grouprestrict'.\n"
     )
     test_act_multiuser_permit_unauthorized: bytes = (
         b"ERROR: You are unauthorized to run action "
-        + b"'test-act-multiuser-permit'.\n"
+        b"'test-act-multiuser-permit'.\n"
     )
     test_act_multigroup_permit_unauthorized: bytes = (
         b"ERROR: You are unauthorized to run action "
-        + b"'test-act-multigroup-permit'.\n"
+        b"'test-act-multigroup-permit'.\n"
     )
     test_act_multiuser_multigroup_permit_unauthorized: bytes = (
         b"ERROR: You are unauthorized to run action "
-        + b"'test-act-multiuser-multigroup-permit'.\n"
+        b"'test-act-multiuser-multigroup-permit'.\n"
+    )
+    test_act_nonexistent_unauthorized: bytes = (
+        b"ERROR: You are unauthorized to run action "
+        b"'test-act-nonexistent'.\n"
     )
     test_act_target_user: bytes = (
         b"uid=1002("
@@ -765,59 +790,59 @@ Command=echo 'test-act-missing-auth'
     )
     test_act_rootdata: bytes = (
         b"/root\n"
-        + b"uid=0(root) gid=0(root) groups=0(root)\n"
-        + b"SHELL=/usr/bin/bash\n"
-        + b"AUTOPKGTEST_NORMAL_USER=unshare\n"
-        + b"PWD=/root\n"
-        + b"LOGNAME=root\n"
-        + b"HOME=/root\n"
-        + b"LANG=C.UTF-8\n"
-        + b"USER=root\n"
-        + b"DEB_BUILD_OPTIONS=parallel=2\n"
-        + b"ADT_NORMAL_USER=unshare\n"
-        + b"SHLVL=1\n"
-        + b"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"
-        + b"MAIL=/var/mail/root\n"
-        + b"DEBIAN_FRONTEND=noninteractive\n"
-        + b"OLDPWD=/\n"
-        + b"_=/usr/bin/env\n"
+        b"uid=0(root) gid=0(root) groups=0(root)\n"
+        b"SHELL=/usr/bin/bash\n"
+        b"AUTOPKGTEST_NORMAL_USER=unshare\n"
+        b"PWD=/root\n"
+        b"LOGNAME=root\n"
+        b"HOME=/root\n"
+        b"LANG=C.UTF-8\n"
+        b"USER=root\n"
+        b"DEB_BUILD_OPTIONS=parallel=2\n"
+        b"ADT_NORMAL_USER=unshare\n"
+        b"SHLVL=1\n"
+        b"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"
+        b"MAIL=/var/mail/root\n"
+        b"DEBIAN_FRONTEND=noninteractive\n"
+        b"OLDPWD=/\n"
+        b"_=/usr/bin/env\n"
     )
     test_act_userdata: bytes = (
         b"/home/privleaptest\n"
-        + b"uid=1002(privleaptest) gid=1002(privleaptest) "
-        + b"groups=1002(privleaptest),0(root)\n"
-        + b"SHELL=/usr/bin/bash\n"
-        + b"AUTOPKGTEST_NORMAL_USER=unshare\n"
-        + b"PWD=/home/privleaptest\n"
-        + b"LOGNAME=privleaptest\n"
-        + b"HOME=/home/privleaptest\n"
-        + b"LANG=C.UTF-8\n"
-        + b"USER=privleaptest\n"
-        + b"DEB_BUILD_OPTIONS=parallel=2\n"
-        + b"ADT_NORMAL_USER=unshare\n"
-        + b"SHLVL=1\n"
-        + b"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"
-        + b"MAIL=/var/mail/root\n"
-        + b"DEBIAN_FRONTEND=noninteractive\n"
-        + b"OLDPWD=/\n"
-        + b"_=/usr/bin/env\n"
+        b"uid=1002(privleaptest) gid=1002(privleaptest) "
+        b"groups=1002(privleaptest),0(root)\n"
+        b"SHELL=/usr/bin/bash\n"
+        b"AUTOPKGTEST_NORMAL_USER=unshare\n"
+        b"PWD=/home/privleaptest\n"
+        b"LOGNAME=privleaptest\n"
+        b"HOME=/home/privleaptest\n"
+        b"LANG=C.UTF-8\n"
+        b"USER=privleaptest\n"
+        b"DEB_BUILD_OPTIONS=parallel=2\n"
+        b"ADT_NORMAL_USER=unshare\n"
+        b"SHLVL=1\n"
+        b"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"
+        b"MAIL=/var/mail/root\n"
+        b"DEBIAN_FRONTEND=noninteractive\n"
+        b"OLDPWD=/\n"
+        b"_=/usr/bin/env\n"
     )
     privleapd_help: bytes = (
         b"privleapd: privleap backend server\n"
-        + b"Usage:\n"
-        + b"  privleapd [-C|--check-config] [-h|--help|-?]\n"
-        + b"Options:\n"
-        + b"  -C, --check-config: Check configuration for validity.\n"
-        + b"  -h, --help, -?: Print usage information.\n"
-        + b"If run without any options specified, the server will start "
-        + b"normally.\n"
+        b"Usage:\n"
+        b"  privleapd [-C|--check-config] [-h|--help|-?]\n"
+        b"Options:\n"
+        b"  -C, --check-config: Check configuration for validity.\n"
+        b"  -h, --help, -?: Print usage information.\n"
+        b"If run without any options specified, the server will start "
+        b"normally.\n"
     )
     privleapd_unrecognized_argument: bytes = (
         b"Unrecognized argument '-z', try 'privleapd --help' for usage info\n"
     )
     privleapd_unrecognized_argument_escape: bytes = (
         b"Unrecognized argument '\\x1b[31mHi\\x1b[m', try 'privleapd "
-        + b"--help' for usage info\n"
+        b"--help' for usage info\n"
     )
     bad_config_file_lines: list[str] = [
         "parse_config_file: ERROR: Error parsing config: "
@@ -918,20 +943,21 @@ Command=echo 'test-act-missing-auth'
         "ValueError: recv_buf contains data past the last string\n",
     ]
     bail_comm_lines: list[str] = [
-        "get_signal_msg: ERROR: Could not get message from client run by account "
+        "get_client_initial_msg: ERROR: Could not get message from client run by account "
         + f"'{PlTestGlobal.test_username}'!\n",
         "Traceback (most recent call last):\n",
         "ConnectionAbortedError: Connection unexpectedly closed\n",
     ]
     send_invalid_comm_message_lines: list[str] = [
-        "get_signal_msg: ERROR: Could not get message from client run by account "
+        "get_client_initial_msg: ERROR: Could not get message from client run by account "
         + f"'{PlTestGlobal.test_username}'!\n",
         "Traceback (most recent call last):\n",
         "ValueError: Invalid message type 'BOB' for socket\n",
     ]
     send_nonexistent_signal_and_bail_lines_part1: list[str] = [
-        "auth_signal_request: WARNING: Could not find action 'nonexistent' "
-        + f"requested by account '{PlTestGlobal.test_username}'\n",
+        "auth_signal_request: WARNING: Action run request: Could not find "
+        + "action 'nonexistent' requested by account "
+        + f"'{PlTestGlobal.test_username}'\n",
     ]
     unauthorized_broken_pipe_lines: list[str] = [
         "send_msg_safe: ERROR: Could not send 'UNAUTHORIZED'\n",
@@ -939,27 +965,29 @@ Command=echo 'test-act-missing-auth'
         "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
     send_userrestrict_signal_and_bail_lines_part1: list[str] = [
-        f"auth_signal_request: WARNING: Account '{PlTestGlobal.test_username}' is "
-        + "not authorized to run action 'test-act-userrestrict'\n",
+        "auth_signal_request: WARNING: Action run request: Account "
+        + f"'{PlTestGlobal.test_username}' is not authorized to run action "
+        + "'test-act-userrestrict'\n",
     ]
     send_grouprestrict_signal_and_bail_lines_part1: list[str] = [
-        f"auth_signal_request: WARNING: Account '{PlTestGlobal.test_username}' is "
-        + "not authorized to run action 'test-act-grouprestrict'\n",
+        "auth_signal_request: WARNING: Action run request: Account "
+        + f"'{PlTestGlobal.test_username}' is not authorized to run action "
+        + "'test-act-grouprestrict'\n",
     ]
     send_invalid_bash_signal_lines: list[str] = [
-        "handle_comm_session: INFO: Triggered action 'test-act-invalid-bash' "
+        "handle_signal_message: INFO: Triggered action 'test-act-invalid-bash' "
         + f"for account '{PlTestGlobal.test_username}'\n",
         "send_action_results: INFO: Action 'test-act-invalid-bash' requested "
         + f"by account '{PlTestGlobal.test_username}' completed\n",
     ]
     send_valid_signal_and_bail_lines: list[str] = [
-        "handle_comm_session: INFO: Triggered action 'test-act-free' "
+        "handle_signal_message: INFO: Triggered action 'test-act-free' "
         + f"for account '{PlTestGlobal.test_username}'\n",
         "send_msg_safe: ERROR: Could not send 'TRIGGER'\n",
         "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
     send_random_garbage_lines: list[str] = [
-        "get_signal_msg: ERROR: Could not get message from client "
+        "get_client_initial_msg: ERROR: Could not get message from client "
         + f"run by account '{PlTestGlobal.test_username}'!\n",
     ]
     invalid_ascii_list: list[bytes] = [
@@ -988,125 +1016,126 @@ Command=echo 'test-act-missing-auth'
     # TODO: Any good way to avoid all the repetition?
     invalid_ascii_lines_list: list[list[str]] = [
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid message type 'TEST' for socket\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
-            "auth_signal_request: WARNING: Could not find action 'PARAM1' "
-            + f"requested by account '{PlTestGlobal.test_username}'\n"
+            "auth_signal_request: WARNING: Action run request: Could not find "
+            + "action 'PARAM1' requested by account "
+            + f"'{PlTestGlobal.test_username}'\n"
         ],
         [
-            "get_signal_msg: ERROR: Could not get message from client "
+            "get_client_initial_msg: ERROR: Could not get message from client "
             + f"run by account '{PlTestGlobal.test_username}'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: recv_buf contains data past the last string\n",
@@ -1147,29 +1176,29 @@ Command=echo 'test-act-missing-auth'
         + "configuration reloaded\n",
     ]
     test_act_added1_success_lines: list[str] = [
-        "handle_comm_session: INFO: Triggered action 'test-act-added1' "
+        "handle_signal_message: INFO: Triggered action 'test-act-added1' "
         + f"for account '{PlTestGlobal.test_username}'\n",
         "send_action_results: INFO: Action 'test-act-added1' requested "
         + f"by account '{PlTestGlobal.test_username}' completed\n",
     ]
     test_act_added2_success_lines: list[str] = [
-        "handle_comm_session: INFO: Triggered action 'test-act-added2' "
+        "handle_signal_message: INFO: Triggered action 'test-act-added2' "
         + f"for account '{PlTestGlobal.test_username}'\n",
         "send_action_results: INFO: Action 'test-act-added2' requested "
         + f"by account '{PlTestGlobal.test_username}' completed\n",
     ]
     test_act_added1_failure_lines: list[str] = [
-        "auth_signal_request: WARNING: Could not find action "
-        + "'test-act-added1' requested by account "
+        "auth_signal_request: WARNING: Action run request: Could not find "
+        + "action 'test-act-added1' requested by account "
         + f"'{PlTestGlobal.test_username}'\n",
     ]
     test_act_added2_failure_lines: list[str] = [
-        "auth_signal_request: WARNING: Could not find action "
-        + "'test-act-added2' requested by account "
+        "auth_signal_request: WARNING: Action run request: Could not find "
+        + "action 'test-act-added2' requested by account "
         + f"'{PlTestGlobal.test_username}'\n",
     ]
     test_act_userpermit_success_lines: list[str] = [
-        "handle_comm_session: INFO: Triggered action 'test-act-userpermit' "
+        "handle_signal_message: INFO: Triggered action 'test-act-userpermit' "
         + f"for account '{PlTestGlobal.test_username}'\n",
         "send_action_results: INFO: Action 'test-act-userpermit' requested "
         + f"by account '{PlTestGlobal.test_username}' completed\n",
@@ -1192,4 +1221,14 @@ Command=echo 'test-act-missing-auth'
         + "'/etc/privleap/conf.d/missing_auth.conf:1:error:No "
         + "authorized users or groups for action: 'test-act-missing-auth''\n",
         "main: CRITICAL: Failed initial config load!\n",
+    ]
+    allowed_action_access_check_lines: list[str] = [
+        "auth_signal_request: INFO: Access check: Account "
+        + f"'{PlTestGlobal.test_username}' is authorized to run action "
+        + "'test-act-free'\n",
+    ]
+    disallowed_action_access_check_lines: list[str] = [
+        "auth_signal_request: WARNING: Access check: Account "
+        + f"'{PlTestGlobal.test_username}' is not authorized to run action "
+        + "'test-act-userrestrict'\n",
     ]

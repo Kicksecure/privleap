@@ -30,6 +30,7 @@ from typing import Tuple, cast, SupportsIndex, IO, NoReturn, Any
 import sdnotify  # type: ignore
 
 # import privleap as pl
+
 import privleap.privleap as pl
 
 
@@ -350,12 +351,15 @@ def run_action(
     return action_process
 
 
-def get_signal_msg(
+def get_client_initial_msg(
     comm_session: pl.PrivleapSession,
-) -> pl.PrivleapCommClientSignalMsg | None:
+) -> (
+    pl.PrivleapCommClientSignalMsg | pl.PrivleapCommClientAccessCheckMsg | None
+):
     """
-    Gets a SIGNAL comm message from the client. Returns None if the client tries
-      to send something other than a SIGNAL message.
+    Gets a SIGNAL or ACCESS_CHECK comm message from the client. Returns
+      None if the client tries to send something other than a SIGNAL or
+      ACCESS_CHECK message.
     """
 
     try:
@@ -368,11 +372,20 @@ def get_signal_msg(
         )
         return None
 
-    if not isinstance(comm_msg, pl.PrivleapCommClientSignalMsg):
-        # Illegal message, a SIGNAL needs to be the first message.
+    if not (
+        isinstance(
+            comm_msg,
+            (
+                pl.PrivleapCommClientSignalMsg,
+                pl.PrivleapCommClientAccessCheckMsg,
+            ),
+        )
+    ):
+        # Illegal message, a SIGNAL or ACCESS_CHECK needs to be the first
+        # message.
         logging.warning(
-            "Did not read SIGNAL as first message from client run by account "
-            "'%s', forcibly closing connection.",
+            "Did not read SIGNAL or ACCESS_CHECK as first message from "
+            "client run by account '%s', forcibly closing connection.",
             comm_session.user_name,
         )
         return None
@@ -510,7 +523,7 @@ def send_action_results(
 
 
 def auth_signal_request(
-    comm_msg: pl.PrivleapCommClientSignalMsg, comm_session: pl.PrivleapSession
+    comm_msg: pl.PrivleapMsg, comm_session: pl.PrivleapSession
 ) -> pl.PrivleapAction | None:
     """
     Finds the requested action, and ensures that the calling user has the
@@ -520,6 +533,22 @@ def auth_signal_request(
       exist.
     """
 
+    auth_type: str
+    if isinstance(comm_msg, pl.PrivleapCommClientSignalMsg):
+        auth_type = "Action run request"
+    elif isinstance(comm_msg, pl.PrivleapCommClientAccessCheckMsg):
+        auth_type = "Access check"
+    else:
+        logging.critical("Invalid message type provided!")
+        sys.exit(1)
+
+    assert isinstance(
+        comm_msg,
+        (
+            pl.PrivleapCommClientSignalMsg,
+            pl.PrivleapCommClientAccessCheckMsg,
+        ),
+    )
     # The auth code attempts to NOT allow a client to tell the difference
     # between an action that doesn't exist, and one that does exist but that
     # they aren't allowed to execute. If authentication fails or the action
@@ -540,7 +569,8 @@ def auth_signal_request(
     if auth_result != PrivleapdAuthStatus.AUTHORIZED:
         if auth_result is None:
             logging.warning(
-                "Could not find action '%s' requested by account '%s'",
+                "%s: Could not find action '%s' requested by account '%s'",
+                auth_type,
                 comm_msg.signal_name,
                 comm_session.user_name,
             )
@@ -549,13 +579,15 @@ def auth_signal_request(
             assert desired_action.action_name is not None
             if auth_result == PrivleapdAuthStatus.USER_MISSING:
                 logging.warning(
-                    "Account '%s' does not exist, cannot run action '%s'",
+                    "%s: Account '%s' does not exist, cannot run action '%s'",
+                    auth_type,
                     comm_session.user_name,
                     desired_action.action_name,
                 )
             elif auth_result == PrivleapdAuthStatus.UNAUTHORIZED:
                 logging.warning(
-                    "Account '%s' is not authorized to run action '%s'",
+                    "%s: Account '%s' is not authorized to run action '%s'",
+                    auth_type,
                     comm_session.user_name,
                     desired_action.action_name,
                 )
@@ -567,7 +599,50 @@ def auth_signal_request(
         return None
 
     assert desired_action is not None
+    logging.info(
+        "%s: Account '%s' is authorized to run action '%s'",
+        auth_type,
+        comm_session.user_name,
+        desired_action.action_name,
+    )
     return desired_action
+
+
+def handle_signal_message(
+    desired_action: pl.PrivleapAction, comm_session: pl.PrivleapSession
+) -> None:
+    """
+    Handles a SIGNAL message from the client.
+    """
+
+    assert comm_session.user_name is not None
+    try:
+        action_process: subprocess.Popen[bytes]
+        action_process = run_action(desired_action, comm_session.user_name)
+    except Exception as e:
+        logging.error(
+            "Action '%s' authorized for account '%s', but trigger failed!",
+            desired_action.action_name,
+            comm_session.user_name,
+            exc_info=e,
+        )
+        send_msg_safe(comm_session, pl.PrivleapCommServerTriggerErrorMsg())
+        return
+
+    logging.info(
+        "Triggered action '%s' for account '%s'",
+        desired_action.action_name,
+        comm_session.user_name,
+    )
+
+    # We don't bail out if this message send fails, since we still need to
+    # monitor and manage the child process, which is part of what
+    # send_action_results() does.
+    send_msg_safe(comm_session, pl.PrivleapCommServerTriggerMsg())
+    assert desired_action.action_name is not None
+    send_action_results(
+        comm_session, desired_action.action_name, action_process
+    )
 
 
 def handle_comm_session(comm_socket: pl.PrivleapSocket) -> None:
@@ -585,12 +660,12 @@ def handle_comm_session(comm_socket: pl.PrivleapSocket) -> None:
         )
         return
 
-    assert comm_session.user_name is not None
-
     try:
-        comm_msg: pl.PrivleapCommClientSignalMsg | None = get_signal_msg(
-            comm_session
-        )
+        comm_msg: (
+            pl.PrivleapCommClientSignalMsg
+            | pl.PrivleapCommClientAccessCheckMsg
+            | None
+        ) = get_client_initial_msg(comm_session)
         if comm_msg is None:
             return
 
@@ -600,34 +675,13 @@ def handle_comm_session(comm_socket: pl.PrivleapSocket) -> None:
 
         if desired_action is None:
             return
-        assert desired_action.action_name is not None
 
-        try:
-            action_process: subprocess.Popen[bytes]
-            action_process = run_action(desired_action, comm_session.user_name)
-        except Exception as e:
-            logging.error(
-                "Action '%s' authorized for account '%s', but trigger failed!",
-                desired_action.action_name,
-                comm_session.user_name,
-                exc_info=e,
-            )
-            send_msg_safe(comm_session, pl.PrivleapCommServerTriggerErrorMsg())
-            return
-
-        logging.info(
-            "Triggered action '%s' for account '%s'",
-            desired_action.action_name,
-            comm_session.user_name,
-        )
-
-        # We don't bail out if this message send fails, since we still need to
-        # monitor and manage the child process, which is part of what
-        # send_action_results() does.
-        send_msg_safe(comm_session, pl.PrivleapCommServerTriggerMsg())
-        send_action_results(
-            comm_session, desired_action.action_name, action_process
-        )
+        if isinstance(comm_msg, pl.PrivleapCommClientSignalMsg):
+            handle_signal_message(desired_action, comm_session)
+        elif isinstance(comm_msg, pl.PrivleapCommClientAccessCheckMsg):
+            # We already authorized the request above, so we can simply tell the
+            # client about that now.
+            send_msg_safe(comm_session, pl.PrivleapCommServerAuthorizedMsg())
 
     finally:
         comm_session.close_session()
