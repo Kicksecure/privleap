@@ -1,3 +1,22 @@
+commit b9b43ab51b1ff22ddf0f270d56d9f62fcc6705a4
+Merge: 2605f0f fb76cc6
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Mon Mar 31 06:08:10 2025 -0400
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit fb76cc6a7683a789ef9d69096a05077350b7ec0f
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Mar 30 15:40:48 2025 -0500
+
+    Add --check switch to leaprun, do some code cleanup
+
+commit 2605f0f3ec7c9dae854c029a569cbf6c3668b39a
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Tue Mar 18 10:56:42 2025 +0000
+
+    bumped changelog version
+
 commit 77828a5ce40d1bbc81e39c4dc62949dc6ca33c76
 Merge: 4c35d5a e8d7023
 Author: Patrick Schleizer <adrelanos@whonix.org>
