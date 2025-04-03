@@ -595,6 +595,10 @@ Command=pwd; id; env
 AuthorizedUsers={PlTestGlobal.test_username}
 TargetUser={PlTestGlobal.test_username}
 
+[expected-disallowed-users]
+User=irc
+User=news
+
 [persistent-users]
 User=messagebus
 """
@@ -724,6 +728,14 @@ Command=echo 'test-act-missing-auth'
     )
     man_socket_not_permitted: bytes = (
         b"ERROR: Account 'man' is not permitted to have a comm socket!\n"
+    )
+    irc_expected_socket_not_permitted: bytes = (
+        b"Account 'irc' is not permitted to have a comm socket, as expected, "
+        b"ok.\n"
+    )
+    news_expected_socket_not_permitted: bytes = (
+        b"Account 'news' is not permitted to have a comm socket, as "
+        b"expected, ok.\n"
     )
     leapctl_help: bytes = (
         b"leapctl <--create|--destroy> <user>\n"
@@ -1231,4 +1243,8 @@ Command=echo 'test-act-missing-auth'
         "auth_signal_request: WARNING: Access check: Account "
         + f"'{PlTestGlobal.test_username}' is not authorized to run action "
         + "'test-act-userrestrict'\n",
+    ]
+    create_expected_disallowed_socket_lines: list[str] = [
+        "handle_control_create_msg: INFO: Expected disallowed account 'irc' "
+        + "requested a comm socket, request denied\n",
     ]

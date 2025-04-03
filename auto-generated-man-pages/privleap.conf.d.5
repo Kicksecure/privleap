@@ -36,6 +36,13 @@ Keys:
 .IP
 \fBUser\fR: Specifies a user to mark as "persistent"\. This key may appear multiple times in the section\. The same user can be specified multiple times\. It is an error to specify a non\-existent user as persistent\.
 .TP
+\fB[expected\-disallowed\-users]\fR
+Description: Specifies one or more users that shall not be permitted to communicate with privleapd\. The only users that should be listed here are users that shouldn't be allowed to connect, but that a privileged privleap client will probably request the creation of a communication socket for\. If a client requests privleapd to create a communication socket for one of these users, privleapd will refuse, but send a message to the client indicating that the request (and refusal) was expected\. leapctl uses this to alert the user when an unexpected failure occurs, but fail silently when an expected one occurs\.
+.IP
+Keys:
+.IP
+\fBUser\fR: Specifies a user to mark as "expected disallowed"\. This key may appear multiple times in the section\. The same user can be specified multiple times\. If the specified user does not exist, the user is skipped over\.
+.TP
 \fB[action:*]\fR
 Description: Action headers define an action that can be run via privleapd\. Headers that start with \fBaction:\fR are interpreted as action headers\. The text after the \fB:\fR is interpreted as the action name\. Each action header must appear only once in privleap's configuration, attempting to define two actions with the same header is an error\.
 .IP

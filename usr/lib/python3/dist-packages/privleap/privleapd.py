@@ -48,6 +48,7 @@ class PrivleapdGlobal:
     action_list: list[pl.PrivleapAction] = []
     persistent_user_list: list[str] = []
     allowed_user_list: list[str] = []
+    expected_disallowed_user_list: list[str] = []
     socket_list: list[pl.PrivleapSocket] = []
     pid_file_path: Path = Path(pl.PrivleapCommon.state_dir, "pid")
     test_mode = False
@@ -100,6 +101,18 @@ def handle_control_create_msg(
         logging.warning("Account '%s' does not exist", control_msg.user_name)
         send_msg_safe(
             control_session, pl.PrivleapControlServerControlErrorMsg()
+        )
+        return
+
+    if user_name in PrivleapdGlobal.expected_disallowed_user_list:
+        logging.info(
+            "Expected disallowed account '%s' requested a comm socket, "
+            "request denied",
+            user_name,
+        )
+        send_msg_safe(
+            control_session,
+            pl.PrivleapControlServerExpectedDisallowedUserMsg(),
         )
         return
 
@@ -791,6 +804,7 @@ def parse_config_file(
     temp_action_list: list[pl.PrivleapAction],
     temp_persistent_user_list: list[str],
     temp_allowed_user_list: list[str],
+    temp_expected_disallowed_user_list: list[str],
 ) -> bool:
     """
     Parses a single config file.
@@ -800,6 +814,7 @@ def parse_config_file(
     action_arr: list[pl.PrivleapAction]
     persistent_user_arr: list[str]
     allowed_user_arr: list[str]
+    expected_disallowed_user_arr: list[str]
 
     config_result = pl.PrivleapCommon.parse_config_file(config_file)
     if isinstance(config_result, str):
@@ -811,6 +826,7 @@ def parse_config_file(
     action_arr = config_result[0]
     persistent_user_arr = config_result[1]
     allowed_user_arr = config_result[2]
+    expected_disallowed_user_arr = config_result[3]
     duplicate_action_name: str | None = extend_action_list(
         action_arr, temp_action_list
     )
@@ -824,19 +840,19 @@ def parse_config_file(
             logging.error("Error parsing config: '%s'", duplicate_action_error)
         return False
     for persistent_user_item in persistent_user_arr:
-        # Note, parse_config_file() normalizes the usernames of
-        # persistent users for us.
+        # Note, parse_config_file() normalizes usernames for us.
         append_if_not_in(persistent_user_item, temp_persistent_user_list)
         # Persistent users are automatically allowed users too.
         append_if_not_in(persistent_user_item, temp_allowed_user_list)
         # It isn't an error for duplicate persistent users to be
         # defined, we just skip over the duplicates.
     for allowed_user_item in allowed_user_arr:
-        # Note, parse_config_file() normalizes the usernames of
-        # allowed users for us.
         append_if_not_in(allowed_user_item, temp_allowed_user_list)
-        # It isn't an error for duplicate allowed users to be
-        # defined, we just skip over the duplicates.
+    for expected_disallowed_user_item in expected_disallowed_user_arr:
+        append_if_not_in(
+            expected_disallowed_user_item,
+            temp_expected_disallowed_user_list,
+        )
     return True
 
 
@@ -855,6 +871,7 @@ def parse_config_files() -> bool:
     temp_action_list: list[pl.PrivleapAction] = []
     temp_persistent_user_list: list[str] = []
     temp_allowed_user_list: list[str] = []
+    temp_expected_disallowed_user_list: list[str] = []
 
     for config_file in config_file_list:
         if not config_file.is_file():
@@ -871,6 +888,7 @@ def parse_config_files() -> bool:
                 temp_action_list,
                 temp_persistent_user_list,
                 temp_allowed_user_list,
+                temp_expected_disallowed_user_list,
             ):
                 return False
         except Exception as e:
@@ -881,6 +899,9 @@ def parse_config_files() -> bool:
     PrivleapdGlobal.action_list = temp_action_list
     PrivleapdGlobal.persistent_user_list = temp_persistent_user_list
     PrivleapdGlobal.allowed_user_list = temp_allowed_user_list
+    PrivleapdGlobal.expected_disallowed_user_list = (
+        temp_expected_disallowed_user_list
+    )
     return True
 
 

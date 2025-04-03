@@ -7,7 +7,7 @@ leaprun(8) -- Run actions with privleap
 -->
 
 ## SYNOPSIS
-`leaprun [--] action_name`
+`leaprun [-c|--check] [--] action_name`
 
 ## DESCRIPTION
 Connects to a privleapd server running on the local machine, and requests that
@@ -15,10 +15,12 @@ the server run an action defined in privleap's config. The exact actions that
 are available to run will vary from system to system.
 
 ## OPTIONS
+* `-c|--check` :
+  Queries the privleapd server to see if the requested action can be run by
+  the caller, without actually running the action.
+
 * `--` :
-  No-op. This is used to allow emulating "end-of-options" capability for
-  consistency's sake, despite the fact that leaprun has no meaningful
-  options.
+  End-of-options indicator.
 
 ## ENVIRONMENT VARIABLES
 None.
