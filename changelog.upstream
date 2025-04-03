@@ -1,3 +1,22 @@
+commit b5f73c41bf86580fc56bee4d34aa8330eb8faad5
+Merge: f40a2a4 78b83a9
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Thu Apr 3 12:24:55 2025 -0400
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit 78b83a9ff22a91c47bab9964e6d8b76672dc5f06
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Apr 2 20:06:28 2025 -0500
+
+    Allow configuring users as "expected disallowed"
+
+commit f40a2a4556c6124dabb75ba593563ce7c72fec9d
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Mon Mar 31 10:20:10 2025 +0000
+
+    bumped changelog version
+
 commit b9b43ab51b1ff22ddf0f270d56d9f62fcc6705a4
 Merge: 2605f0f fb76cc6
 Author: Patrick Schleizer <adrelanos@whonix.org>
