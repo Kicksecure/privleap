@@ -440,6 +440,18 @@ def run_leapctl_tests() -> None:
     )
     # ---
     leapctl_assert_command(
+        ["leapctl", "--create", "irc"],
+        exit_code=0,
+        stdout_data=PlTestData.irc_expected_socket_not_permitted,
+    )
+    # ---
+    leapctl_assert_command(
+        ["leapctl", "--create", "news"],
+        exit_code=0,
+        stdout_data=PlTestData.news_expected_socket_not_permitted,
+    )
+    # ---
+    leapctl_assert_command(
         ["leapctl", "--create", "root"],
         exit_code=0,
         stdout_data=PlTestData.root_socket_created,
@@ -1598,6 +1610,37 @@ def privleapd_destroy_missing_user_socket_test(bogus: str) -> bool:
     return assert_success
 
 
+def privleapd_create_expected_disallowed_socket_test(bogus: str) -> bool:
+    """
+    Test how privleapd handles a control client that requests a socket to be
+      created for a user that is marked as "expected disallowed".
+    """
+
+    if bogus != "":
+        return False
+    util.discard_privleapd_stderr()
+    assert_success: bool = True
+    control_session: pl.PrivleapSession = pl.PrivleapSession(
+        is_control_session=True
+    )
+    control_session.send_msg(pl.PrivleapControlClientCreateMsg("irc"))
+    control_server_msg: pl.PrivleapMsg = control_session.get_msg()
+    control_session.close_session()
+    if not isinstance(
+        control_server_msg, pl.PrivleapControlServerExpectedDisallowedUserMsg
+    ):
+        logging.error(
+            "privleapd returned unexpected message type: %s",
+            type(control_server_msg),
+        )
+        assert_success = False
+    if not util.compare_privleapd_stderr(
+        PlTestData.create_expected_disallowed_socket_lines
+    ):
+        assert_success = False
+    return assert_success
+
+
 def privleapd_destroy_user_socket_and_bail_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
@@ -2515,6 +2558,12 @@ def run_privleapd_tests() -> None:
         privleapd_destroy_missing_user_socket_test,
         "",
         "Test privleapd socket destroy request for user with deleted socket",
+    )
+    # ---
+    privleapd_assert_function(
+        privleapd_create_expected_disallowed_socket_test,
+        "",
+        "Test privleapd socket create request for expected disallowed user",
     )
     # ---
     privleapd_assert_function(

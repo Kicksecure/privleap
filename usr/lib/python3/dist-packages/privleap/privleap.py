@@ -55,7 +55,8 @@ class PrivleapConfigSection(Enum):
     ACTION = 1
     PERSISTENT_USERS = 2
     ALLOWED_USERS = 3
-    NONE = 4
+    EXPECTED_DISALLOWED_USERS = 4
+    NONE = 5
 
 
 class PrivleapMsg:
@@ -207,6 +208,22 @@ class PrivleapControlServerDisallowedUserMsg(PrivleapMsg):
     """
 
     name = "DISALLOWED_USER"
+
+
+class PrivleapControlServerExpectedDisallowedUserMsg(PrivleapMsg):
+    """
+    Privleap message.
+
+    Sent from server to client.
+
+    Indicates that the requested creation operation specified a user that is
+      configured as disallowed and expected. The user thus cannot have a
+      comm socket created for them, but the client should take into account
+      that its request was expected and indicate this to the user as
+      appropriate.
+    """
+
+    name = "EXPECTED_DISALLOWED_USER"
 
 
 class PrivleapCommClientSignalMsg(PrivleapMsg):
@@ -726,6 +743,11 @@ class PrivleapSession:
                     recv_buf, str_count=0, blob_at_end=False
                 )
                 return PrivleapControlServerDisallowedUserMsg()
+            if msg_type_str == "EXPECTED_DISALLOWED_USER":
+                self.__parse_msg_parameters(
+                    recv_buf, str_count=0, blob_at_end=False
+                )
+                return PrivleapControlServerExpectedDisallowedUserMsg()
             raise ValueError(
                 f"Invalid message type '{msg_type_str}' for socket"
             )
@@ -831,6 +853,7 @@ class PrivleapSession:
                 PrivleapControlServerNouserMsg,
                 PrivleapControlServerPersistentUserMsg,
                 PrivleapControlServerDisallowedUserMsg,
+                PrivleapControlServerExpectedDisallowedUserMsg,
             ):
                 raise ValueError("Invalid message type for socket.")
         elif self.is_control_session and not self.is_server_side:
@@ -1044,7 +1067,12 @@ class PrivleapAction:
         self.target_group = target_group
 
 
-ConfigData: TypeAlias = Tuple[list[PrivleapAction], list[str], list[str]]
+ConfigData: TypeAlias = Tuple[
+    list[PrivleapAction],
+    list[str],
+    list[str],
+    list[str],
+]
 
 
 class PrivleapCommon:
@@ -1099,6 +1127,7 @@ class PrivleapCommon:
         action_output_list: list[PrivleapAction] = []
         persistent_user_output_list: list[str] = []
         allowed_user_output_list: list[str] = []
+        expected_disallowed_user_output_list: list[str] = []
         current_section_type: PrivleapConfigSection = PrivleapConfigSection.NONE
         line_idx: int = 0
         detect_comment_regex: re.Pattern[str] = re.compile(r"\s*#")
@@ -1181,6 +1210,10 @@ class PrivleapCommon:
                         current_section_type = (
                             PrivleapConfigSection.ALLOWED_USERS
                         )
+                    elif current_header_name == "expected-disallowed-users":
+                        current_section_type = (
+                            PrivleapConfigSection.EXPECTED_DISALLOWED_USERS
+                        )
                     elif current_header_name[:7] == "action:":
                         current_action_name = current_header_name[7:]
                         current_section_type = PrivleapConfigSection.ACTION
@@ -1243,6 +1276,29 @@ class PrivleapCommon:
                         if config_val is not None:
                             if config_val not in allowed_user_output_list:
                                 allowed_user_output_list.append(config_val)
+                    else:
+                        return (
+                            f"{config_file}:{line_idx}:error:Unrecognized "
+                            f"key '{config_key}' found under header "
+                            f"'{current_header_name}'"
+                        )
+                elif (
+                    current_section_type
+                    == PrivleapConfigSection.EXPECTED_DISALLOWED_USERS
+                ):
+                    if config_key == "User":
+                        assert config_val is not None
+                        config_val = PrivleapCommon.normalize_user_id(
+                            config_val
+                        )
+                        if config_val is not None:
+                            if (
+                                config_val
+                                not in expected_disallowed_user_output_list
+                            ):
+                                expected_disallowed_user_output_list.append(
+                                    config_val
+                                )
                     else:
                         return (
                             f"{config_file}:{line_idx}:error:Unrecognized "
@@ -1341,6 +1397,7 @@ class PrivleapCommon:
             action_output_list,
             persistent_user_output_list,
             allowed_user_output_list,
+            expected_disallowed_user_output_list,
         )
 
     @staticmethod

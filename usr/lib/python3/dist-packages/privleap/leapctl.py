@@ -133,6 +133,15 @@ def handle_create_request(user_name: str) -> NoReturn:
             f"Account {repr(user_name)} is not permitted to have a comm socket!",
             2,
         )
+    elif isinstance(
+        control_msg,
+        pl.PrivleapControlServerExpectedDisallowedUserMsg,
+    ):
+        print(
+            f"Account {repr(user_name)} is not permitted to have a comm "
+            "socket, as expected, ok."
+        )
+        cleanup_and_exit(0)
     elif isinstance(control_msg, pl.PrivleapControlServerExistsMsg):
         print(f"Comm socket already exists for account {repr(user_name)}.")
         cleanup_and_exit(0)
