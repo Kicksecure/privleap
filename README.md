@@ -34,7 +34,7 @@ utility to make privleap easier to use from within shell scripts and at the
 command line. `leapctl` should usually only be used by other background
 processes on the system, though it can be useful for debugging.
 
-See the `leaprun(8)`, `leapctl(8)`, and `privleapd(1)` manpages for usage 
+See the `leaprun(8)`, `leapctl(8)`, and `privleapd(1)` manpages for usage
 instructions.
 
 ## Configuration format
@@ -59,25 +59,25 @@ test suite:
 * mmdebstrap
 * python3
 
-Additionally, the `/usr/bin/newuidmap` and `/usr/bin/newgidmap` 
+Additionally, the `/usr/bin/newuidmap` and `/usr/bin/newgidmap`
 executables must be SUID-root.
 
-It is recommended, though not necessarily required, that the host system 
+It is recommended, though not necessarily required, that the host system
 be running Debian 12 or a compatible derivative thereof such as
 [Kicksecure](https://www.kicksecure.com/).
 
-The test suite leverages Debian's autopkgtest tool, which allows running 
-the test suite in an isolated environment, unaffected by the host's 
-configuration for the most part. To run the tests, simply run the 
-`run_autopkgtest` script from the root of the source tree. The script will 
-function regardless of what your current working directory is when you 
+The test suite leverages Debian's autopkgtest tool, which allows running
+the test suite in an isolated environment, unaffected by the host's
+configuration for the most part. To run the tests, simply run the
+`run_autopkgtest` script from the root of the source tree. The script will
+function regardless of what your current working directory is when you
 call it.
 
 `run_autopkgtest` creates an unshare tarball under
-`~/.cache/sbuild/bookworm-amd64.tar.zst` (which is where autopkgtest 
+`~/.cache/sbuild/bookworm-amd64.tar.zst` (which is where autopkgtest
 expects to find it). This tarball may eventually get out of date as packages
-in Debian are upgraded, or it may end up improperly built if you interrupt 
-`run_autopkgtest` while it is building the tarball initially. If for some 
-reason you need to rebuild this tarball from scratch before doing the next 
-test, run `run_autopkgtest --reset-tarball`. This will delete the tarball 
+in Debian are upgraded, or it may end up improperly built if you interrupt
+`run_autopkgtest` while it is building the tarball initially. If for some
+reason you need to rebuild this tarball from scratch before doing the next
+test, run `run_autopkgtest --reset-tarball`. This will delete the tarball
 and regenerate it, then run the tests as usual.
