@@ -68,8 +68,8 @@ messages longer than this, although it is not generally recommended.
   specified user does not have a communication socket, and `CONTROL_ERROR` if
   this fails.
 * `RELOAD` - Reloads configuration data. `privleapd` will respond with `OK` if
-  this succeeds, and `CONTROL_ERROR` if this fails (due to invalid 
-  configuration). The details of the invalid configuration that lead to a 
+  this succeeds, and `CONTROL_ERROR` if this fails (due to invalid
+  configuration). The details of the invalid configuration that lead to a
   failure will be logged.
 
 `privleapd` can send the following messages on the `control` socket, which
@@ -83,16 +83,16 @@ clients must be able to understand:
   username specified in the message already has a communication socket open.
 * `NOUSER` - The first client-sent message was a `DESTROY` message, but the
   username specified in the message has no communication socket open.
-* `PERSISTENT_USER` - The first client-sent message was a `DESTROY` 
-  message, but the username specified in the message is a "persistent 
+* `PERSISTENT_USER` - The first client-sent message was a `DESTROY`
+  message, but the username specified in the message is a "persistent
   user" and cannot have their socket destroyed. (See
   /etc/privleap/conf.d/README for more information on persistent users.)
 * `DISALLOWED_USER` - The first client-sent message was a `CREATE` message,
-  but the username specified in the message is not an "allowed user" and 
-  cannot have a socket created for them. (See `man privleap.conf.d ` for 
+  but the username specified in the message is not an "allowed user" and
+  cannot have a socket created for them. (See `man privleap.conf.d ` for
   more information on allowed users.)
 * `EXPECTED_DISALLOWED_USER` - The first client-sent message was a `CREATE`
-  message, but the username specified in the message is an "expected 
+  message, but the username specified in the message is an "expected
   disallowed user" and cannot have a socket created for them. (See
   `man privleap.conf.d` for more information on allowed users.)
 
@@ -151,15 +151,15 @@ understand:
   between 0 and 255.
 * `AUTHORIZED` - Indicates that the user who sent an `ACCESS_CHECK` query is
   authorized to run the action specified by the `ACCESS_CHECK` message.
-* `UNAUTHORIZED` - Indicates that the user attempting to trigger or query the 
+* `UNAUTHORIZED` - Indicates that the user attempting to trigger or query the
   specified action is not authorized to trigger that action, or that the
-  signal sent by the client has no matching action. This response 
+  signal sent by the client has no matching action. This response
   intentionally does not tell the client whether they simply aren't allowed
   to perform the action, or whether the action doesn't even exist.
 
 `privleapd` will only parse the first one of each of the above client-sent
 messages per session. `privleapd` will terminate the session immediately after
-sending `AUTHORIZED`, `UNAUTHORIZED`, or `RESULT_EXITCODE`. privleapd 
+sending `AUTHORIZED`, `UNAUTHORIZED`, or `RESULT_EXITCODE`. privleapd
 *may* send multiple `RESULT_STDOUT` and `RESULT_STDERR` messages in a
 single session.
 
@@ -167,7 +167,7 @@ In actual operation, the client (most likely `leaprun`) is expected to open a
 session with `privleapd` and send either a `SIGNAL` or `ACCESS_CHECK` message.
 If the user is authorized to trigger the action specified in the message,
 `privleapd` will respond with either `AUTHORIZED` in reply to an
-`ACCESS_CHECK`, or `TRIGGER` in response to a `SIGNAL`. If privleapd is 
+`ACCESS_CHECK`, or `TRIGGER` in response to a `SIGNAL`. If privleapd is
 running an action, it will send `RESULT_STDOUT` and `RESULT_STDERR` messages
 as the action runs so the caller can see the output of the action.
 
