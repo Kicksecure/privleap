@@ -1,3 +1,21 @@
+commit 017f899a50e6c3629da259fc327e6f10ceb3bd56
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Tue Apr 8 07:25:15 2025 -0400
+
+    remove trailing spaces
+
+commit 7e203ec5c239dd814e4a4898b4ae40c2b2041689
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Tue Apr 8 07:13:09 2025 -0400
+
+    remove trailing spaces
+
+commit a0cc68dc56c0c601d43570c5327b699bb1564757
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Thu Apr 3 17:01:21 2025 +0000
+
+    bumped changelog version
+
 commit b5f73c41bf86580fc56bee4d34aa8330eb8faad5
 Merge: f40a2a4 78b83a9
 Author: Patrick Schleizer <adrelanos@whonix.org>
