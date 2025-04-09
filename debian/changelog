@@ -1,3 +1,9 @@
+privleap (3:3.3-1) unstable; urgency=medium
+
+  * New upstream version (local package).
+
+ -- Patrick Schleizer <adrelanos@whonix.org>  Wed, 09 Apr 2025 15:15:39 +0000
+
 privleap (3:3.2-1) unstable; urgency=medium
 
   * New upstream version (local package).
