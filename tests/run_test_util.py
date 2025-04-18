@@ -1255,7 +1255,7 @@ Command=echo 'test-act-missing-auth'
     leaprun_terminate_lines: list[str] = [
         "handle_signal_message: INFO: Triggered action 'test-act-noreturn' "
         + f"for account '{PlTestGlobal.test_username}'\n",
-        "send_action_results: INFO: Action 'test-act-noreturn' prematurely "
+        "check_action_terminate: INFO: Action 'test-act-noreturn' prematurely "
         + f"terminated by account '{PlTestGlobal.test_username}'\n",
         "send_action_results: INFO: Action 'test-act-noreturn' requested by "
         + f"account '{PlTestGlobal.test_username}' completed\n",
