@@ -15,7 +15,8 @@
 
 import sys
 import getpass
-from typing import cast, Union, NoReturn
+import select
+from typing import cast, Union, NoReturn, Tuple
 
 # import privleap as pl
 
@@ -41,6 +42,7 @@ class LeaprunGlobal:
         | pl.PrivleapCommClientAccessCheckMsg
         | None
     ) = None
+    terminate_session = False
     comm_session: pl.PrivleapSession | None = None
 
 
@@ -156,6 +158,39 @@ def send_output_msg() -> None:
             )
 
 
+def check_terminate_session() -> None:
+    """
+    Checks if the user has attempted to terminate the session, and instructs
+      the server to terminate the running action if so.
+    """
+
+    if LeaprunGlobal.terminate_session:
+        try:
+            assert LeaprunGlobal.comm_session is not None
+            LeaprunGlobal.comm_session.send_msg(
+                pl.PrivleapCommClientTerminateMsg()
+            )
+            cleanup_and_exit(130)
+        except Exception:
+            generic_error("Could not send terminate message to privleapd!")
+
+
+def handle_server_reply(comm_msg: pl.PrivleapMsg) -> None:
+    """
+    Handles a reply from the server with info from the running action.
+    """
+
+    if isinstance(comm_msg, pl.PrivleapCommServerResultStdoutMsg):
+        _ = sys.stdout.buffer.write(cast(Buffer, comm_msg.stdout_bytes))
+    elif isinstance(comm_msg, pl.PrivleapCommServerResultStderrMsg):
+        _ = sys.stderr.buffer.write(cast(Buffer, comm_msg.stderr_bytes))
+    elif isinstance(comm_msg, pl.PrivleapCommServerResultExitcodeMsg):
+        assert comm_msg.exit_code is not None
+        cleanup_and_exit(comm_msg.exit_code)
+    else:
+        unexpected_msg_error(comm_msg)
+
+
 def handle_response() -> NoReturn:
     """
     Handles the signal response from the server.
@@ -194,33 +229,37 @@ def handle_response() -> NoReturn:
         elif isinstance(comm_msg, pl.PrivleapCommServerTriggerMsg):
             while True:
                 try:
-                    comm_msg = LeaprunGlobal.comm_session.get_msg()
+                    check_terminate_session()
+                    assert LeaprunGlobal.comm_session.backend_socket is not None
+
+                    try:
+                        ready_streams: Tuple[
+                            list[int], list[int], list[int]
+                        ] = select.select(
+                            [
+                                LeaprunGlobal.comm_session.backend_socket.fileno()
+                            ],
+                            [],
+                            [],
+                        )
+                    except KeyboardInterrupt:
+                        LeaprunGlobal.terminate_session = True
+                        continue
+
+                    if (
+                        LeaprunGlobal.comm_session.backend_socket.fileno()
+                        in ready_streams[0]
+                    ):
+                        comm_msg = LeaprunGlobal.comm_session.get_msg()
+                    else:
+                        continue
                 except Exception:
                     generic_error(
                         "Action triggered, but privleapd closed the connection "
                         "before sending all output!"
                     )
 
-                # noinspection PyUnboundLocalVariable
-                if isinstance(comm_msg, pl.PrivleapCommServerResultStdoutMsg):
-                    # noinspection PyUnboundLocalVariable
-                    _ = sys.stdout.buffer.write(
-                        cast(Buffer, comm_msg.stdout_bytes)
-                    )
-                elif isinstance(comm_msg, pl.PrivleapCommServerResultStderrMsg):
-                    # noinspection PyUnboundLocalVariable
-                    _ = sys.stderr.buffer.write(
-                        cast(Buffer, comm_msg.stderr_bytes)
-                    )
-                elif isinstance(
-                    comm_msg, pl.PrivleapCommServerResultExitcodeMsg
-                ):
-                    # noinspection PyUnboundLocalVariable
-                    assert comm_msg.exit_code is not None
-                    cleanup_and_exit(comm_msg.exit_code)
-                else:
-                    # noinspection PyUnboundLocalVariable
-                    unexpected_msg_error(comm_msg)
+                handle_server_reply(comm_msg)
 
         else:
             # noinspection PyUnboundLocalVariable

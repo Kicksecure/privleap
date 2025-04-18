@@ -134,8 +134,7 @@ def handle_create_request(user_name: str) -> NoReturn:
             2,
         )
     elif isinstance(
-        control_msg,
-        pl.PrivleapControlServerExpectedDisallowedUserMsg,
+        control_msg, pl.PrivleapControlServerExpectedDisallowedUserMsg
     ):
         print(
             f"Account {repr(user_name)} is not permitted to have a comm "
