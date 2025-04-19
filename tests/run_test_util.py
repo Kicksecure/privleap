@@ -595,6 +595,10 @@ Command=pwd; id; env
 AuthorizedUsers={PlTestGlobal.test_username}
 TargetUser={PlTestGlobal.test_username}
 
+[action:test-act-noreturn]
+Command=sleep infinity
+AuthorizedUsers={PlTestGlobal.test_username}
+
 [expected-disallowed-users]
 User=irc
 User=news
@@ -862,7 +866,7 @@ Command=echo 'test-act-missing-auth'
         "main: CRITICAL: Failed initial config load!\n",
     ]
     bad_config_file_check_lines: list[str] = [
-        "/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax\n",
+        "/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax\n"
     ]
     control_disconnect_lines: list[str] = [
         "handle_control_session: ERROR: Could not get message from control client!\n",
@@ -969,7 +973,7 @@ Command=echo 'test-act-missing-auth'
     send_nonexistent_signal_and_bail_lines_part1: list[str] = [
         "auth_signal_request: WARNING: Action run request: Could not find "
         + "action 'nonexistent' requested by account "
-        + f"'{PlTestGlobal.test_username}'\n",
+        + f"'{PlTestGlobal.test_username}'\n"
     ]
     unauthorized_broken_pipe_lines: list[str] = [
         "send_msg_safe: ERROR: Could not send 'UNAUTHORIZED'\n",
@@ -979,12 +983,12 @@ Command=echo 'test-act-missing-auth'
     send_userrestrict_signal_and_bail_lines_part1: list[str] = [
         "auth_signal_request: WARNING: Action run request: Account "
         + f"'{PlTestGlobal.test_username}' is not authorized to run action "
-        + "'test-act-userrestrict'\n",
+        + "'test-act-userrestrict'\n"
     ]
     send_grouprestrict_signal_and_bail_lines_part1: list[str] = [
         "auth_signal_request: WARNING: Action run request: Account "
         + f"'{PlTestGlobal.test_username}' is not authorized to run action "
-        + "'test-act-grouprestrict'\n",
+        + "'test-act-grouprestrict'\n"
     ]
     send_invalid_bash_signal_lines: list[str] = [
         "handle_signal_message: INFO: Triggered action 'test-act-invalid-bash' "
@@ -1000,7 +1004,7 @@ Command=echo 'test-act-missing-auth'
     ]
     send_random_garbage_lines: list[str] = [
         "get_client_initial_msg: ERROR: Could not get message from client "
-        + f"run by account '{PlTestGlobal.test_username}'!\n",
+        + f"run by account '{PlTestGlobal.test_username}'!\n"
     ]
     invalid_ascii_list: list[bytes] = [
         b"\x00\x00\x00\x05\x1BTEST",
@@ -1185,7 +1189,7 @@ Command=echo 'test-act-missing-auth'
     ]
     config_reload_success_lines: list[str] = [
         "handle_control_reload_msg: INFO: Handled RELOAD message, "
-        + "configuration reloaded\n",
+        + "configuration reloaded\n"
     ]
     test_act_added1_success_lines: list[str] = [
         "handle_signal_message: INFO: Triggered action 'test-act-added1' "
@@ -1202,12 +1206,12 @@ Command=echo 'test-act-missing-auth'
     test_act_added1_failure_lines: list[str] = [
         "auth_signal_request: WARNING: Action run request: Could not find "
         + "action 'test-act-added1' requested by account "
-        + f"'{PlTestGlobal.test_username}'\n",
+        + f"'{PlTestGlobal.test_username}'\n"
     ]
     test_act_added2_failure_lines: list[str] = [
         "auth_signal_request: WARNING: Action run request: Could not find "
         + "action 'test-act-added2' requested by account "
-        + f"'{PlTestGlobal.test_username}'\n",
+        + f"'{PlTestGlobal.test_username}'\n"
     ]
     test_act_userpermit_success_lines: list[str] = [
         "handle_signal_message: INFO: Triggered action 'test-act-userpermit' "
@@ -1237,14 +1241,27 @@ Command=echo 'test-act-missing-auth'
     allowed_action_access_check_lines: list[str] = [
         "auth_signal_request: INFO: Access check: Account "
         + f"'{PlTestGlobal.test_username}' is authorized to run action "
-        + "'test-act-free'\n",
+        + "'test-act-free'\n"
     ]
     disallowed_action_access_check_lines: list[str] = [
         "auth_signal_request: WARNING: Access check: Account "
         + f"'{PlTestGlobal.test_username}' is not authorized to run action "
-        + "'test-act-userrestrict'\n",
+        + "'test-act-userrestrict'\n"
     ]
     create_expected_disallowed_socket_lines: list[str] = [
         "handle_control_create_msg: INFO: Expected disallowed account 'irc' "
-        + "requested a comm socket, request denied\n",
+        + "requested a comm socket, request denied\n"
+    ]
+    leaprun_terminate_lines: list[str] = [
+        "handle_signal_message: INFO: Triggered action 'test-act-noreturn' "
+        + f"for account '{PlTestGlobal.test_username}'\n",
+        "check_action_terminate: INFO: Action 'test-act-noreturn' prematurely "
+        + f"terminated by account '{PlTestGlobal.test_username}'\n",
+        "send_action_results: INFO: Action 'test-act-noreturn' requested by "
+        + f"account '{PlTestGlobal.test_username}' completed\n",
+    ]
+    terminate_sent_first_lines: list[str] = [
+        "get_client_initial_msg: WARNING: Did not read SIGNAL or "
+        + "ACCESS_CHECK as first message from client run by account "
+        + f"'{PlTestGlobal.test_username}', forcibly closing connection.\n"
     ]

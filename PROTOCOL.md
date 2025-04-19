@@ -122,6 +122,9 @@ socket:
   triggering of the action corresponding to `<signal_name>`.
 * `ACCESS_CHECK <signal_name>` - Queries privleapd to determine if the caller
   is authorized to trigger the action corresponding to `<signal_name>`.
+* `TERMINATE` - Instructs privleapd to immediately terminate the running
+  action. The server should not attempt to send any further messages to the
+  client once this message is received. 
 
 `privleapd` can send the following messages, which clients must be able to
 understand:

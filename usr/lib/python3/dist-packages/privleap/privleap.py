@@ -271,6 +271,18 @@ class PrivleapCommClientAccessCheckMsg(PrivleapMsg):
         return f"{self.name} {self.signal_name}".encode("utf-8")
 
 
+class PrivleapCommClientTerminateMsg(PrivleapMsg):
+    """
+    Privleapd message.
+    Sent from client to server.
+
+    Instructs the server to terminate the action previously triggered by the
+    client.
+    """
+
+    name = "TERMINATE"
+
+
 class PrivleapCommServerTriggerMsg(PrivleapMsg):
     """
     Privleap message.
@@ -656,7 +668,7 @@ class PrivleapSession:
             if recv_buf_pos != len(recv_buf):
                 raise ValueError("recv_buf contains data past the last string")
 
-        return output_list, blob
+        return (output_list, blob)
 
     # pylint: disable=too-many-return-statements, too-many-branches, too-many-statements
     # Rationale:
@@ -692,12 +704,12 @@ class PrivleapSession:
         blob: bytes | None
         if self.is_control_session and self.is_server_side:
             if msg_type_str == "CREATE":
-                param_list, _ = self.__parse_msg_parameters(
+                (param_list, _) = self.__parse_msg_parameters(
                     recv_buf, str_count=1, blob_at_end=False
                 )
                 return PrivleapControlClientCreateMsg(param_list[0])
             if msg_type_str == "DESTROY":
-                param_list, _ = self.__parse_msg_parameters(
+                (param_list, _) = self.__parse_msg_parameters(
                     recv_buf, str_count=1, blob_at_end=False
                 )
                 return PrivleapControlClientDestroyMsg(param_list[0])
@@ -756,15 +768,20 @@ class PrivleapSession:
         # messages
         if not self.is_control_session and self.is_server_side:
             if msg_type_str == "SIGNAL":
-                param_list, _ = self.__parse_msg_parameters(
+                (param_list, _) = self.__parse_msg_parameters(
                     recv_buf, str_count=1, blob_at_end=False
                 )
                 return PrivleapCommClientSignalMsg(param_list[0])
             if msg_type_str == "ACCESS_CHECK":
-                param_list, _ = self.__parse_msg_parameters(
+                (param_list, _) = self.__parse_msg_parameters(
                     recv_buf, str_count=1, blob_at_end=False
                 )
                 return PrivleapCommClientAccessCheckMsg(param_list[0])
+            if msg_type_str == "TERMINATE":
+                self.__parse_msg_parameters(
+                    recv_buf, str_count=0, blob_at_end=False
+                )
+                return PrivleapCommClientTerminateMsg()
             raise ValueError(
                 f"Invalid message type '{msg_type_str}' for socket"
             )
@@ -783,19 +800,19 @@ class PrivleapSession:
             )
             return PrivleapCommServerTriggerErrorMsg()
         if msg_type_str == "RESULT_STDOUT":
-            _, blob = self.__parse_msg_parameters(
+            (_, blob) = self.__parse_msg_parameters(
                 recv_buf, str_count=0, blob_at_end=True
             )
             assert blob is not None
             return PrivleapCommServerResultStdoutMsg(blob)
         if msg_type_str == "RESULT_STDERR":
-            _, blob = self.__parse_msg_parameters(
+            (_, blob) = self.__parse_msg_parameters(
                 recv_buf, str_count=0, blob_at_end=True
             )
             assert blob is not None
             return PrivleapCommServerResultStderrMsg(blob)
         if msg_type_str == "RESULT_EXITCODE":
-            param_list, _ = self.__parse_msg_parameters(
+            (param_list, _) = self.__parse_msg_parameters(
                 recv_buf, str_count=1, blob_at_end=False
             )
             return PrivleapCommServerResultExitcodeMsg(int(param_list[0]))
@@ -878,6 +895,7 @@ class PrivleapSession:
             if msg_obj_type not in (
                 PrivleapCommClientSignalMsg,
                 PrivleapCommClientAccessCheckMsg,
+                PrivleapCommClientTerminateMsg,
             ):
                 raise ValueError("Invalid message type for socket.")
 
@@ -1068,10 +1086,7 @@ class PrivleapAction:
 
 
 ConfigData: TypeAlias = Tuple[
-    list[PrivleapAction],
-    list[str],
-    list[str],
-    list[str],
+    list[PrivleapAction], list[str], list[str], list[str]
 ]
 
 

@@ -19,13 +19,12 @@ import os
 import pwd
 import grp
 import subprocess
-import socket
 import re
 import logging
 import time
 from enum import Enum
 from pathlib import Path
-from typing import Tuple, cast, SupportsIndex, IO, NoReturn, Any
+from typing import Tuple, cast, SupportsIndex, NoReturn, Any
 
 import sdnotify  # type: ignore
 
@@ -111,8 +110,7 @@ def handle_control_create_msg(
             user_name,
         )
         send_msg_safe(
-            control_session,
-            pl.PrivleapControlServerExpectedDisallowedUserMsg(),
+            control_session, pl.PrivleapControlServerExpectedDisallowedUserMsg()
         )
         return
 
@@ -360,6 +358,10 @@ def run_action(
         stdin=subprocess.PIPE,
     )
     assert action_process.stdin is not None
+    assert action_process.stdout is not None
+    assert action_process.stderr is not None
+    os.set_blocking(action_process.stdout.fileno(), False)
+    os.set_blocking(action_process.stderr.fileno(), False)
     action_process.stdin.close()
     return action_process
 
@@ -376,7 +378,7 @@ def get_client_initial_msg(
     """
 
     try:
-        comm_msg = comm_session.get_msg()
+        comm_msg: pl.PrivleapMsg = comm_session.get_msg()
     except Exception as e:
         logging.error(
             "Could not get message from client run by account '%s'!",
@@ -472,6 +474,44 @@ def authorize_user(
     return PrivleapdAuthStatus.UNAUTHORIZED
 
 
+def check_action_terminate(
+    comm_session: pl.PrivleapSession, action_name: str
+) -> bool:
+    """
+    Checks for a TERMINATE message from the client.
+    """
+
+    assert comm_session.backend_socket is not None
+    ready_streams: Tuple[list[int], list[int], list[int]] = select.select(
+        [comm_session.backend_socket.fileno()], [], [], 0
+    )
+    if comm_session.backend_socket.fileno() in ready_streams[0]:
+        try:
+            comm_msg: pl.PrivleapMsg = comm_session.get_msg()
+        except Exception as e:
+            logging.error(
+                "Could not get message from client run by account '%s'!",
+                comm_session.user_name,
+                exc_info=e,
+            )
+            return True
+        if isinstance(comm_msg, pl.PrivleapCommClientTerminateMsg):
+            logging.info(
+                "Action '%s' prematurely terminated by account '%s'",
+                action_name,
+                comm_session.user_name,
+            )
+            return True
+        logging.error(
+            "Received invalid message type '%s' from client run by account '%s'!",
+            type(comm_msg).__name__,
+            comm_session.user_name,
+        )
+        return True
+
+    return False
+
+
 def send_action_results(
     comm_session: pl.PrivleapSession,
     action_name: str,
@@ -484,36 +524,52 @@ def send_action_results(
 
     assert action_process.stdout is not None
     assert action_process.stderr is not None
+    assert comm_session.backend_socket is not None
+
     try:
         stdout_done: bool = False
         stderr_done: bool = False
+
         while not stdout_done or not stderr_done:
-            ready_streams: Tuple[
-                list[IO[bytes]], list[IO[bytes]], list[IO[bytes]]
-            ] = select.select(
-                [action_process.stdout, action_process.stderr], [], []
+            select.select(
+                [
+                    action_process.stdout.fileno(),
+                    action_process.stderr.fileno(),
+                    comm_session.backend_socket.fileno(),
+                ],
+                [],
+                [],
             )
-            if action_process.stdout in ready_streams[0]:
-                # This reads up to 1024 bytes but may read less.
-                stdio_buf: bytes = action_process.stdout.read(1024)
-                if stdio_buf == b"":
+
+            while True:
+                if check_action_terminate(comm_session, action_name):
+                    return
+
+                stdout_buf: bytes | None = action_process.stdout.read(1024)
+                stderr_buf: bytes | None = action_process.stderr.read(1024)
+
+                if stdout_buf == b"":
                     stdout_done = True
-                else:
+                elif stdout_buf is not None:
                     if not send_msg_safe(
                         comm_session,
-                        pl.PrivleapCommServerResultStdoutMsg(stdio_buf),
+                        pl.PrivleapCommServerResultStdoutMsg(stdout_buf),
                     ):
                         return
-            if action_process.stderr in ready_streams[0]:
-                stdio_buf = action_process.stderr.read(1024)
-                if stdio_buf == b"":
+
+                if stderr_buf == b"":
                     stderr_done = True
-                else:
+                elif stderr_buf is not None:
                     if not send_msg_safe(
                         comm_session,
-                        pl.PrivleapCommServerResultStderrMsg(stdio_buf),
+                        pl.PrivleapCommServerResultStderrMsg(stderr_buf),
                     ):
                         return
+
+                if (stdout_buf is None or stdout_done) and (
+                    stderr_buf is None or stderr_done
+                ):
+                    break
 
         action_process.wait()
 
@@ -557,10 +613,7 @@ def auth_signal_request(
 
     assert isinstance(
         comm_msg,
-        (
-            pl.PrivleapCommClientSignalMsg,
-            pl.PrivleapCommClientAccessCheckMsg,
-        ),
+        (pl.PrivleapCommClientSignalMsg, pl.PrivleapCommClientAccessCheckMsg),
     )
     # The auth code attempts to NOT allow a client to tell the difference
     # between an action that doesn't exist, and one that does exist but that
@@ -850,8 +903,7 @@ def parse_config_file(
         append_if_not_in(allowed_user_item, temp_allowed_user_list)
     for expected_disallowed_user_item in expected_disallowed_user_arr:
         append_if_not_in(
-            expected_disallowed_user_item,
-            temp_expected_disallowed_user_list,
+            expected_disallowed_user_item, temp_expected_disallowed_user_list
         )
     return True
 
@@ -1006,22 +1058,24 @@ def main_loop() -> NoReturn:
     """
 
     while True:
-        ready_socket_list: Tuple[
-            list[IO[bytes]], list[IO[bytes]], list[IO[bytes]]
-        ] = select.select(
-            [
-                sock_obj.backend_socket
-                for sock_obj in PrivleapdGlobal.socket_list
-            ],
-            [],
-            [],
-            5,
+        ready_socket_list: Tuple[list[int], list[int], list[int]] = (
+            select.select(
+                [
+                    sock_obj.backend_socket.fileno()
+                    for sock_obj in PrivleapdGlobal.socket_list
+                    if sock_obj.backend_socket is not None
+                ],
+                [],
+                [],
+                5,
+            )
         )
         PrivleapdGlobal.sdnotify_object.notify("WATCHDOG=1")
-        for ready_socket in ready_socket_list[0]:
+        for ready_socket_fileno in ready_socket_list[0]:
             ready_sock_obj: pl.PrivleapSocket | None = None
             for sock_obj in PrivleapdGlobal.socket_list:
-                if sock_obj.backend_socket == cast(socket.socket, ready_socket):
+                assert sock_obj.backend_socket is not None
+                if sock_obj.backend_socket.fileno() == ready_socket_fileno:
                     ready_sock_obj = sock_obj
                     break
             if ready_sock_obj is None:

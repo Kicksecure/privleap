@@ -28,6 +28,7 @@ import subprocess
 import shutil
 import socket
 import time
+import signal
 from pathlib import Path
 from typing import NoReturn, Tuple, IO, TypeAlias
 from collections.abc import Callable
@@ -2137,6 +2138,53 @@ def privleapd_disallowed_action_access_check_test(bogus: str) -> bool:
     return assert_success
 
 
+def privleapd_leaprun_terminate_test(bogus: str) -> bool:
+    """
+    Test how privleapd handles leaprun terminating an action prematurely.
+    """
+
+    if bogus != "":
+        return False
+    util.discard_privleapd_stderr()
+    with subprocess.Popen(
+        [
+            "sudo",
+            "-u",
+            PlTestGlobal.test_username,
+            "leaprun",
+            "test-act-noreturn",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as leaprun_proc:
+        time.sleep(2)
+        leaprun_proc.send_signal(signal.SIGINT)
+        leaprun_proc.wait()
+
+    if util.compare_privleapd_stderr(PlTestData.leaprun_terminate_lines):
+        return True
+    return False
+
+
+def privleapd_terminate_sent_first_test(bogus: str) -> bool:
+    """
+    Test how privleapd handles a comm client that send a TERMINATE message
+      as the first message.
+    """
+
+    if bogus != "":
+        return False
+    util.discard_privleapd_stderr()
+    comm_session: pl.PrivleapSession = pl.PrivleapSession(
+        PlTestGlobal.test_username
+    )
+    comm_session.send_msg(pl.PrivleapCommClientTerminateMsg())
+    comm_session.close_session()
+    if util.compare_privleapd_stderr(PlTestData.terminate_sent_first_lines):
+        return True
+    return False
+
+
 def privleapd_invalid_ascii_test(idx_str: str) -> bool:
     """
     Test how privleapd handles a comm client that sends well-formed messages
@@ -2649,6 +2697,18 @@ def run_privleapd_tests() -> None:
         privleapd_disallowed_action_access_check_test,
         "",
         "Test privleapd access check with disallowed action",
+    )
+    # ---
+    privleapd_assert_function(
+        privleapd_leaprun_terminate_test,
+        "",
+        "Test privleapd response to leaprun terminate command",
+    )
+    # ---
+    privleapd_assert_function(
+        privleapd_terminate_sent_first_test,
+        "",
+        "Test privleapd response to terminate command being sent first",
     )
     # ---
     privleapd_assert_function(
