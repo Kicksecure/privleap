@@ -1,3 +1,34 @@
+commit 01216269e46755d6b9b36b9f5663d90fc1a95573
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Apr 19 13:29:47 2025 -0400
+
+    remove trailing whitespace
+
+commit 6589787ff174998fab6939033787804682f8d542
+Merge: f29f3cc 2c50838
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Apr 19 13:28:12 2025 -0400
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit 2c50838641386556db111b3d646587d47f673cea
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Thu Apr 17 23:30:59 2025 -0500
+
+    Fix buffering issues with stdout/stderr streaming
+
+commit c3fcbf3f5eba7ec3e8c04e0a41a0692c33a1c4ca
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Thu Apr 17 21:34:21 2025 -0500
+
+    Make it possible to interrupt a privleap action
+
+commit f29f3cce79c3e821e21f52c6c5bb182446dabe0e
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Wed Apr 9 15:15:39 2025 +0000
+
+    bumped changelog version
+
 commit 0112115f0cddb8e6979f1ead97933460c74a006d
 Author: Patrick Schleizer <adrelanos@whonix.org>
 Date:   Wed Apr 9 09:48:06 2025 -0400
