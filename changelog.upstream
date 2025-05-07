@@ -1,3 +1,15 @@
+commit 0f0bd1cc04594f4bc9f7567bad56fb9a64616a1e
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Wed May 7 02:35:09 2025 -0400
+
+    python -su
+
+commit 4cd0c313881584aa7e451cd2ce7f6ce14c81c185
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Apr 19 17:33:12 2025 +0000
+
+    bumped changelog version
+
 commit 01216269e46755d6b9b36b9f5663d90fc1a95573
 Author: Patrick Schleizer <adrelanos@whonix.org>
 Date:   Sat Apr 19 13:29:47 2025 -0400
