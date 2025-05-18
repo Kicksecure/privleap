@@ -8,7 +8,7 @@ considered bugs, please report them!
 * *Action* - A set of commands and accompanying metadata defined in one of
   privleap's configuration files. Each action corresponds to a single line of
   Bash code that is run when the action is *triggered*. Actions can only be
-  triggered by users and groups authorized to trigger them, and may require the
+  triggered by users and groups authorized to trigger them and may require the
   person operating the authorized user to prove their identity. Each action has
   a specific name.
 * *Session* - A connection between a privleap client and a privleap background
@@ -27,7 +27,7 @@ should aim to prevent DoS attacks caused by resource-intensive activity
 patterns. In general, the server should err on the side of caution and terminate
 a connection without explanation if the client is not sending data quickly
 enough or sends unexpected data. This same level of care does not need to be
-taken with the control socket, as it is accessibly only by root and thus is not
+taken with the control socket, as it is accessible only by root and thus is not
 a danger.
 
 Each message is formatted as a Pascal-style string that can be up to 2^32-1
@@ -36,7 +36,7 @@ contain arbitrary binary data (including NUL bytes) and should not be blindly
 trusted if it comes from an untrusted source. Messages are case-sensitive.
 
 Throughout this spec, placeholders are formatted as `<placeholder>`. These
-placeholders are expected to be substituted wholesale for the actual data that
+placeholders are expected to be substituted wholesale with the actual data that
 belongs there. For instance, `CREATE <username>` contains the placeholder
 `<username>`. If the username `john` is being used, the string would be
 changed to `CREATE john`.
@@ -51,7 +51,7 @@ permissions `0600`. The containing directory `/run/privleapd` is owned by
 `root:root` and uses permissions `0644`. The `control` socket is used to
 manage communication sockets for each individual user account.
 
-Any messages sent by the client must be no longer than 4096 bytes long (not
+Any messages sent by the client must be no longer than 4096 bytes (not
 including the four-byte message length header). `privleapd` will forcibly
 disconnect a client that attempts to send a longer message than this. This is
 expected to be enough to allow any practically-sized usernames, signal names,
@@ -69,7 +69,7 @@ messages longer than this, although it is not generally recommended.
   this fails.
 * `RELOAD` - Reloads configuration data. `privleapd` will respond with `OK` if
   this succeeds, and `CONTROL_ERROR` if this fails (due to invalid
-  configuration). The details of the invalid configuration that lead to a
+  configuration). The details of the invalid configuration that led to a
   failure will be logged.
 
 `privleapd` can send the following messages on the `control` socket, which
@@ -89,7 +89,7 @@ clients must be able to understand:
   /etc/privleap/conf.d/README for more information on persistent users.)
 * `DISALLOWED_USER` - The first client-sent message was a `CREATE` message,
   but the username specified in the message is not an "allowed user" and
-  cannot have a socket created for them. (See `man privleap.conf.d ` for
+  cannot have a socket created for them. (See `man privleap.conf.d` for
   more information on allowed users.)
 * `EXPECTED_DISALLOWED_USER` - The first client-sent message was a `CREATE`
   message, but the username specified in the message is an "expected
@@ -120,9 +120,9 @@ socket:
 
 * `SIGNAL <signal_name>` - Sends a signal to `privleapd`, requesting the
   triggering of the action corresponding to `<signal_name>`.
-* `ACCESS_CHECK <signal_name>` - Queries privleapd to determine if the caller
+* `ACCESS_CHECK <signal_name>` - Queries `privleapd` to determine if the caller
   is authorized to trigger the action corresponding to `<signal_name>`.
-* `TERMINATE` - Instructs privleapd to immediately terminate the running
+* `TERMINATE` - Instructs `privleapd` to immediately terminate the running
   action. The server should not attempt to send any further messages to the
   client once this message is received.
 
@@ -132,8 +132,8 @@ understand:
 * `TRIGGER` - Indicates that the action requested by the previous `SIGNAL`
   message has been triggered. `privleapd` will send `TRIGGER` after *beginning*
   execution of the code specified in the action, with no respect to whether the
-  action has completed or yet. If a client is satisfied that the action has
-  started execution, it can disconnect from `privleapd` immediately, otherwise
+  action has completed or not. If a client is satisfied that the action has
+  started execution, it can disconnect from `privleapd` immediately; otherwise,
   it should wait to disconnect until receiving a `RESULT_EXITCODE` message.
 * `TRIGGER_ERROR` - Indicates that the action requested by the previous `SIGNAL`
   message was authorized, but launching it failed. This is usually due to
@@ -141,7 +141,7 @@ understand:
   actual problems *starting* the action. If the action starts successfully but
   exits non-zero, `privleapd` will still consider this a success. The client can
   use the value accompanying the `RESULT_EXITCODE` message to determine whether
-  the action actually succeeded or not.
+  the action actually succeeded or ignore it.
 * `RESULT_STDOUT <result_stdout_text>` - Indicates that the action requested by
   the previous `SIGNAL` message wrote the given block of data to STDOUT.
   `<result_stdout_text>` is arbitrary binary data.
@@ -162,7 +162,7 @@ understand:
 
 `privleapd` will only parse the first one of each of the above client-sent
 messages per session. `privleapd` will terminate the session immediately after
-sending `AUTHORIZED`, `UNAUTHORIZED`, or `RESULT_EXITCODE`. privleapd
+sending `AUTHORIZED`, `UNAUTHORIZED`, or `RESULT_EXITCODE`. `privleapd`
 *may* send multiple `RESULT_STDOUT` and `RESULT_STDERR` messages in a
 single session.
 
@@ -170,18 +170,18 @@ In actual operation, the client (most likely `leaprun`) is expected to open a
 session with `privleapd` and send either a `SIGNAL` or `ACCESS_CHECK` message.
 If the user is authorized to trigger the action specified in the message,
 `privleapd` will respond with either `AUTHORIZED` in reply to an
-`ACCESS_CHECK`, or `TRIGGER` in response to a `SIGNAL`. If privleapd is
+`ACCESS_CHECK`, or `TRIGGER` in response to a `SIGNAL`. If `privleapd` is
 running an action, it will send `RESULT_STDOUT` and `RESULT_STDERR` messages
 as the action runs so the caller can see the output of the action.
 
 ## Potential future development:
 
-* Right now privleap is designed only to allow running specific actions as
-  root without a password, without the dangers of sudo. It would make it much
-  more useful if it was able to handle identity verification. This could be
+* Right now, privleap is designed only to allow running specific actions as
+  root without a password, without the dangers of sudo. It would be much
+  more useful if it were able to handle identity verification. This could be
   done with `CHALLENGE` and `CHALLENGE_PASS` messages from the server, and
   a `RESPONSE` message from the client. This would only allow for simple
-  password-based (or similar) auth though. PAM could potentially also be used,
+  password-based (or similar) authentication, though. PAM could potentially also be used,
   but trying to forward PAM auth requests over a socket could be extremely
   difficult or impossible, so in practice this would probably end up bypassing
-  PAM, which is potentially livable but not ideal.
+  PAM, which is potentially livable, but not ideal.
