@@ -453,6 +453,17 @@ def run_leapctl_tests() -> None:
     )
     # ---
     leapctl_assert_command(
+        ["leapctl", "--create", "alttest"],
+        exit_code=0,
+        stdout_data=PlTestData.alttest_socket_created,
+    )
+    leapctl_assert_command(
+        ["leapctl", "--destroy", "alttest"],
+        exit_code=0,
+        stdout_data=PlTestData.alttest_socket_destroyed,
+    )
+    # ---
+    leapctl_assert_command(
         ["leapctl", "--create", "root"],
         exit_code=0,
         stdout_data=PlTestData.root_socket_created,
@@ -741,6 +752,28 @@ def run_leaprun_tests() -> None:
         ],
         exit_code=0,
         stdout_data=PlTestData.test_act_target_user,
+    )
+    # ---
+    leaprun_assert_command(
+        ["leapctl", "--create", "alttest"],
+        exit_code=0,
+        stdout_data=PlTestData.alttest_socket_created,
+    )
+    leaprun_assert_command(
+        [
+            "sudo",
+            "-u",
+            "alttest",
+            "leaprun",
+            "test-act-privleap-grouppermit"
+        ],
+        exit_code=0,
+        stdout_data=b"test-act-privleap-grouppermit\n",
+    )
+    leaprun_assert_command(
+        ["leapctl", "--destroy", "alttest"],
+        exit_code=0,
+        stdout_data=PlTestData.alttest_socket_destroyed,
     )
     # ---
     leaprun_assert_command(
@@ -2911,6 +2944,9 @@ def main() -> NoReturn:
     util.stop_privleapd_service()
     util.setup_test_account(
         PlTestGlobal.test_username, PlTestGlobal.test_home_dir
+    )
+    util.setup_test_account(
+        "alttest", Path("/home/alttest")
     )
     util.displace_old_privleap_config()
     util.write_privleap_test_config()

@@ -329,7 +329,7 @@ def run_action(
         # Target user is set but group is unset, set the group to the target
         # user's default group.
         assert target_user is not None
-        target_user_info = pwd.getpwnam(target_user)
+        target_user_info: pwd.struct_passwd = pwd.getpwnam(target_user)
         target_user_gid = target_user_info.pw_gid
         target_group = grp.getgrgid(target_user_gid).gr_name
     elif target_user is None:
