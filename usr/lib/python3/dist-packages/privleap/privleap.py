@@ -1142,6 +1142,7 @@ class PrivleapCommon:
         action_output_list: list[PrivleapAction] = []
         persistent_user_output_list: list[str] = []
         allowed_user_output_list: list[str] = []
+        allowed_user_groups_list: list[str] = []
         expected_disallowed_user_output_list: list[str] = []
         current_section_type: PrivleapConfigSection = PrivleapConfigSection.NONE
         line_idx: int = 0
@@ -1291,6 +1292,14 @@ class PrivleapCommon:
                         if config_val is not None:
                             if config_val not in allowed_user_output_list:
                                 allowed_user_output_list.append(config_val)
+                    elif config_key == "Group":
+                        assert config_val is not None
+                        config_val = PrivleapCommon.normalize_group_id(
+                            config_val
+                        )
+                        if config_val is not None:
+                            if config_val not in allowed_user_groups_list:
+                                allowed_user_groups_list.append(config_val)
                     else:
                         return (
                             f"{config_file}:{line_idx}:error:Unrecognized "
@@ -1407,6 +1416,16 @@ class PrivleapCommon:
                     current_target_group,
                 )
             )
+
+        for group in allowed_user_groups_list:
+            group_info: grp.struct_group = grp.getgrnam(group)
+            for user_name in group_info.gr_mem:
+                if user_name not in allowed_user_output_list:
+                    allowed_user_output_list.append(user_name)
+            for user in pwd.getpwall():
+                if user.pw_gid == group_info.gr_gid:
+                    if user.pw_name not in allowed_user_output_list:
+                        allowed_user_output_list.append(user.pw_name)
 
         return (
             action_output_list,

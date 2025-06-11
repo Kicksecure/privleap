@@ -158,16 +158,21 @@ def setup_test_account(test_username: str, test_home_dir: Path) -> None:
         grp.getgrgid(gid).gr_name
         for gid in os.getgrouplist(test_username, user_gid)
     ]
-    if not "sudo" in group_list:
-        try:
-            subprocess.run(["adduser", test_username, "sudo"], check=True)
-        except Exception as e:
-            logging.critical(
-                "Could not add account '%s' to group 'sudo'!",
-                test_username,
-                exc_info=e,
-            )
-            sys.exit(1)
+    for additional_group in ("sudo", "privleap"):
+        if not additional_group in group_list:
+            try:
+                subprocess.run(
+                    ["adduser", test_username, additional_group],
+                    check=True,
+                )
+            except Exception as e:
+                logging.critical(
+                    "Could not add account '%s' to group '%s'!",
+                    test_username,
+                    additional_group,
+                    exc_info=e,
+                )
+                sys.exit(1)
     ensure_path_lacks_files(test_home_dir)
     if not test_home_dir.exists():
         test_home_dir.mkdir(parents=True)
@@ -505,6 +510,8 @@ User=_apt
 User=daemon
 User=deleteme
 User=root
+Group=privleap
+Group=idontexist
 
 [action:test-act-grouprestrict-userpermit]
 Command=echo 'test-act-grouprestrict-userpermit'
@@ -514,6 +521,10 @@ AuthorizedGroups=sys
 [action:test-act-userpermit]
 Command=echo 'test-act-userpermit'
 AuthorizedUsers={PlTestGlobal.test_username}
+
+[action:test-act-privleap-grouppermit]
+Command=echo 'test-act-privleap-grouppermit'
+AuthorizedGroups=privleap
 
 [persistent-users]
 User=bin
@@ -740,6 +751,10 @@ Command=echo 'test-act-missing-auth'
     news_expected_socket_not_permitted: bytes = (
         b"Account 'news' is not permitted to have a comm socket, as "
         b"expected, ok.\n"
+    )
+    alttest_socket_created: bytes = b"Comm socket created for account 'alttest'.\n"
+    alttest_socket_destroyed: bytes = (
+        b"Comm socket destroyed for account 'alttest'.\n"
     )
     leapctl_help: bytes = (
         b"leapctl <--create|--destroy> <user>\n"
@@ -1159,7 +1174,7 @@ Command=echo 'test-act-missing-auth'
     ]
     duplicate_actions_config_file_lines: list[str] = [
         "parse_config_file: ERROR: Error parsing config: "
-        + "'/etc/privleap/conf.d/unit-test.conf:52:error:Duplicate action "
+        + "'/etc/privleap/conf.d/unit-test.conf:58:error:Duplicate action "
         + "found: 'test-act-sudopermit''\n",
         "main: CRITICAL: Failed initial config load!\n",
     ]

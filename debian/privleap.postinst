@@ -95,6 +95,13 @@ start_privleapd() {
 
 case "$1" in
    configure)
+      groupadd_exit_code='0'
+      groupadd --system privleap || groupadd_exit_code="$?"
+      ## groupadd exit code 9 = group name already in use
+      if [ "${groupadd_exit_code}" != '0' ] \
+         && [ "${groupadd_exit_code}" != '9' ]; then
+         1>&2 echo -e "${red}${bold}WARNING: Could not create 'privleap' group.${reset}"
+      fi
       deb-systemd-helper enable privleapd.service
       deb-systemd-helper enable leapctl@.service
       start_privleapd 'n'

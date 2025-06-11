@@ -28,6 +28,8 @@ Description: Specifies one or more users that shall be permitted to communicate 
 Keys:
 .IP
 \fBUser\fR: Specifies a user to mark as "allowed"\. This key may appear multiple times in the section\. The same user can be specified multiple times\. If the specified user does not exist, the user is skipped over\.
+.IP
+\fBGroup\fR: Specifies a user group to mark as "allowed"\. All users who are a member of the specified group will be marked as "allowed"\. This key may appear multiple times in the section\. The same group can be specified multiple times\. If the specified group does not exist, the group is skipped over\.
 .TP
 \fB[persistent\-users]\fR
 Description: Specifies one or more users that shall always have open communication sockets for communicating with privleapd\. Users that are specified as "persistent" are automatically considered "allowed" as well\. The communication sockets for persistent users cannot be destroyed via a request from a privileged privleap client\. The \fB[persistent\-users]\fR section can be specified more than once in privleap's configuration\. The contents of each section will be stacked on top of each other\.
