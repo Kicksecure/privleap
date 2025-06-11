@@ -1,3 +1,22 @@
+commit 197e1a3635f58299e9a67e04c742de9b4d9eed1e
+Merge: 6b5ea57 736f145
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Wed Jun 11 15:12:09 2025 -0400
+
+    Merge remote-tracking branch 'ArrayBolt3/master'
+
+commit 736f145b5bb3276c8e76319dbf23772ff31d69cf
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Jun 6 15:46:47 2025 -0500
+
+    Add Group key support for allowed-users section, add privleap group
+
+commit 6b5ea577b68997720e36f826623941f5f31c8485
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Tue May 20 11:39:46 2025 +0000
+
+    bumped changelog version
+
 commit 6d59a8c9a4a7ba61bdba36d5b1f320fe6b268248
 Author: Patrick Schleizer <adrelanos@whonix.org>
 Date:   Sun May 18 06:59:55 2025 -0400
