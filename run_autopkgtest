@@ -15,9 +15,9 @@ autopkgtest_tarball_path="${HOME}/.cache/sbuild/${target_distribution}-amd64.tar
 create_autopkgtest_tarball() {
   mkdir -p ~/.cache/sbuild
   sudo mmdebstrap \
-    --include=ca-certificates,passwd,adduser \
+    --include=ca-certificates,passwd,adduser,initramfs-tools \
     --skip=output/dev \
-    --variant=buildd \
+    --variant=debootstrap \
     "${target_distribution}" \
     "${autopkgtest_tarball_path}" \
     --customize-hook='chroot "$1" passwd --delete root' \
