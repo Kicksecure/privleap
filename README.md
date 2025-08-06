@@ -74,7 +74,7 @@ function regardless of your current working directory when you
 call it.
 
 `run_autopkgtest` creates an unshare tarball under
-`~/.cache/sbuild/bookworm-amd64.tar.zst` (which is where autopkgtest
+`~/.cache/sbuild/trixie-amd64.tar.zst` (which is where autopkgtest
 expects to find it). This tarball may eventually become outdated as packages
 in Debian are upgraded, or it may end up improperly built if you interrupt
 `run_autopkgtest` while it is building the tarball initially. If for some
