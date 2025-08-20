@@ -278,13 +278,15 @@ def start_privleapd_subprocess(
         time.sleep(PlTestGlobal.base_delay * 2)
     else:
         privleapd_started_checks = 0
+        privleapd_start_failed = False
         while not PlTestGlobal.privleapd_test_ready_file.exists():
             if privleapd_started_checks >= 10:
                 logging.critical("privleapd failed to start!")
-                sys.exit(1)
+                privleapd_start_failed = True
+                break
             time.sleep(PlTestGlobal.base_delay)
             privleapd_started_checks += 1
-        PlTestGlobal.privleapd_test_ready_file.unlink()
+        PlTestGlobal.privleapd_test_ready_file.unlink(missing_ok=True)
         early_privleapd_output: str | None = proc_try_readline(
             PlTestGlobal.privleapd_proc,
             PlTestGlobal.base_delay,
@@ -301,6 +303,8 @@ def start_privleapd_subprocess(
                 )
                 if early_privleapd_output is None:
                     break
+            sys.exit(1)
+        elif privleapd_start_failed:
             sys.exit(1)
     PlTestGlobal.privleapd_running = True
 
@@ -752,7 +756,9 @@ Command=echo 'test-act-missing-auth'
         b"Account 'news' is not permitted to have a comm socket, as "
         b"expected, ok.\n"
     )
-    alttest_socket_created: bytes = b"Comm socket created for account 'alttest'.\n"
+    alttest_socket_created: bytes = (
+        b"Comm socket created for account 'alttest'.\n"
+    )
     alttest_socket_destroyed: bytes = (
         b"Comm socket destroyed for account 'alttest'.\n"
     )
@@ -829,7 +835,6 @@ Command=echo 'test-act-missing-auth'
         b"HOME=/root\n"
         b"LANG=C.UTF-8\n"
         b"USER=root\n"
-        b"DEB_BUILD_OPTIONS=parallel=2\n"
         b"ADT_NORMAL_USER=unshare\n"
         b"SHLVL=1\n"
         b"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"
@@ -849,7 +854,6 @@ Command=echo 'test-act-missing-auth'
         b"HOME=/home/privleaptest\n"
         b"LANG=C.UTF-8\n"
         b"USER=privleaptest\n"
-        b"DEB_BUILD_OPTIONS=parallel=2\n"
         b"ADT_NORMAL_USER=unshare\n"
         b"SHLVL=1\n"
         b"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"
@@ -1022,27 +1026,27 @@ Command=echo 'test-act-missing-auth'
         + f"run by account '{PlTestGlobal.test_username}'!\n"
     ]
     invalid_ascii_list: list[bytes] = [
-        b"\x00\x00\x00\x05\x1BTEST",
-        b"\x00\x00\x00\x05TEST\x1B",
-        b"\x00\x00\x00\x05TE\x1BST",
-        b"\x00\x00\x00\x05\x1FTEST",
-        b"\x00\x00\x00\x05TEST\x1F",
-        b"\x00\x00\x00\x05TE\x1FST",
-        b"\x00\x00\x00\x05\x7FTEST",
-        b"\x00\x00\x00\x05TEST\x7F",
-        b"\x00\x00\x00\x05TE\x7FST",
+        b"\x00\x00\x00\x05\x1bTEST",
+        b"\x00\x00\x00\x05TEST\x1b",
+        b"\x00\x00\x00\x05TE\x1bST",
+        b"\x00\x00\x00\x05\x1fTEST",
+        b"\x00\x00\x00\x05TEST\x1f",
+        b"\x00\x00\x00\x05TE\x1fST",
+        b"\x00\x00\x00\x05\x7fTEST",
+        b"\x00\x00\x00\x05TEST\x7f",
+        b"\x00\x00\x00\x05TE\x7fST",
         b"\x00\x00\x00\x04TEST",
-        b"\x00\x00\x00\x0ESIGNAL PARAM1\x1B",
-        b"\x00\x00\x00\x0ESIGNAL \x1BPARAM1",
-        b"\x00\x00\x00\x0ESIGNAL PAR\x1BAM1",
-        b"\x00\x00\x00\x0ESIGNAL PARAM1\x1F",
-        b"\x00\x00\x00\x0ESIGNAL \x1FPARAM1",
-        b"\x00\x00\x00\x0ESIGNAL PAR\x1BAM1",
-        b"\x00\x00\x00\x0ESIGNAL PARAM1\x1F",
-        b"\x00\x00\x00\x0ESIGNAL \x7FPARAM1",
-        b"\x00\x00\x00\x0ESIGNAL PAR\x7FAM1",
-        b"\x00\x00\x00\x0DSIGNAL PARAM1",
-        b"\x00\x00\x00\x0ESIGNAL  PARAM1",
+        b"\x00\x00\x00\x0eSIGNAL PARAM1\x1b",
+        b"\x00\x00\x00\x0eSIGNAL \x1bPARAM1",
+        b"\x00\x00\x00\x0eSIGNAL PAR\x1bAM1",
+        b"\x00\x00\x00\x0eSIGNAL PARAM1\x1f",
+        b"\x00\x00\x00\x0eSIGNAL \x1fPARAM1",
+        b"\x00\x00\x00\x0eSIGNAL PAR\x1bAM1",
+        b"\x00\x00\x00\x0eSIGNAL PARAM1\x1f",
+        b"\x00\x00\x00\x0eSIGNAL \x7fPARAM1",
+        b"\x00\x00\x00\x0eSIGNAL PAR\x7fAM1",
+        b"\x00\x00\x00\x0dSIGNAL PARAM1",
+        b"\x00\x00\x00\x0eSIGNAL  PARAM1",
     ]
     # TODO: Any good way to avoid all the repetition?
     invalid_ascii_lines_list: list[list[str]] = [

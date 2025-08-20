@@ -9,15 +9,15 @@ set -o errtrace
 set -o pipefail
 
 privleap_project_dir="$(dirname "$(readlink -f "${0}")")"
-target_distribution="bookworm"
+target_distribution="trixie"
 autopkgtest_tarball_path="${HOME}/.cache/sbuild/${target_distribution}-amd64.tar.zst"
 
 create_autopkgtest_tarball() {
   mkdir -p ~/.cache/sbuild
   sudo mmdebstrap \
-    --include=ca-certificates \
+    --include=ca-certificates,passwd,adduser,initramfs-tools \
     --skip=output/dev \
-    --variant=buildd \
+    --variant=debootstrap \
     "${target_distribution}" \
     "${autopkgtest_tarball_path}" \
     --customize-hook='chroot "$1" passwd --delete root' \
@@ -87,7 +87,7 @@ run_autopkgtest() {
   if ! [ -f '/usr/bin/dh' ]; then
     offer_package_install 'debhelper'
   fi
-  if ! [ -f '/usr/share/keyrings/debian-archive-bookworm-stable.gpg' ]; then
+  if ! [ -f '/usr/share/keyrings/debian-archive-trixie-stable.gpg' ]; then
     offer_package_install 'debian-archive-keyring'
   fi
   if [ "$(basename "${privleap_project_dir}")" != 'privleap' ]; then

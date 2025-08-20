@@ -636,11 +636,16 @@ def leaprun_filter_env_var_test_stdout(
     for stdout_part in stdout_parts:
         if stdout_part == b"":
             continue
-        if (
-            stdout_part.startswith(b"ADTTMP=")
-            or stdout_part.startswith(b"AUTOPKGTEST_ARTIFACTS=")
-            or stdout_part.startswith(b"AUTOPKGTEST_TMP=")
-            or stdout_part.startswith(b"ADT_ARTIFACTS=")
+        if any(
+            [
+                stdout_part.startswith(b"ADTTMP="),
+                stdout_part.startswith(b"AUTOPKGTEST_ARTIFACTS="),
+                stdout_part.startswith(b"AUTOPKGTEST_TMP="),
+                stdout_part.startswith(b"ADT_ARTIFACTS="),
+                stdout_part.startswith(b"AUTOPKGTEST_TESTBED_ARCH="),
+                stdout_part.startswith(b"AUTOPKGTEST_TEST_ARCH="),
+                stdout_part.startswith(b"DEB_BUILD_OPTIONS="),
+            ]
         ):
             continue
         stdout_parts_out.append(stdout_part)
@@ -760,13 +765,7 @@ def run_leaprun_tests() -> None:
         stdout_data=PlTestData.alttest_socket_created,
     )
     leaprun_assert_command(
-        [
-            "sudo",
-            "-u",
-            "alttest",
-            "leaprun",
-            "test-act-privleap-grouppermit"
-        ],
+        ["sudo", "-u", "alttest", "leaprun", "test-act-privleap-grouppermit"],
         exit_code=0,
         stdout_data=b"test-act-privleap-grouppermit\n",
     )
@@ -1752,7 +1751,7 @@ def privleapd_send_invalid_control_message_test(bogus: str) -> bool:
     # privleap message packets are simply length-prefixed binary blobs, with the
     # length specified as a 4-byte big-endian integer.
     util.socket_send_raw_bytes(
-        control_session.backend_socket, b"\x00\x00\x00\x0DBOB asdfghjkl"
+        control_session.backend_socket, b"\x00\x00\x00\x0dBOB asdfghjkl"
     )
     control_session.close_session()
     if not util.compare_privleapd_stderr(
@@ -1822,7 +1821,7 @@ def privleapd_send_invalid_comm_message_test(bogus: str) -> bool:
     # privleap message packets are simply length-prefixed binary blobs, with the
     # length specified as a 4-byte big-endian integer.
     util.socket_send_raw_bytes(
-        comm_session.backend_socket, b"\x00\x00\x00\x0DBOB asdfghjkl"
+        comm_session.backend_socket, b"\x00\x00\x00\x0dBOB asdfghjkl"
     )
     comm_session.close_session()
     if not util.compare_privleapd_stderr(
@@ -2945,9 +2944,7 @@ def main() -> NoReturn:
     util.setup_test_account(
         PlTestGlobal.test_username, PlTestGlobal.test_home_dir
     )
-    util.setup_test_account(
-        "alttest", Path("/home/alttest")
-    )
+    util.setup_test_account("alttest", Path("/home/alttest"))
     util.displace_old_privleap_config()
     util.write_privleap_test_config()
 
