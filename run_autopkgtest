@@ -14,6 +14,9 @@ autopkgtest_tarball_path="${HOME}/.cache/sbuild/${target_distribution}-amd64.tar
 
 create_autopkgtest_tarball() {
   mkdir -p ~/.cache/sbuild
+  ## TODO: Can we use dracut instead of initramfs-tools? (We have to install
+  ## initramfs-tools here right now to make the autopkgtest environment happy
+  ## but maybe dracut will work instead.)
   sudo mmdebstrap \
     --include=ca-certificates,passwd,adduser,initramfs-tools \
     --skip=output/dev \
