@@ -1,3 +1,46 @@
+commit 9a313fbffbd39d63d659fb575bf0b4d8288a2e92
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Tue Aug 26 05:13:29 2025 -0400
+
+    re-generate man pages (generated using "genmkfile manpages")
+
+commit 054be3f4cef06393f07788eceaec67b727aa3629
+Merge: ba728f4 6e81f21
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Wed Aug 20 08:57:36 2025 -0400
+
+    Merge remote-tracking branch 'ArrayBolt3/arraybolt3/trixie'
+
+commit ba728f47f59c669a970d539e9ded1e4ace4ed153
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Wed Aug 20 06:57:28 2025 -0400
+
+    bumped Standards-Version
+
+commit d5b98c4a37bda4f37c28995f8bf394d278d5fe9f
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Wed Aug 20 06:25:34 2025 -0400
+
+    readme
+
+commit 6e81f2112b5be0a0f5ad1f78b4732d082ea67f00
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Aug 6 17:58:25 2025 -0500
+
+    Adjustments to pass black, mypy, pylint, and regression tests under Trixie
+
+commit c830986b43780a55b92e9cade5c1228b23ca275d
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Tue Aug 5 22:58:04 2025 -0500
+
+    Port to Trixie.
+
+commit 9f7a3afb78b5518e527f41492e8188a12217d3b6
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Jun 14 12:00:35 2025 +0000
+
+    bumped changelog version
+
 commit 60f76a84a27b5fda9f35d9a59a87a0e04a2daf7a
 Author: Patrick Schleizer <adrelanos@whonix.org>
 Date:   Sat Jun 14 07:58:14 2025 -0400
