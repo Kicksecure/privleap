@@ -62,11 +62,12 @@ def print_usage() -> NoReturn:
     """
 
     print(
-        """leaprun <signal_name>
+        """leaprun [-c|--check] <action_name>
 
-    signal_name : The name of the signal that leaprun should send. Sending a
-                  signal with a particular name will request privleapd to
-                  trigger an action of the same name."""
+    -c, --check : Check if the current user is authorized to run an action.
+    action_name : The name of the action leaprun should handle. leaprun will
+                  send a signal to trigger the named action (or will ask
+                  privleapd to check if the user can trigger the action)."""
     )
     cleanup_and_exit(1)
 
