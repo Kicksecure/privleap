@@ -1,3 +1,22 @@
+commit 3abcc0823ffac0ec59d5735ffb9244c5ec990b9d
+Merge: 09aa71a 43fbac9
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Nov 1 04:01:05 2025 -0400
+
+    Merge remote-tracking branch 'ArrayBolt3/arraybolt3/trixie'
+
+commit 43fbac99c4fa6ec9312623d9452312627fa30f45
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Oct 31 13:39:45 2025 -0500
+
+    Fix leaprun documentation
+
+commit 09aa71a4e807d8b78bd70630bd08712d019e4e47
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Fri Sep 19 16:16:03 2025 +0000
+
+    bumped changelog version
+
 commit bc92aae0a5728be364d43198a28335f391b4b278
 Author: Patrick Schleizer <adrelanos@whonix.org>
 Date:   Thu Sep 18 10:07:57 2025 -0400
