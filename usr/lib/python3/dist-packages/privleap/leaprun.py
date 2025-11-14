@@ -16,11 +16,23 @@
 import sys
 import getpass
 import select
+import os
+import pwd
 from typing import cast, Union, NoReturn, Tuple
 
-# import privleap as pl
-
-import privleap.privleap as pl
+from .privleap import (
+  PrivleapCommClientAccessCheckMsg,
+  PrivleapCommClientSignalMsg,
+  PrivleapCommClientTerminateMsg,
+  PrivleapCommServerResultExitcodeMsg,
+  PrivleapCommServerResultStderrMsg,
+  PrivleapCommServerResultStdoutMsg,
+  PrivleapCommServerTriggerErrorMsg,
+  PrivleapCommServerTriggerMsg,
+  PrivleapCommServerUnauthorizedMsg,
+  PrivleapMsg,
+  PrivleapSession,
+)
 
 Buffer = Union[bytes, bytearray, memoryview]
 
@@ -38,12 +50,12 @@ class LeaprunGlobal:
     signal_name: str | None = None
     check_mode: bool = False
     output_msg: (
-        pl.PrivleapCommClientSignalMsg
-        | pl.PrivleapCommClientAccessCheckMsg
+        PrivleapCommClientSignalMsg
+        | PrivleapCommClientAccessCheckMsg
         | None
     ) = None
     terminate_session = False
-    comm_session: pl.PrivleapSession | None = None
+    comm_session: PrivleapSession | None = None
 
 
 def cleanup_and_exit(exit_code: int) -> NoReturn:
@@ -81,7 +93,7 @@ def generic_error(error_msg: str) -> NoReturn:
     cleanup_and_exit(1)
 
 
-def unexpected_msg_error(comm_msg: pl.PrivleapMsg) -> NoReturn:
+def unexpected_msg_error(comm_msg: PrivleapMsg) -> NoReturn:
     """
     Alerts about an unexpected message type being received from the server.
     """
@@ -102,11 +114,11 @@ def create_output_msg() -> None:
     assert LeaprunGlobal.signal_name is not None
     try:
         if LeaprunGlobal.check_mode:
-            LeaprunGlobal.output_msg = pl.PrivleapCommClientAccessCheckMsg(
+            LeaprunGlobal.output_msg = PrivleapCommClientAccessCheckMsg(
                 LeaprunGlobal.signal_name
             )
         else:
-            LeaprunGlobal.output_msg = pl.PrivleapCommClientSignalMsg(
+            LeaprunGlobal.output_msg = PrivleapCommClientSignalMsg(
                 LeaprunGlobal.signal_name
             )
     except Exception:
@@ -130,7 +142,7 @@ def start_comm_session() -> None:
         # socket that we actually *can* open. This authenticates us as a
         # side-effect, but the authentication is not dependent on us telling the
         # truth, so there isn't a vulnerability here.
-        LeaprunGlobal.comm_session = pl.PrivleapSession(getpass.getuser())
+        LeaprunGlobal.comm_session = PrivleapSession(getpass.getuser())
     except Exception:
         generic_error("Could not connect to privleapd!")
 
@@ -169,27 +181,36 @@ def check_terminate_session() -> None:
         try:
             assert LeaprunGlobal.comm_session is not None
             LeaprunGlobal.comm_session.send_msg(
-                pl.PrivleapCommClientTerminateMsg()
+                PrivleapCommClientTerminateMsg()
             )
             cleanup_and_exit(130)
         except Exception:
             generic_error("Could not send terminate message to privleapd!")
 
 
-def handle_server_reply(comm_msg: pl.PrivleapMsg) -> None:
+def handle_server_reply(comm_msg: PrivleapMsg) -> None:
     """
     Handles a reply from the server with info from the running action.
     """
 
-    if isinstance(comm_msg, pl.PrivleapCommServerResultStdoutMsg):
+    if isinstance(comm_msg, PrivleapCommServerResultStdoutMsg):
         _ = sys.stdout.buffer.write(cast(Buffer, comm_msg.stdout_bytes))
-    elif isinstance(comm_msg, pl.PrivleapCommServerResultStderrMsg):
+    elif isinstance(comm_msg, PrivleapCommServerResultStderrMsg):
         _ = sys.stderr.buffer.write(cast(Buffer, comm_msg.stderr_bytes))
-    elif isinstance(comm_msg, pl.PrivleapCommServerResultExitcodeMsg):
+    elif isinstance(comm_msg, PrivleapCommServerResultExitcodeMsg):
         assert comm_msg.exit_code is not None
         cleanup_and_exit(comm_msg.exit_code)
     else:
         unexpected_msg_error(comm_msg)
+
+
+def get_calling_account_str() -> str:
+    """
+    Returns a string indicating the username and UID of the calling account.
+    """
+
+    uid = os.geteuid()
+    return f"'{pwd.getpwuid(uid).pw_name}' ({uid})"
 
 
 def handle_response() -> NoReturn:
@@ -201,33 +222,33 @@ def handle_response() -> NoReturn:
     assert LeaprunGlobal.signal_name is not None
     try:
         comm_msg: (
-            pl.PrivleapMsg
-            | pl.PrivleapCommServerResultStdoutMsg
-            | pl.PrivleapCommServerResultStderrMsg
-            | pl.PrivleapCommServerResultExitcodeMsg
+            PrivleapMsg
+            | PrivleapCommServerResultStdoutMsg
+            | PrivleapCommServerResultStderrMsg
+            | PrivleapCommServerResultExitcodeMsg
         ) = LeaprunGlobal.comm_session.get_msg()
     except Exception:
         generic_error("privleapd didn't return a valid response!")
 
-    if isinstance(comm_msg, pl.PrivleapCommServerUnauthorizedMsg):
+    if isinstance(comm_msg, PrivleapCommServerUnauthorizedMsg):
         generic_error(
-            "You are unauthorized to run action "
-            f"{repr(LeaprunGlobal.signal_name)}."
+            f"Account {get_calling_account_str()} is unauthorized to run "
+            f"action {repr(LeaprunGlobal.signal_name)}."
         )
 
     if LeaprunGlobal.check_mode:
         print(
-            "You are authorized to run action "
+            f"Account {get_calling_account_str()} is authorized to run action "
             f"{repr(LeaprunGlobal.signal_name)}."
         )
         sys.exit(0)
     else:
-        if isinstance(comm_msg, pl.PrivleapCommServerTriggerErrorMsg):
+        if isinstance(comm_msg, PrivleapCommServerTriggerErrorMsg):
             generic_error(
                 "An error was encountered launching action "
                 f"{repr(LeaprunGlobal.signal_name)}."
             )
-        elif isinstance(comm_msg, pl.PrivleapCommServerTriggerMsg):
+        elif isinstance(comm_msg, PrivleapCommServerTriggerMsg):
             while True:
                 try:
                     check_terminate_session()

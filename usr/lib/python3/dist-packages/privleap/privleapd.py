@@ -28,9 +28,36 @@ from typing import Tuple, cast, SupportsIndex, NoReturn, Any
 
 import sdnotify  # type: ignore
 
-# import privleap as pl
-
-import privleap.privleap as pl
+from .privleap import (
+  ConfigData,
+  PrivleapAction,
+  PrivleapCommClientAccessCheckMsg,
+  PrivleapCommClientSignalMsg,
+  PrivleapCommClientTerminateMsg,
+  PrivleapCommon,
+  PrivleapCommServerAuthorizedMsg,
+  PrivleapCommServerResultExitcodeMsg,
+  PrivleapCommServerResultStderrMsg,
+  PrivleapCommServerResultStdoutMsg,
+  PrivleapCommServerTriggerErrorMsg,
+  PrivleapCommServerTriggerMsg,
+  PrivleapCommServerUnauthorizedMsg,
+  PrivleapControlClientCreateMsg,
+  PrivleapControlClientDestroyMsg,
+  PrivleapControlClientReloadMsg,
+  PrivleapControlServerControlErrorMsg,
+  PrivleapControlServerDisallowedUserMsg,
+  PrivleapControlServerExistsMsg,
+  PrivleapControlServerExpectedDisallowedUserMsg,
+  PrivleapControlServerNouserMsg,
+  PrivleapControlServerOkMsg,
+  PrivleapControlServerPersistentUserMsg,
+  PrivleapMsg,
+  PrivleapSession,
+  PrivleapSocket,
+  PrivleapSocketType,
+  PrivleapValidateType,
+)
 
 
 # pylint: disable=too-few-public-methods
@@ -44,12 +71,12 @@ class PrivleapdGlobal:
     """
 
     config_dir: Path = Path("/etc/privleap/conf.d")
-    action_list: list[pl.PrivleapAction] = []
+    action_list: list[PrivleapAction] = []
     persistent_user_list: list[str] = []
     allowed_user_list: list[str] = []
     expected_disallowed_user_list: list[str] = []
-    socket_list: list[pl.PrivleapSocket] = []
-    pid_file_path: Path = Path(pl.PrivleapCommon.state_dir, "pid")
+    socket_list: list[PrivleapSocket] = []
+    pid_file_path: Path = Path(PrivleapCommon.state_dir, "pid")
     test_mode = False
     check_config_mode = False
     debug_mode = False
@@ -66,7 +93,7 @@ class PrivleapdAuthStatus(Enum):
     UNAUTHORIZED = 3
 
 
-def send_msg_safe(session: pl.PrivleapSession, msg: pl.PrivleapMsg) -> bool:
+def send_msg_safe(session: PrivleapSession, msg: PrivleapMsg) -> bool:
     """
     Sends a message to the client, gracefully handling the situation where the
       client has already closed the session.
@@ -85,21 +112,21 @@ def send_msg_safe(session: pl.PrivleapSession, msg: pl.PrivleapMsg) -> bool:
 
 
 def handle_control_create_msg(
-    control_session: pl.PrivleapSession,
-    control_msg: pl.PrivleapControlClientCreateMsg,
+    control_session: PrivleapSession,
+    control_msg: PrivleapControlClientCreateMsg,
 ) -> None:
     """
     Handles a CREATE control message from the client.
     """
 
     assert control_msg.user_name is not None
-    user_name: str | None = pl.PrivleapCommon.normalize_user_id(
+    user_name: str | None = PrivleapCommon.normalize_user_id(
         control_msg.user_name
     )
     if user_name is None:
         logging.warning("Account '%s' does not exist", control_msg.user_name)
         send_msg_safe(
-            control_session, pl.PrivleapControlServerControlErrorMsg()
+            control_session, PrivleapControlServerControlErrorMsg()
         )
         return
 
@@ -110,7 +137,7 @@ def handle_control_create_msg(
             user_name,
         )
         send_msg_safe(
-            control_session, pl.PrivleapControlServerExpectedDisallowedUserMsg()
+            control_session, PrivleapControlServerExpectedDisallowedUserMsg()
         )
         return
 
@@ -119,7 +146,7 @@ def handle_control_create_msg(
             "Account '%s' is not allowed to have a comm socket", user_name
         )
         send_msg_safe(
-            control_session, pl.PrivleapControlServerDisallowedUserMsg()
+            control_session, PrivleapControlServerDisallowedUserMsg()
         )
         return
 
@@ -131,32 +158,32 @@ def handle_control_create_msg(
                 "exists",
                 user_name,
             )
-            send_msg_safe(control_session, pl.PrivleapControlServerExistsMsg())
+            send_msg_safe(control_session, PrivleapControlServerExistsMsg())
             return
 
     try:
-        comm_socket: pl.PrivleapSocket = pl.PrivleapSocket(
-            pl.PrivleapSocketType.COMMUNICATION, user_name
+        comm_socket: PrivleapSocket = PrivleapSocket(
+            PrivleapSocketType.COMMUNICATION, user_name
         )
         PrivleapdGlobal.socket_list.append(comm_socket)
         logging.info(
             "Handled CREATE message for account '%s', socket created", user_name
         )
-        send_msg_safe(control_session, pl.PrivleapControlServerOkMsg())
+        send_msg_safe(control_session, PrivleapControlServerOkMsg())
         return
     except Exception as e:
         logging.error(
             "Failed to create socket for account '%s'!", user_name, exc_info=e
         )
         send_msg_safe(
-            control_session, pl.PrivleapControlServerControlErrorMsg()
+            control_session, PrivleapControlServerControlErrorMsg()
         )
         return
 
 
 def handle_control_destroy_msg(
-    control_session: pl.PrivleapSession,
-    control_msg: pl.PrivleapControlClientDestroyMsg,
+    control_session: PrivleapSession,
+    control_msg: PrivleapControlClientDestroyMsg,
 ) -> None:
     """
     Handles a DESTROY control message from the client.
@@ -171,7 +198,7 @@ def handle_control_destroy_msg(
     assert control_msg.user_name is not None
     remove_sock_idx: int | None = None
 
-    user_name: str | None = pl.PrivleapCommon.normalize_user_id(
+    user_name: str | None = PrivleapCommon.normalize_user_id(
         control_msg.user_name
     )
     if user_name is None:
@@ -183,13 +210,13 @@ def handle_control_destroy_msg(
             user_name,
         )
         send_msg_safe(
-            control_session, pl.PrivleapControlServerPersistentUserMsg()
+            control_session, PrivleapControlServerPersistentUserMsg()
         )
         return
 
     for sock_idx, sock in enumerate(PrivleapdGlobal.socket_list):
         if sock.user_name == user_name:
-            socket_path: Path = Path(pl.PrivleapCommon.comm_dir, user_name)
+            socket_path: Path = Path(PrivleapCommon.comm_dir, user_name)
             if socket_path.exists():
                 try:
                     socket_path.unlink()
@@ -216,7 +243,7 @@ def handle_control_destroy_msg(
             "Handled DESTROY message for account '%s', socket destroyed",
             user_name,
         )
-        send_msg_safe(control_session, pl.PrivleapControlServerOkMsg())
+        send_msg_safe(control_session, PrivleapControlServerOkMsg())
         return
 
     # remove_sock_idx is None.
@@ -224,32 +251,32 @@ def handle_control_destroy_msg(
         "Handled DESTROY message for account '%s', socket did not exist",
         user_name,
     )
-    send_msg_safe(control_session, pl.PrivleapControlServerNouserMsg())
+    send_msg_safe(control_session, PrivleapControlServerNouserMsg())
     return
 
 
-def handle_control_reload_msg(control_session: pl.PrivleapSession) -> None:
+def handle_control_reload_msg(control_session: PrivleapSession) -> None:
     """
     Handles a RELOAD message from the client.
     """
 
     if parse_config_files():
         logging.info("Handled RELOAD message, configuration reloaded")
-        send_msg_safe(control_session, pl.PrivleapControlServerOkMsg())
+        send_msg_safe(control_session, PrivleapControlServerOkMsg())
     else:
         logging.warning("Handled RELOAD message, configuration was invalid!")
         send_msg_safe(
-            control_session, pl.PrivleapControlServerControlErrorMsg()
+            control_session, PrivleapControlServerControlErrorMsg()
         )
 
 
-def handle_control_session(control_socket: pl.PrivleapSocket) -> None:
+def handle_control_session(control_socket: PrivleapSocket) -> None:
     """
     Handles control socket connections, for creating or destroying comm sockets.
     """
 
     try:
-        control_session: pl.PrivleapSession = control_socket.get_session()
+        control_session: PrivleapSession = control_socket.get_session()
     except Exception as e:
         logging.error(
             "Could not start control session with client!", exc_info=e
@@ -258,9 +285,9 @@ def handle_control_session(control_socket: pl.PrivleapSocket) -> None:
 
     try:
         control_msg: (
-            pl.PrivleapMsg
-            | pl.PrivleapControlClientCreateMsg
-            | pl.PrivleapControlClientDestroyMsg
+            PrivleapMsg
+            | PrivleapControlClientCreateMsg
+            | PrivleapControlClientDestroyMsg
         )
 
         try:
@@ -271,11 +298,11 @@ def handle_control_session(control_socket: pl.PrivleapSocket) -> None:
             )
             return
 
-        if isinstance(control_msg, pl.PrivleapControlClientCreateMsg):
+        if isinstance(control_msg, PrivleapControlClientCreateMsg):
             handle_control_create_msg(control_session, control_msg)
-        elif isinstance(control_msg, pl.PrivleapControlClientDestroyMsg):
+        elif isinstance(control_msg, PrivleapControlClientDestroyMsg):
             handle_control_destroy_msg(control_session, control_msg)
-        elif isinstance(control_msg, pl.PrivleapControlClientReloadMsg):
+        elif isinstance(control_msg, PrivleapControlClientReloadMsg):
             handle_control_reload_msg(control_session)
         else:
             logging.critical(
@@ -288,7 +315,7 @@ def handle_control_session(control_socket: pl.PrivleapSocket) -> None:
 
 
 def run_action(
-    desired_action: pl.PrivleapAction, calling_user: str
+    desired_action: PrivleapAction, calling_user: str
 ) -> subprocess.Popen[bytes]:
     # pylint: disable=consider-using-with
     # Rationale:
@@ -367,9 +394,9 @@ def run_action(
 
 
 def get_client_initial_msg(
-    comm_session: pl.PrivleapSession,
+    comm_session: PrivleapSession,
 ) -> (
-    pl.PrivleapCommClientSignalMsg | pl.PrivleapCommClientAccessCheckMsg | None
+    PrivleapCommClientSignalMsg | PrivleapCommClientAccessCheckMsg | None
 ):
     """
     Gets a SIGNAL or ACCESS_CHECK comm message from the client. Returns
@@ -378,7 +405,7 @@ def get_client_initial_msg(
     """
 
     try:
-        comm_msg: pl.PrivleapMsg = comm_session.get_msg()
+        comm_msg: PrivleapMsg = comm_session.get_msg()
     except Exception as e:
         logging.error(
             "Could not get message from client run by account '%s'!",
@@ -391,8 +418,8 @@ def get_client_initial_msg(
         isinstance(
             comm_msg,
             (
-                pl.PrivleapCommClientSignalMsg,
-                pl.PrivleapCommClientAccessCheckMsg,
+                PrivleapCommClientSignalMsg,
+                PrivleapCommClientAccessCheckMsg,
             ),
         )
     ):
@@ -408,7 +435,7 @@ def get_client_initial_msg(
     return comm_msg
 
 
-def lookup_desired_action(action_name: str) -> pl.PrivleapAction | None:
+def lookup_desired_action(action_name: str) -> PrivleapAction | None:
     """
     Finds the privleap action corresponding to the provided action name. Returns
       None if the action cannot be found.
@@ -421,7 +448,7 @@ def lookup_desired_action(action_name: str) -> pl.PrivleapAction | None:
 
 
 def authorize_user(
-    action: pl.PrivleapAction, raw_user_name: str
+    action: PrivleapAction, raw_user_name: str
 ) -> PrivleapdAuthStatus:
     """
     Ensures the user that requested an action to be run is authorized to run
@@ -432,7 +459,7 @@ def authorize_user(
     assert action.action_name is not None
     assert raw_user_name is not None
 
-    user_name: str | None = pl.PrivleapCommon.normalize_user_id(raw_user_name)
+    user_name: str | None = PrivleapCommon.normalize_user_id(raw_user_name)
     if user_name is None:
         # User doesn't exist? This should never happen but you never know...
         return PrivleapdAuthStatus.USER_MISSING
@@ -475,7 +502,7 @@ def authorize_user(
 
 
 def check_action_terminate(
-    comm_session: pl.PrivleapSession, action_name: str
+    comm_session: PrivleapSession, action_name: str
 ) -> bool:
     """
     Checks for a TERMINATE message from the client.
@@ -487,7 +514,7 @@ def check_action_terminate(
     )
     if comm_session.backend_socket.fileno() in ready_streams[0]:
         try:
-            comm_msg: pl.PrivleapMsg = comm_session.get_msg()
+            comm_msg: PrivleapMsg = comm_session.get_msg()
         except Exception as e:
             logging.error(
                 "Could not get message from client run by account '%s'!",
@@ -495,7 +522,7 @@ def check_action_terminate(
                 exc_info=e,
             )
             return True
-        if isinstance(comm_msg, pl.PrivleapCommClientTerminateMsg):
+        if isinstance(comm_msg, PrivleapCommClientTerminateMsg):
             logging.info(
                 "Action '%s' prematurely terminated by account '%s'",
                 action_name,
@@ -513,7 +540,7 @@ def check_action_terminate(
 
 
 def send_action_results(
-    comm_session: pl.PrivleapSession,
+    comm_session: PrivleapSession,
     action_name: str,
     action_process: subprocess.Popen[bytes],
 ) -> None:
@@ -553,7 +580,7 @@ def send_action_results(
                 elif stdout_buf is not None:
                     if not send_msg_safe(
                         comm_session,
-                        pl.PrivleapCommServerResultStdoutMsg(stdout_buf),
+                        PrivleapCommServerResultStdoutMsg(stdout_buf),
                     ):
                         return
 
@@ -562,7 +589,7 @@ def send_action_results(
                 elif stderr_buf is not None:
                     if not send_msg_safe(
                         comm_session,
-                        pl.PrivleapCommServerResultStderrMsg(stderr_buf),
+                        PrivleapCommServerResultStderrMsg(stderr_buf),
                     ):
                         return
 
@@ -587,13 +614,13 @@ def send_action_results(
 
     send_msg_safe(
         comm_session,
-        pl.PrivleapCommServerResultExitcodeMsg(action_process.returncode),
+        PrivleapCommServerResultExitcodeMsg(action_process.returncode),
     )
 
 
 def auth_signal_request(
-    comm_msg: pl.PrivleapMsg, comm_session: pl.PrivleapSession
-) -> pl.PrivleapAction | None:
+    comm_msg: PrivleapMsg, comm_session: PrivleapSession
+) -> PrivleapAction | None:
     """
     Finds the requested action, and ensures that the calling user has the
       permissions to run it. Returns the desired action if auth succeeds.
@@ -603,9 +630,9 @@ def auth_signal_request(
     """
 
     auth_type: str
-    if isinstance(comm_msg, pl.PrivleapCommClientSignalMsg):
+    if isinstance(comm_msg, PrivleapCommClientSignalMsg):
         auth_type = "Action run request"
-    elif isinstance(comm_msg, pl.PrivleapCommClientAccessCheckMsg):
+    elif isinstance(comm_msg, PrivleapCommClientAccessCheckMsg):
         auth_type = "Access check"
     else:
         logging.critical("Invalid message type provided!")
@@ -613,7 +640,7 @@ def auth_signal_request(
 
     assert isinstance(
         comm_msg,
-        (pl.PrivleapCommClientSignalMsg, pl.PrivleapCommClientAccessCheckMsg),
+        (PrivleapCommClientSignalMsg, PrivleapCommClientAccessCheckMsg),
     )
     # The auth code attempts to NOT allow a client to tell the difference
     # between an action that doesn't exist, and one that does exist but that
@@ -624,7 +651,7 @@ def auth_signal_request(
     # as a side-channel, but that would potentially allow DoS attacks which
     # are probably a bigger threat.
     auth_start_time: float = time.monotonic()
-    desired_action: pl.PrivleapAction | None = lookup_desired_action(
+    desired_action: PrivleapAction | None = lookup_desired_action(
         comm_msg.signal_name
     )
     auth_result: PrivleapdAuthStatus | None = None
@@ -661,7 +688,7 @@ def auth_signal_request(
         auth_fail_sleep_time: float = auth_end_time - auth_start_time
         if auth_fail_sleep_time > 0:
             time.sleep(auth_fail_sleep_time)
-        send_msg_safe(comm_session, pl.PrivleapCommServerUnauthorizedMsg())
+        send_msg_safe(comm_session, PrivleapCommServerUnauthorizedMsg())
         return None
 
     assert desired_action is not None
@@ -675,7 +702,7 @@ def auth_signal_request(
 
 
 def handle_signal_message(
-    desired_action: pl.PrivleapAction, comm_session: pl.PrivleapSession
+    desired_action: PrivleapAction, comm_session: PrivleapSession
 ) -> None:
     """
     Handles a SIGNAL message from the client.
@@ -692,7 +719,7 @@ def handle_signal_message(
             comm_session.user_name,
             exc_info=e,
         )
-        send_msg_safe(comm_session, pl.PrivleapCommServerTriggerErrorMsg())
+        send_msg_safe(comm_session, PrivleapCommServerTriggerErrorMsg())
         return
 
     logging.info(
@@ -704,20 +731,20 @@ def handle_signal_message(
     # We don't bail out if this message send fails, since we still need to
     # monitor and manage the child process, which is part of what
     # send_action_results() does.
-    send_msg_safe(comm_session, pl.PrivleapCommServerTriggerMsg())
+    send_msg_safe(comm_session, PrivleapCommServerTriggerMsg())
     assert desired_action.action_name is not None
     send_action_results(
         comm_session, desired_action.action_name, action_process
     )
 
 
-def handle_comm_session(comm_socket: pl.PrivleapSocket) -> None:
+def handle_comm_session(comm_socket: PrivleapSocket) -> None:
     """
     Handles comm socket connections, for running actions.
     """
 
     try:
-        comm_session: pl.PrivleapSession = comm_socket.get_session()
+        comm_session: PrivleapSession = comm_socket.get_session()
     except Exception as e:
         logging.error(
             "Could not start comm session with client run by account '%s'!",
@@ -728,26 +755,26 @@ def handle_comm_session(comm_socket: pl.PrivleapSocket) -> None:
 
     try:
         comm_msg: (
-            pl.PrivleapCommClientSignalMsg
-            | pl.PrivleapCommClientAccessCheckMsg
+            PrivleapCommClientSignalMsg
+            | PrivleapCommClientAccessCheckMsg
             | None
         ) = get_client_initial_msg(comm_session)
         if comm_msg is None:
             return
 
-        desired_action: pl.PrivleapAction | None = auth_signal_request(
+        desired_action: PrivleapAction | None = auth_signal_request(
             comm_msg, comm_session
         )
 
         if desired_action is None:
             return
 
-        if isinstance(comm_msg, pl.PrivleapCommClientSignalMsg):
+        if isinstance(comm_msg, PrivleapCommClientSignalMsg):
             handle_signal_message(desired_action, comm_session)
-        elif isinstance(comm_msg, pl.PrivleapCommClientAccessCheckMsg):
+        elif isinstance(comm_msg, PrivleapCommClientAccessCheckMsg):
             # We already authorized the request above, so we can simply tell the
             # client about that now.
-            send_msg_safe(comm_session, pl.PrivleapCommServerAuthorizedMsg())
+            send_msg_safe(comm_session, PrivleapCommServerAuthorizedMsg())
 
     finally:
         comm_session.close_session()
@@ -815,13 +842,13 @@ def cleanup_old_state_dir() -> None:
         )
         sys.exit(1)
     # Cleanup any sockets left behind by an old privleapd process
-    if pl.PrivleapCommon.state_dir.exists():
+    if PrivleapCommon.state_dir.exists():
         try:
-            shutil.rmtree(pl.PrivleapCommon.state_dir)
+            shutil.rmtree(PrivleapCommon.state_dir)
         except Exception as e:
             logging.critical(
                 "Could not delete '%s'!",
-                str(pl.PrivleapCommon.state_dir),
+                str(PrivleapCommon.state_dir),
                 exc_info=e,
             )
             sys.exit(1)
@@ -837,7 +864,7 @@ def append_if_not_in(item: Any, item_list: list[Any]) -> None:
 
 
 def extend_action_list(
-    action_arr: list[pl.PrivleapAction], target_arr: list[pl.PrivleapAction]
+    action_arr: list[PrivleapAction], target_arr: list[PrivleapAction]
 ) -> str | None:
     """
     Extend PrivleapdGlobal.action_list with the contents of action_arr. If a
@@ -854,7 +881,7 @@ def extend_action_list(
 
 def parse_config_file(
     config_file: Path,
-    temp_action_list: list[pl.PrivleapAction],
+    temp_action_list: list[PrivleapAction],
     temp_persistent_user_list: list[str],
     temp_allowed_user_list: list[str],
     temp_expected_disallowed_user_list: list[str],
@@ -863,13 +890,13 @@ def parse_config_file(
     Parses a single config file.
     """
 
-    config_result: pl.ConfigData | str
-    action_arr: list[pl.PrivleapAction]
+    config_result: ConfigData | str
+    action_arr: list[PrivleapAction]
     persistent_user_arr: list[str]
     allowed_user_arr: list[str]
     expected_disallowed_user_arr: list[str]
 
-    config_result = pl.PrivleapCommon.parse_config_file(config_file)
+    config_result = PrivleapCommon.parse_config_file(config_file)
     if isinstance(config_result, str):
         if PrivleapdGlobal.check_config_mode:
             print(config_result, file=sys.stderr)
@@ -884,7 +911,7 @@ def parse_config_file(
         action_arr, temp_action_list
     )
     if duplicate_action_name is not None:
-        duplicate_action_error = pl.PrivleapCommon.find_bad_config_header(
+        duplicate_action_error = PrivleapCommon.find_bad_config_header(
             config_file, duplicate_action_name, "Duplicate action found:"
         )
         if PrivleapdGlobal.check_config_mode:
@@ -920,7 +947,7 @@ def parse_config_files() -> bool:
         config_file_list.append(config_file)
     config_file_list.sort()
 
-    temp_action_list: list[pl.PrivleapAction] = []
+    temp_action_list: list[PrivleapAction] = []
     temp_persistent_user_list: list[str] = []
     temp_allowed_user_list: list[str] = []
     temp_expected_disallowed_user_list: list[str] = []
@@ -929,8 +956,8 @@ def parse_config_files() -> bool:
         if not config_file.is_file():
             continue
 
-        if not pl.PrivleapCommon.validate_id(
-            str(config_file), pl.PrivleapValidateType.CONFIG_FILE
+        if not PrivleapCommon.validate_id(
+            str(config_file), PrivleapValidateType.CONFIG_FILE
         ):
             continue
 
@@ -962,37 +989,37 @@ def populate_state_dir() -> None:
     Creates the state dir and PID file.
     """
 
-    if not pl.PrivleapCommon.state_dir.exists():
+    if not PrivleapCommon.state_dir.exists():
         try:
-            pl.PrivleapCommon.state_dir.mkdir(parents=True)
+            PrivleapCommon.state_dir.mkdir(parents=True)
         except Exception as e:
             logging.critical(
                 "Cannot create '%s'!",
-                str(pl.PrivleapCommon.state_dir),
+                str(PrivleapCommon.state_dir),
                 exc_info=e,
             )
             sys.exit(1)
     else:
         logging.critical(
             "Directory '%s' should not exist yet, but does!",
-            str(pl.PrivleapCommon.state_dir),
+            str(PrivleapCommon.state_dir),
         )
         sys.exit(1)
 
-    if not pl.PrivleapCommon.comm_dir.exists():
+    if not PrivleapCommon.comm_dir.exists():
         try:
-            pl.PrivleapCommon.comm_dir.mkdir(parents=True)
+            PrivleapCommon.comm_dir.mkdir(parents=True)
         except Exception as e:
             logging.critical(
                 "Cannot create '%s'!",
-                str(pl.PrivleapCommon.comm_dir),
+                str(PrivleapCommon.comm_dir),
                 exc_info=e,
             )
             sys.exit(1)
     else:
         logging.critical(
             "Directory '%s' should not exist yet, but does!",
-            str(pl.PrivleapCommon.comm_dir),
+            str(PrivleapCommon.comm_dir),
         )
         sys.exit(1)
 
@@ -1008,8 +1035,8 @@ def open_control_socket() -> None:
     """
 
     try:
-        control_socket: pl.PrivleapSocket = pl.PrivleapSocket(
-            pl.PrivleapSocketType.CONTROL
+        control_socket: PrivleapSocket = PrivleapSocket(
+            PrivleapSocketType.CONTROL
         )
     except Exception as e:
         logging.critical("Failed to open control socket!", exc_info=e)
@@ -1028,8 +1055,8 @@ def open_persistent_comm_sockets() -> None:
 
     for user_name in PrivleapdGlobal.persistent_user_list:
         try:
-            comm_socket: pl.PrivleapSocket = pl.PrivleapSocket(
-                pl.PrivleapSocketType.COMMUNICATION, user_name
+            comm_socket: PrivleapSocket = PrivleapSocket(
+                PrivleapSocketType.COMMUNICATION, user_name
             )
             PrivleapdGlobal.socket_list.append(comm_socket)
             # We intentionally don't log the creation of persistent user sockets
@@ -1072,7 +1099,7 @@ def main_loop() -> NoReturn:
         )
         PrivleapdGlobal.sdnotify_object.notify("WATCHDOG=1")
         for ready_socket_fileno in ready_socket_list[0]:
-            ready_sock_obj: pl.PrivleapSocket | None = None
+            ready_sock_obj: PrivleapSocket | None = None
             for sock_obj in PrivleapdGlobal.socket_list:
                 assert sock_obj.backend_socket is not None
                 if sock_obj.backend_socket.fileno() == ready_socket_fileno:
@@ -1081,7 +1108,7 @@ def main_loop() -> NoReturn:
             if ready_sock_obj is None:
                 logging.critical("privleapd lost track of a socket!")
                 sys.exit(1)
-            if ready_sock_obj.socket_type == pl.PrivleapSocketType.CONTROL:
+            if ready_sock_obj.socket_type == PrivleapSocketType.CONTROL:
                 handle_control_session(ready_sock_obj)
             else:
                 comm_thread: Thread = Thread(
