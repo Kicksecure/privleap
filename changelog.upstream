@@ -1,3 +1,22 @@
+commit d06f3db017c61f4c1fe52c2be3b7c9326441ee76
+Merge: d913bb6 bf27bd5
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Fri Nov 14 01:47:06 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/arraybolt3/trixie'
+
+commit bf27bd57b256b468f48105a14eaa2834b786b23c
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Thu Nov 13 21:55:55 2025 -0600
+
+    Add username/UID to authorized/unauthorized messages in leaprun, refactor tests to be much easier to work with
+
+commit d913bb6e0948017bc136d171bdfc71fd878f9e03
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Nov 1 08:17:38 2025 +0000
+
+    bumped changelog version
+
 commit 3abcc0823ffac0ec59d5735ffb9244c5ec990b9d
 Merge: 09aa71a 43fbac9
 Author: Patrick Schleizer <adrelanos@whonix.org>
