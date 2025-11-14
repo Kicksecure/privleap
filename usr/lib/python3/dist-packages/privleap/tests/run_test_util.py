@@ -778,31 +778,57 @@ Command=echo 'test-act-missing-auth'
         + b"           communication socket for.\n"
     )
     test_act_free_authorized: bytes = (
-        b"You are authorized to run action 'test-act-free'.\n"
+        b"Account '"
+        + PlTestGlobal.test_username_bytes
+        + b"' (1002) is authorized to run action 'test-act-free'.\n"
     )
     test_act_userrestrict_unauthorized: bytes = (
-        b"ERROR: You are unauthorized to run action "
-        b"'test-act-userrestrict'.\n"
+        b"ERROR: Account '"
+        + PlTestGlobal.test_username_bytes
+        + b"' (1002) is unauthorized to run action "
+        + b"'test-act-userrestrict'.\n"
     )
     test_act_grouprestrict_unauthorized: bytes = (
-        b"ERROR: You are unauthorized to run action "
-        b"'test-act-grouprestrict'.\n"
+        b"ERROR: Account '"
+        + PlTestGlobal.test_username_bytes
+        + b"' (1002) is unauthorized to run action "
+        + b"'test-act-grouprestrict'.\n"
     )
     test_act_multiuser_permit_unauthorized: bytes = (
-        b"ERROR: You are unauthorized to run action "
+        b"ERROR: Account 'bin' (2) is unauthorized to run action "
         b"'test-act-multiuser-permit'.\n"
     )
     test_act_multigroup_permit_unauthorized: bytes = (
-        b"ERROR: You are unauthorized to run action "
+        b"ERROR: Account 'bin' (2) is unauthorized to run action "
         b"'test-act-multigroup-permit'.\n"
     )
     test_act_multiuser_multigroup_permit_unauthorized: bytes = (
-        b"ERROR: You are unauthorized to run action "
+        b"ERROR: Account 'bin' (2) is unauthorized to run action "
         b"'test-act-multiuser-multigroup-permit'.\n"
     )
     test_act_nonexistent_unauthorized: bytes = (
-        b"ERROR: You are unauthorized to run action "
-        b"'test-act-nonexistent'.\n"
+        b"ERROR: Account '"
+        + PlTestGlobal.test_username_bytes
+        + b"' (1002) is unauthorized to run action "
+        + b"'test-act-nonexistent'.\n"
+    )
+    test_act_added1_unauthorized: bytes = (
+        b"ERROR: Account '"
+        + PlTestGlobal.test_username_bytes
+        + b"' (1002) is unauthorized to run action "
+        + b"'test-act-added1'.\n"
+    )
+    test_act_added2_unauthorized: bytes = (
+        b"ERROR: Account '"
+        + PlTestGlobal.test_username_bytes
+        + b"' (1002) is unauthorized to run action "
+        + b"'test-act-added2'.\n"
+    )
+    test_act_invalid_unauthorized: bytes = (
+        b"ERROR: Account '"
+        + PlTestGlobal.test_username_bytes
+        + b"' (1002) is unauthorized to run action "
+        + b"'test-act-invalid'.\n"
     )
     test_act_target_user: bytes = (
         b"uid=1002("
@@ -956,9 +982,6 @@ Command=echo 'test-act-missing-auth'
     )
     privleapd_ensure_running_as_root_fail: bytes = (
         b"ensure_running_as_root: CRITICAL: privleapd must run as root!\n"
-    )
-    test_act_invalid_unauthorized: bytes = (
-        b"ERROR: You are unauthorized to run action 'test-act-invalid'.\n"
     )
     destroy_bad_user_socket_and_bail_lines: list[str] = [
         "handle_control_destroy_msg: INFO: Handled DESTROY message for account "

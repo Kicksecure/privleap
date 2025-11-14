@@ -3,4 +3,4 @@
 ## Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
 ## See the file COPYING for copying conditions.
 
-python3 tests/run_test.py --no-service-handling
+python3 usr/lib/python3/dist-packages/privleap/tests/run_test.py --no-service-handling

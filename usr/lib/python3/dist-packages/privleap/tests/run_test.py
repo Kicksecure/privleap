@@ -33,12 +33,47 @@ from pathlib import Path
 from typing import NoReturn, Tuple, IO, TypeAlias
 from collections.abc import Callable
 
-# import privleap as pl
+from run_test_util import (
+  assert_command_result,
+  compare_privleapd_stderr,
+  discard_privleapd_stderr,
+  displace_old_privleap_config,
+  ensure_running_as_root,
+  PlTestData,
+  PlTestGlobal,
+  restore_old_privleap_config,
+  setup_test_account,
+  socket_send_raw_bytes,
+  start_privleapd_service,
+  start_privleapd_subprocess,
+  stop_privleapd_service,
+  stop_privleapd_subprocess,
+  write_privleap_test_config,
+)
 
-import privleap.privleap as pl
-import run_test_util as util
-from run_test_util import stop_privleapd_subprocess
-from run_test_util import PlTestGlobal, PlTestData
+from privleap.privleap import (
+  PrivleapCommClientAccessCheckMsg,
+  PrivleapCommClientSignalMsg,
+  PrivleapCommClientTerminateMsg,
+  PrivleapCommServerAuthorizedMsg,
+  PrivleapCommServerResultExitcodeMsg,
+  PrivleapCommServerResultStderrMsg,
+  PrivleapCommServerResultStdoutMsg,
+  PrivleapCommServerTriggerMsg,
+  PrivleapCommServerUnauthorizedMsg,
+  PrivleapControlClientCreateMsg,
+  PrivleapControlClientDestroyMsg,
+  PrivleapControlClientReloadMsg,
+  PrivleapControlServerControlErrorMsg,
+  PrivleapControlServerExistsMsg,
+  PrivleapControlServerExpectedDisallowedUserMsg,
+  PrivleapControlServerNouserMsg,
+  PrivleapControlServerOkMsg,
+  PrivleapMsg,
+  PrivleapSession,
+  PrivleapSocket,
+  PrivleapSocketType,
+)
 
 leapctl_asserts_passed: int = 0
 leapctl_asserts_failed: int = 0
@@ -123,7 +158,7 @@ def leapctl_assert_command(
 
     global leapctl_asserts_passed
     global leapctl_asserts_failed
-    if util.assert_command_result(
+    if assert_command_result(
         command_data, exit_code, stdout_data, stderr_data
     ):
         logging.info("Assert passed: %s", command_data)
@@ -192,8 +227,8 @@ def leapctl_server_error_test(bogus: str) -> bool:
     if bogus != "":
         return False
     init_fake_server_dirs()
-    control_socket: pl.PrivleapSocket = pl.PrivleapSocket(
-        pl.PrivleapSocketType.CONTROL
+    control_socket: PrivleapSocket = PrivleapSocket(
+        PrivleapSocketType.CONTROL
     )
     with subprocess.Popen(
         ["leapctl", "--create", PlTestGlobal.test_username],
@@ -202,7 +237,7 @@ def leapctl_server_error_test(bogus: str) -> bool:
     ) as leapctl_proc:
         control_session = control_socket.get_session()
         control_session.get_msg()
-        control_session.send_msg(pl.PrivleapControlServerControlErrorMsg())
+        control_session.send_msg(PrivleapControlServerControlErrorMsg())
         control_session.close_session()
         assert control_socket.backend_socket is not None
         control_socket.backend_socket.shutdown(socket.SHUT_RDWR)
@@ -223,8 +258,8 @@ def leapctl_server_cutoff_test(bogus: str) -> bool:
     if bogus != "":
         return False
     init_fake_server_dirs()
-    control_socket: pl.PrivleapSocket = pl.PrivleapSocket(
-        pl.PrivleapSocketType.CONTROL
+    control_socket: PrivleapSocket = PrivleapSocket(
+        PrivleapSocketType.CONTROL
     )
     # This test is prone to race conditions, so we try 5 times and consider it
     # good if one of those times passes.
@@ -252,7 +287,7 @@ def run_leapctl_tests() -> None:
     """
 
     # ---
-    util.start_privleapd_subprocess([])
+    start_privleapd_subprocess([])
     leapctl_assert_command(
         ["leapctl", "--create", "nonexistent"],
         exit_code=1,
@@ -411,13 +446,13 @@ def run_leapctl_tests() -> None:
         stdout_data=PlTestData.cannot_destroy_persistent_sys_socket,
     )
     # ---
-    util.stop_privleapd_subprocess()
+    stop_privleapd_subprocess()
     leapctl_assert_function(
         leapctl_create_deleteme_user,
         "",
         "Create user for deleted user socket destroy test",
     )
-    util.start_privleapd_subprocess([])
+    start_privleapd_subprocess([])
     leapctl_assert_command(
         ["leapctl", "--create", "deleteme"],
         exit_code=0,
@@ -469,7 +504,7 @@ def run_leapctl_tests() -> None:
         stdout_data=PlTestData.root_socket_created,
     )
     # ---
-    util.stop_privleapd_subprocess()
+    stop_privleapd_subprocess()
     leapctl_assert_function(
         leapctl_server_error_test,
         "",
@@ -508,7 +543,7 @@ def leaprun_assert_command(
 
     global leaprun_asserts_passed
     global leaprun_asserts_failed
-    if util.assert_command_result(
+    if assert_command_result(
         command_data, exit_code, stdout_data, stderr_data, filter_func
     ):
         logging.info("Assert passed: %s", command_data)
@@ -546,8 +581,8 @@ def leaprun_server_invalid_response_test(bogus: str) -> bool:
     if bogus != "":
         return False
     init_fake_server_dirs()
-    comm_socket: pl.PrivleapSocket = pl.PrivleapSocket(
-        pl.PrivleapSocketType.COMMUNICATION,
+    comm_socket: PrivleapSocket = PrivleapSocket(
+        PrivleapSocketType.COMMUNICATION,
         user_name=PlTestGlobal.test_username,
     )
     with subprocess.Popen(
@@ -566,7 +601,7 @@ def leaprun_server_invalid_response_test(bogus: str) -> bool:
         #     incorrect message type is sent anyway, so we have to bypass the
         #     protections.
         comm_session._PrivleapSession__send_msg(  # type: ignore [attr-defined]
-            pl.PrivleapControlServerNouserMsg()
+            PrivleapControlServerNouserMsg()
         )
         comm_session.close_session()
         assert comm_socket.backend_socket is not None
@@ -593,8 +628,8 @@ def leaprun_server_late_cutoff_test(bogus: str) -> bool:
     if bogus != "":
         return False
     init_fake_server_dirs()
-    comm_socket: pl.PrivleapSocket = pl.PrivleapSocket(
-        pl.PrivleapSocketType.COMMUNICATION,
+    comm_socket: PrivleapSocket = PrivleapSocket(
+        PrivleapSocketType.COMMUNICATION,
         user_name=PlTestGlobal.test_username,
     )
     with subprocess.Popen(
@@ -662,7 +697,7 @@ def run_leaprun_tests() -> None:
     """
 
     # ---
-    util.start_privleapd_subprocess([])
+    start_privleapd_subprocess([])
     leaprun_assert_command(
         ["sudo", "-u", PlTestGlobal.test_username, "leaprun", "test"],
         exit_code=1,
@@ -674,14 +709,14 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=PlTestData.test_username_socket_created,
     )
-    util.stop_privleapd_subprocess()
+    stop_privleapd_subprocess()
     leaprun_assert_command(
         ["sudo", "-u", PlTestGlobal.test_username, "leaprun", "test-act-free"],
         exit_code=1,
         stderr_data=PlTestData.privleapd_connection_failed,
     )
     # ---
-    util.start_privleapd_subprocess([])
+    start_privleapd_subprocess([])
     leaprun_assert_command(
         ["leapctl", "--create", PlTestGlobal.test_username],
         exit_code=0,
@@ -1089,7 +1124,7 @@ def run_leaprun_tests() -> None:
         stderr_data=PlTestData.test_act_userrestrict_unauthorized,
     )
     # ---
-    util.stop_privleapd_subprocess()
+    stop_privleapd_subprocess()
     leaprun_assert_function(
         leaprun_server_invalid_response_test,
         "",
@@ -1100,7 +1135,7 @@ def run_leaprun_tests() -> None:
         leaprun_server_late_cutoff_test, "", "Leaprun server late cutoff test"
     )
     # ---
-    util.start_privleapd_subprocess([])
+    start_privleapd_subprocess([])
     leaprun_assert_function(
         write_new_config_file,
         "added_actions_config_file",
@@ -1160,8 +1195,7 @@ def run_leaprun_tests() -> None:
             "test-act-added1",
         ],
         exit_code=1,
-        stderr_data=b"ERROR: You are unauthorized to run action "
-        + b"'test-act-added1'.\n",
+        stderr_data=PlTestData.test_act_added1_unauthorized,
     )
     leaprun_assert_command(
         [
@@ -1172,8 +1206,7 @@ def run_leaprun_tests() -> None:
             "test-act-added2",
         ],
         exit_code=1,
-        stderr_data=b"ERROR: You are unauthorized to run action "
-        + b"'test-act-added2'.\n",
+        stderr_data=PlTestData.test_act_added2_unauthorized,
     )
     # ---
     leaprun_assert_function(
@@ -1347,8 +1380,8 @@ def privleapd_bad_config_file_test(test_type: str) -> bool:
             )
         case "missing_auth_config_file":
             expect_privleapd_stderr = PlTestData.missing_auth_config_file_lines
-    util.start_privleapd_subprocess([], allow_error_output=True)
-    if not util.compare_privleapd_stderr(expect_privleapd_stderr):
+    start_privleapd_subprocess([], allow_error_output=True)
+    if not compare_privleapd_stderr(expect_privleapd_stderr):
         stop_privleapd_subprocess()
         return False
     stop_privleapd_subprocess()
@@ -1362,8 +1395,8 @@ def privleapd_bad_config_file_check_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.start_privleapd_subprocess(["--check-config"], allow_error_output=True)
-    if not util.compare_privleapd_stderr(
+    start_privleapd_subprocess(["--check-config"], allow_error_output=True)
+    if not compare_privleapd_stderr(
         PlTestData.bad_config_file_check_lines
     ):
         stop_privleapd_subprocess()
@@ -1380,12 +1413,12 @@ def privleapd_control_disconnect_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
-    control_session: pl.PrivleapSession = pl.PrivleapSession(
+    discard_privleapd_stderr()
+    control_session: PrivleapSession = PrivleapSession(
         is_control_session=True
     )
     control_session.close_session()
-    return util.compare_privleapd_stderr(PlTestData.control_disconnect_lines)
+    return compare_privleapd_stderr(PlTestData.control_disconnect_lines)
 
 
 def privleapd_create_invalid_user_socket_test(bogus: str) -> bool:
@@ -1396,23 +1429,23 @@ def privleapd_create_invalid_user_socket_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     assert_success: bool = True
-    control_session: pl.PrivleapSession = pl.PrivleapSession(
+    control_session: PrivleapSession = PrivleapSession(
         is_control_session=True
     )
-    control_session.send_msg(pl.PrivleapControlClientCreateMsg("nonexistent"))
-    control_server_msg: pl.PrivleapMsg = control_session.get_msg()
+    control_session.send_msg(PrivleapControlClientCreateMsg("nonexistent"))
+    control_server_msg: PrivleapMsg = control_session.get_msg()
     control_session.close_session()
     if not isinstance(
-        control_server_msg, pl.PrivleapControlServerControlErrorMsg
+        control_server_msg, PrivleapControlServerControlErrorMsg
     ):
         logging.error(
             "privleapd returned unexpected message type: %s",
             type(control_server_msg),
         )
         assert_success = False
-    if not util.compare_privleapd_stderr(
+    if not compare_privleapd_stderr(
         PlTestData.control_create_invalid_user_socket_lines
     ):
         assert_success = False
@@ -1428,18 +1461,18 @@ def privleapd_create_invalid_user_socket_and_bail_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     # This test is prone to race conditions, so we try 5 times and consider it
     # good if one of those times passes.
     for i in range(5):
-        control_session: pl.PrivleapSession = pl.PrivleapSession(
+        control_session: PrivleapSession = PrivleapSession(
             is_control_session=True
         )
         control_session.send_msg(
-            pl.PrivleapControlClientCreateMsg("nonexistent")
+            PrivleapControlClientCreateMsg("nonexistent")
         )
         control_session.close_session()
-        if util.compare_privleapd_stderr(
+        if compare_privleapd_stderr(
             PlTestData.create_invalid_user_socket_and_bail_lines, quiet=i != 4
         ):
             return True
@@ -1454,21 +1487,21 @@ def privleapd_destroy_invalid_user_socket_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     assert_success: bool = True
-    control_session: pl.PrivleapSession = pl.PrivleapSession(
+    control_session: PrivleapSession = PrivleapSession(
         is_control_session=True
     )
-    control_session.send_msg(pl.PrivleapControlClientDestroyMsg("nonexistent"))
-    control_server_msg: pl.PrivleapMsg = control_session.get_msg()
+    control_session.send_msg(PrivleapControlClientDestroyMsg("nonexistent"))
+    control_server_msg: PrivleapMsg = control_session.get_msg()
     control_session.close_session()
-    if not isinstance(control_server_msg, pl.PrivleapControlServerNouserMsg):
+    if not isinstance(control_server_msg, PrivleapControlServerNouserMsg):
         logging.error(
             "privleapd returned unexpected message type: %s",
             type(control_server_msg),
         )
         assert_success = False
-    if not util.compare_privleapd_stderr(
+    if not compare_privleapd_stderr(
         PlTestData.destroy_invalid_user_socket_lines
     ):
         assert_success = False
@@ -1482,35 +1515,35 @@ def privleapd_create_user_socket_twice_test(bogus: str) -> bool:
     """
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     assert_success: bool = True
-    control_session: pl.PrivleapSession = pl.PrivleapSession(
+    control_session: PrivleapSession = PrivleapSession(
         is_control_session=True
     )
     control_session.send_msg(
-        pl.PrivleapControlClientCreateMsg(PlTestGlobal.test_username)
+        PrivleapControlClientCreateMsg(PlTestGlobal.test_username)
     )
-    control_server_msg: pl.PrivleapMsg = control_session.get_msg()
+    control_server_msg: PrivleapMsg = control_session.get_msg()
     control_session.close_session()
-    if not isinstance(control_server_msg, pl.PrivleapControlServerOkMsg):
+    if not isinstance(control_server_msg, PrivleapControlServerOkMsg):
         logging.error(
             "privleapd returned unexpected message type: %s",
             type(control_server_msg),
         )
         assert_success = False
-    control_session = pl.PrivleapSession(is_control_session=True)
+    control_session = PrivleapSession(is_control_session=True)
     control_session.send_msg(
-        pl.PrivleapControlClientCreateMsg(PlTestGlobal.test_username)
+        PrivleapControlClientCreateMsg(PlTestGlobal.test_username)
     )
     control_server_msg = control_session.get_msg()
     control_session.close_session()
-    if not isinstance(control_server_msg, pl.PrivleapControlServerExistsMsg):
+    if not isinstance(control_server_msg, PrivleapControlServerExistsMsg):
         logging.error(
             "privleapd returned unexpected message type: %s",
             type(control_server_msg),
         )
         assert_success = False
-    if not util.compare_privleapd_stderr(PlTestData.create_user_socket_lines):
+    if not compare_privleapd_stderr(PlTestData.create_user_socket_lines):
         assert_success = False
     return assert_success
 
@@ -1524,18 +1557,18 @@ def privleapd_create_existing_user_socket_and_bail_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     # This test is prone to race conditions, so we try 5 times and consider it
     # good if one of those times passes.
     for i in range(5):
-        control_session: pl.PrivleapSession = pl.PrivleapSession(
+        control_session: PrivleapSession = PrivleapSession(
             is_control_session=True
         )
         control_session.send_msg(
-            pl.PrivleapControlClientCreateMsg(PlTestGlobal.test_username)
+            PrivleapControlClientCreateMsg(PlTestGlobal.test_username)
         )
         control_session.close_session()
-        if util.compare_privleapd_stderr(
+        if compare_privleapd_stderr(
             PlTestData.create_existing_user_socket_and_bail_lines, quiet=i != 4
         ):
             return True
@@ -1550,25 +1583,25 @@ def privleapd_create_blocked_user_socket_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     assert_success: bool = True
-    control_session: pl.PrivleapSession = pl.PrivleapSession(
+    control_session: PrivleapSession = PrivleapSession(
         is_control_session=True
     )
     control_session.send_msg(
-        pl.PrivleapControlClientCreateMsg(PlTestGlobal.test_username)
+        PrivleapControlClientCreateMsg(PlTestGlobal.test_username)
     )
-    control_server_msg: pl.PrivleapMsg = control_session.get_msg()
+    control_server_msg: PrivleapMsg = control_session.get_msg()
     control_session.close_session()
     if not isinstance(
-        control_server_msg, pl.PrivleapControlServerControlErrorMsg
+        control_server_msg, PrivleapControlServerControlErrorMsg
     ):
         logging.error(
             "privleapd returned unexpected message type: %s",
             type(control_server_msg),
         )
         assert_success = False
-    if not util.compare_privleapd_stderr(
+    if not compare_privleapd_stderr(
         PlTestData.create_blocked_user_socket_lines
     ):
         assert_success = False
@@ -1584,18 +1617,18 @@ def privleapd_create_blocked_user_socket_and_bail_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     # This test is prone to race conditions, so we try 5 times and consider it
     # good if one of those times passes.
     for i in range(5):
-        control_session: pl.PrivleapSession = pl.PrivleapSession(
+        control_session: PrivleapSession = PrivleapSession(
             is_control_session=True
         )
         control_session.send_msg(
-            pl.PrivleapControlClientCreateMsg(PlTestGlobal.test_username)
+            PrivleapControlClientCreateMsg(PlTestGlobal.test_username)
         )
         control_session.close_session()
-        if util.compare_privleapd_stderr(
+        if compare_privleapd_stderr(
             PlTestData.create_blocked_user_socket_and_bail_lines, quiet=i != 4
         ):
             return True
@@ -1610,7 +1643,7 @@ def privleapd_destroy_missing_user_socket_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     assert_success: bool = True
     try:
         os.unlink(
@@ -1622,21 +1655,21 @@ def privleapd_destroy_missing_user_socket_test(bogus: str) -> bool:
         )
     except Exception:
         return False
-    control_session: pl.PrivleapSession = pl.PrivleapSession(
+    control_session: PrivleapSession = PrivleapSession(
         is_control_session=True
     )
     control_session.send_msg(
-        pl.PrivleapControlClientDestroyMsg(PlTestGlobal.test_username)
+        PrivleapControlClientDestroyMsg(PlTestGlobal.test_username)
     )
-    control_server_msg: pl.PrivleapMsg = control_session.get_msg()
+    control_server_msg: PrivleapMsg = control_session.get_msg()
     control_session.close_session()
-    if not isinstance(control_server_msg, pl.PrivleapControlServerOkMsg):
+    if not isinstance(control_server_msg, PrivleapControlServerOkMsg):
         logging.error(
             "privleapd returned unexpected message type: %s",
             type(control_server_msg),
         )
         assert_success = False
-    if not util.compare_privleapd_stderr(
+    if not compare_privleapd_stderr(
         PlTestData.destroy_missing_user_socket_lines
     ):
         assert_success = False
@@ -1651,23 +1684,23 @@ def privleapd_create_expected_disallowed_socket_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     assert_success: bool = True
-    control_session: pl.PrivleapSession = pl.PrivleapSession(
+    control_session: PrivleapSession = PrivleapSession(
         is_control_session=True
     )
-    control_session.send_msg(pl.PrivleapControlClientCreateMsg("irc"))
-    control_server_msg: pl.PrivleapMsg = control_session.get_msg()
+    control_session.send_msg(PrivleapControlClientCreateMsg("irc"))
+    control_server_msg: PrivleapMsg = control_session.get_msg()
     control_session.close_session()
     if not isinstance(
-        control_server_msg, pl.PrivleapControlServerExpectedDisallowedUserMsg
+        control_server_msg, PrivleapControlServerExpectedDisallowedUserMsg
     ):
         logging.error(
             "privleapd returned unexpected message type: %s",
             type(control_server_msg),
         )
         assert_success = False
-    if not util.compare_privleapd_stderr(
+    if not compare_privleapd_stderr(
         PlTestData.create_expected_disallowed_socket_lines
     ):
         assert_success = False
@@ -1683,25 +1716,25 @@ def privleapd_destroy_user_socket_and_bail_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     # This test is prone to race conditions, so we try 5 times and consider it
     # good if one of those times passes.
     for i in range(5):
-        control_session: pl.PrivleapSession = pl.PrivleapSession(
+        control_session: PrivleapSession = PrivleapSession(
             is_control_session=True
         )
         control_session.send_msg(
-            pl.PrivleapControlClientCreateMsg(PlTestGlobal.test_username)
+            PrivleapControlClientCreateMsg(PlTestGlobal.test_username)
         )
         _ = control_session.get_msg()
         control_session.close_session()
-        util.discard_privleapd_stderr()
-        control_session = pl.PrivleapSession(is_control_session=True)
+        discard_privleapd_stderr()
+        control_session = PrivleapSession(is_control_session=True)
         control_session.send_msg(
-            pl.PrivleapControlClientDestroyMsg(PlTestGlobal.test_username)
+            PrivleapControlClientDestroyMsg(PlTestGlobal.test_username)
         )
         control_session.close_session()
-        if util.compare_privleapd_stderr(
+        if compare_privleapd_stderr(
             PlTestData.destroy_user_socket_and_bail_lines, quiet=i != 4
         ):
             return True
@@ -1717,18 +1750,18 @@ def privleapd_destroy_bad_user_socket_and_bail_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     # This test is prone to race conditions, so we try 5 times and consider it
     # good if one of those times passes.
     for i in range(5):
-        control_session: pl.PrivleapSession = pl.PrivleapSession(
+        control_session: PrivleapSession = PrivleapSession(
             is_control_session=True
         )
         control_session.send_msg(
-            pl.PrivleapControlClientDestroyMsg(PlTestGlobal.test_username)
+            PrivleapControlClientDestroyMsg(PlTestGlobal.test_username)
         )
         control_session.close_session()
-        if util.compare_privleapd_stderr(
+        if compare_privleapd_stderr(
             PlTestData.destroy_bad_user_socket_and_bail_lines, quiet=i != 4
         ):
             return True
@@ -1743,18 +1776,18 @@ def privleapd_send_invalid_control_message_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
-    control_session: pl.PrivleapSession = pl.PrivleapSession(
+    discard_privleapd_stderr()
+    control_session: PrivleapSession = PrivleapSession(
         is_control_session=True
     )
     assert control_session.backend_socket is not None
     # privleap message packets are simply length-prefixed binary blobs, with the
     # length specified as a 4-byte big-endian integer.
-    util.socket_send_raw_bytes(
+    socket_send_raw_bytes(
         control_session.backend_socket, b"\x00\x00\x00\x0dBOB asdfghjkl"
     )
     control_session.close_session()
-    if not util.compare_privleapd_stderr(
+    if not compare_privleapd_stderr(
         PlTestData.send_invalid_control_message_lines
     ):
         return False
@@ -1768,8 +1801,8 @@ def privleapd_send_corrupted_control_message_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
-    control_session: pl.PrivleapSession = pl.PrivleapSession(
+    discard_privleapd_stderr()
+    control_session: PrivleapSession = PrivleapSession(
         is_control_session=True
     )
     assert control_session.backend_socket is not None
@@ -1777,11 +1810,11 @@ def privleapd_send_corrupted_control_message_test(bogus: str) -> bool:
     # the user to create a socket for. The "exploit" at the end is additional
     # data that isn't expected and should be rejected. The pun in "root exploit"
     # was not originally intended, but was too good to leave out :)
-    util.socket_send_raw_bytes(
+    socket_send_raw_bytes(
         control_session.backend_socket, b"\x00\x00\x00\x13CREATE root exploit"
     )
     control_session.close_session()
-    if not util.compare_privleapd_stderr(
+    if not compare_privleapd_stderr(
         PlTestData.send_corrupted_control_message_lines
     ):
         return False
@@ -1796,12 +1829,12 @@ def privleapd_bail_comm_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
-    comm_session: pl.PrivleapSession = pl.PrivleapSession(
+    discard_privleapd_stderr()
+    comm_session: PrivleapSession = PrivleapSession(
         PlTestGlobal.test_username
     )
     comm_session.close_session()
-    if not util.compare_privleapd_stderr(PlTestData.bail_comm_lines):
+    if not compare_privleapd_stderr(PlTestData.bail_comm_lines):
         return False
     return True
 
@@ -1813,18 +1846,18 @@ def privleapd_send_invalid_comm_message_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
-    comm_session: pl.PrivleapSession = pl.PrivleapSession(
+    discard_privleapd_stderr()
+    comm_session: PrivleapSession = PrivleapSession(
         PlTestGlobal.test_username
     )
     assert comm_session.backend_socket is not None
     # privleap message packets are simply length-prefixed binary blobs, with the
     # length specified as a 4-byte big-endian integer.
-    util.socket_send_raw_bytes(
+    socket_send_raw_bytes(
         comm_session.backend_socket, b"\x00\x00\x00\x0dBOB asdfghjkl"
     )
     comm_session.close_session()
-    if not util.compare_privleapd_stderr(
+    if not compare_privleapd_stderr(
         PlTestData.send_invalid_comm_message_lines
     ):
         return False
@@ -1839,18 +1872,18 @@ def privleapd_send_nonexistent_signal_and_bail_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     # This test is prone to race conditions, so we try 5 times and consider it
     # good if one of those times passes.
     for i in range(5):
-        comm_session: pl.PrivleapSession = pl.PrivleapSession(
+        comm_session: PrivleapSession = PrivleapSession(
             PlTestGlobal.test_username
         )
-        comm_session.send_msg(pl.PrivleapCommClientSignalMsg("nonexistent"))
+        comm_session.send_msg(PrivleapCommClientSignalMsg("nonexistent"))
         comm_session.close_session()
         part1_passed: bool = False
         part2_passed: bool = False
-        if util.compare_privleapd_stderr(
+        if compare_privleapd_stderr(
             PlTestData.send_nonexistent_signal_and_bail_lines_part1,
             quiet=i != 4,
         ):
@@ -1858,7 +1891,7 @@ def privleapd_send_nonexistent_signal_and_bail_test(bogus: str) -> bool:
         # privleapd waits about 3 seconds before sending the UNAUTHORIZED
         # message for security reasons
         time.sleep(3)
-        if util.compare_privleapd_stderr(
+        if compare_privleapd_stderr(
             PlTestData.unauthorized_broken_pipe_lines, quiet=i != 4
         ):
             part2_passed = True
@@ -1876,20 +1909,20 @@ def privleapd_send_userrestrict_signal_and_bail_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     # This test is prone to race conditions, so we try 5 times and consider it
     # good if one of those times passes.
     for i in range(5):
-        comm_session: pl.PrivleapSession = pl.PrivleapSession(
+        comm_session: PrivleapSession = PrivleapSession(
             PlTestGlobal.test_username
         )
         comm_session.send_msg(
-            pl.PrivleapCommClientSignalMsg("test-act-userrestrict")
+            PrivleapCommClientSignalMsg("test-act-userrestrict")
         )
         comm_session.close_session()
         part1_passed: bool = False
         part2_passed: bool = False
-        if util.compare_privleapd_stderr(
+        if compare_privleapd_stderr(
             PlTestData.send_userrestrict_signal_and_bail_lines_part1,
             quiet=i != 4,
         ):
@@ -1897,7 +1930,7 @@ def privleapd_send_userrestrict_signal_and_bail_test(bogus: str) -> bool:
         # privleapd waits about 3 seconds before sending the UNAUTHORIZED
         # message for security reasons
         time.sleep(3)
-        if util.compare_privleapd_stderr(
+        if compare_privleapd_stderr(
             PlTestData.unauthorized_broken_pipe_lines, quiet=i != 4
         ):
             part2_passed = True
@@ -1915,20 +1948,20 @@ def privleapd_send_grouprestrict_signal_and_bail_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     # This test is prone to race conditions, so we try 5 times and consider it
     # good if one of those times passes.
     for i in range(5):
-        comm_session: pl.PrivleapSession = pl.PrivleapSession(
+        comm_session: PrivleapSession = PrivleapSession(
             PlTestGlobal.test_username
         )
         comm_session.send_msg(
-            pl.PrivleapCommClientSignalMsg("test-act-grouprestrict")
+            PrivleapCommClientSignalMsg("test-act-grouprestrict")
         )
         comm_session.close_session()
         part1_passed: bool = False
         part2_passed: bool = False
-        if util.compare_privleapd_stderr(
+        if compare_privleapd_stderr(
             PlTestData.send_grouprestrict_signal_and_bail_lines_part1,
             quiet=i != 4,
         ):
@@ -1936,7 +1969,7 @@ def privleapd_send_grouprestrict_signal_and_bail_test(bogus: str) -> bool:
         # privleapd waits about 3 seconds before sending the UNAUTHORIZED
         # message for security reasons
         time.sleep(3)
-        if util.compare_privleapd_stderr(
+        if compare_privleapd_stderr(
             PlTestData.unauthorized_broken_pipe_lines, quiet=i != 4
         ):
             part2_passed = True
@@ -1954,10 +1987,10 @@ def privleapd_check_signal_response_helper(
       to privleapd_check_signal_response_test.
     """
 
-    comm_session: pl.PrivleapSession = pl.PrivleapSession(
+    comm_session: PrivleapSession = PrivleapSession(
         PlTestGlobal.test_username
     )
-    comm_session.send_msg(pl.PrivleapCommClientSignalMsg(test_action))
+    comm_session.send_msg(PrivleapCommClientSignalMsg(test_action))
     accumulated_stdout: bytes = b""
     accumulated_stderr: bytes = b""
     returned_exitcode: int = 0
@@ -1967,23 +2000,23 @@ def privleapd_check_signal_response_helper(
         try:
             comm_session_msg = comm_session.get_msg()
             if isinstance(
-                comm_session_msg, pl.PrivleapCommServerUnauthorizedMsg
+                comm_session_msg, PrivleapCommServerUnauthorizedMsg
             ):
                 returned_unauthorized = True
                 break
-            if isinstance(comm_session_msg, pl.PrivleapCommServerTriggerMsg):
+            if isinstance(comm_session_msg, PrivleapCommServerTriggerMsg):
                 continue
 
             if isinstance(
-                comm_session_msg, pl.PrivleapCommServerResultStdoutMsg
+                comm_session_msg, PrivleapCommServerResultStdoutMsg
             ):
                 accumulated_stdout += comm_session_msg.stdout_bytes
             elif isinstance(
-                comm_session_msg, pl.PrivleapCommServerResultStderrMsg
+                comm_session_msg, PrivleapCommServerResultStderrMsg
             ):
                 accumulated_stderr += comm_session_msg.stderr_bytes
             elif isinstance(
-                comm_session_msg, pl.PrivleapCommServerResultExitcodeMsg
+                comm_session_msg, PrivleapCommServerResultExitcodeMsg
             ):
                 returned_exitcode = comm_session_msg.exit_code
                 break
@@ -2052,7 +2085,7 @@ def privleapd_check_signal_response_test(test_type: str) -> bool:
 
     if test_action is None:
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
 
     accumulated_stdout: bytes
     accumulated_stderr: bytes
@@ -2088,7 +2121,7 @@ def privleapd_check_signal_response_test(test_type: str) -> bool:
             returned_unauthorized,
         )
         assert_success = False
-    if not util.compare_privleapd_stderr(expect_privleapd_stderr):
+    if not compare_privleapd_stderr(expect_privleapd_stderr):
         assert_success = False
     return assert_success
 
@@ -2102,16 +2135,16 @@ def privleapd_send_valid_signal_and_bail_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     # This test is prone to race conditions, so we try 5 times and consider it
     # good if one of those times passes.
     for i in range(5):
-        comm_session: pl.PrivleapSession = pl.PrivleapSession(
+        comm_session: PrivleapSession = PrivleapSession(
             PlTestGlobal.test_username
         )
-        comm_session.send_msg(pl.PrivleapCommClientSignalMsg("test-act-free"))
+        comm_session.send_msg(PrivleapCommClientSignalMsg("test-act-free"))
         comm_session.close_session()
-        if util.compare_privleapd_stderr(
+        if compare_privleapd_stderr(
             PlTestData.send_valid_signal_and_bail_lines, quiet=i != 4
         ):
             return True
@@ -2126,17 +2159,17 @@ def privleapd_allowed_action_access_check_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     assert_success: bool = True
-    comm_session: pl.PrivleapSession = pl.PrivleapSession(
+    comm_session: PrivleapSession = PrivleapSession(
         PlTestGlobal.test_username
     )
-    comm_session.send_msg(pl.PrivleapCommClientAccessCheckMsg("test-act-free"))
-    comm_session_msg: pl.PrivleapMsg = comm_session.get_msg()
-    if not isinstance(comm_session_msg, pl.PrivleapCommServerAuthorizedMsg):
+    comm_session.send_msg(PrivleapCommClientAccessCheckMsg("test-act-free"))
+    comm_session_msg: PrivleapMsg = comm_session.get_msg()
+    if not isinstance(comm_session_msg, PrivleapCommServerAuthorizedMsg):
         logging.error("Incorrect reply to access check!")
         assert_success = False
-    if not util.compare_privleapd_stderr(
+    if not compare_privleapd_stderr(
         PlTestData.allowed_action_access_check_lines
     ):
         assert_success = False
@@ -2151,19 +2184,19 @@ def privleapd_disallowed_action_access_check_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     assert_success: bool = True
-    comm_session: pl.PrivleapSession = pl.PrivleapSession(
+    comm_session: PrivleapSession = PrivleapSession(
         PlTestGlobal.test_username
     )
     comm_session.send_msg(
-        pl.PrivleapCommClientAccessCheckMsg("test-act-userrestrict")
+        PrivleapCommClientAccessCheckMsg("test-act-userrestrict")
     )
-    comm_session_msg: pl.PrivleapMsg = comm_session.get_msg()
-    if not isinstance(comm_session_msg, pl.PrivleapCommServerUnauthorizedMsg):
+    comm_session_msg: PrivleapMsg = comm_session.get_msg()
+    if not isinstance(comm_session_msg, PrivleapCommServerUnauthorizedMsg):
         logging.error("Incorrect reply to access check!")
         assert_success = False
-    if not util.compare_privleapd_stderr(
+    if not compare_privleapd_stderr(
         PlTestData.disallowed_action_access_check_lines
     ):
         assert_success = False
@@ -2177,7 +2210,7 @@ def privleapd_leaprun_terminate_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     with subprocess.Popen(
         [
             "sudo",
@@ -2193,7 +2226,7 @@ def privleapd_leaprun_terminate_test(bogus: str) -> bool:
         leaprun_proc.send_signal(signal.SIGINT)
         leaprun_proc.wait()
 
-    if util.compare_privleapd_stderr(PlTestData.leaprun_terminate_lines):
+    if compare_privleapd_stderr(PlTestData.leaprun_terminate_lines):
         return True
     return False
 
@@ -2206,13 +2239,13 @@ def privleapd_terminate_sent_first_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
-    comm_session: pl.PrivleapSession = pl.PrivleapSession(
+    discard_privleapd_stderr()
+    comm_session: PrivleapSession = PrivleapSession(
         PlTestGlobal.test_username
     )
-    comm_session.send_msg(pl.PrivleapCommClientTerminateMsg())
+    comm_session.send_msg(PrivleapCommClientTerminateMsg())
     comm_session.close_session()
-    if util.compare_privleapd_stderr(PlTestData.terminate_sent_first_lines):
+    if compare_privleapd_stderr(PlTestData.terminate_sent_first_lines):
         return True
     return False
 
@@ -2226,7 +2259,7 @@ def privleapd_invalid_ascii_test(idx_str: str) -> bool:
     idx: int = int(idx_str)
     if idx > len(PlTestData.invalid_ascii_list):
         return False
-    comm_session: pl.PrivleapSession = pl.PrivleapSession(
+    comm_session: PrivleapSession = PrivleapSession(
         PlTestGlobal.test_username
     )
     assert comm_session.backend_socket is not None
@@ -2238,7 +2271,7 @@ def privleapd_invalid_ascii_test(idx_str: str) -> bool:
     except Exception:
         pass
     comm_session.close_session()
-    if util.compare_privleapd_stderr(
+    if compare_privleapd_stderr(
         PlTestData.invalid_ascii_lines_list[idx], False
     ):
         return True
@@ -2252,17 +2285,17 @@ def privleapd_send_random_garbage_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
-    comm_session: pl.PrivleapSession = pl.PrivleapSession(
+    discard_privleapd_stderr()
+    comm_session: PrivleapSession = PrivleapSession(
         PlTestGlobal.test_username
     )
     assert comm_session.backend_socket is not None
     with open("/dev/urandom", "rb") as randfile:
-        util.socket_send_raw_bytes(
+        socket_send_raw_bytes(
             comm_session.backend_socket, randfile.read(256)
         )
     comm_session.close_session()
-    if util.compare_privleapd_stderr(PlTestData.send_random_garbage_lines):
+    if compare_privleapd_stderr(PlTestData.send_random_garbage_lines):
         return True
     return False
 
@@ -2274,20 +2307,20 @@ def privleapd_config_reload_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     assert_success: bool = True
-    control_session: pl.PrivleapSession = pl.PrivleapSession(
+    control_session: PrivleapSession = PrivleapSession(
         is_control_session=True
     )
-    control_session.send_msg(pl.PrivleapControlClientReloadMsg())
-    control_server_msg: pl.PrivleapMsg = control_session.get_msg()
-    if not isinstance(control_server_msg, pl.PrivleapControlServerOkMsg):
+    control_session.send_msg(PrivleapControlClientReloadMsg())
+    control_server_msg: PrivleapMsg = control_session.get_msg()
+    if not isinstance(control_server_msg, PrivleapControlServerOkMsg):
         logging.error(
             "privleapd returned unexpected message type: %s",
             type(control_server_msg),
         )
         assert_success = False
-    if not util.compare_privleapd_stderr(
+    if not compare_privleapd_stderr(
         PlTestData.config_reload_success_lines
     ):
         assert_success = False
@@ -2301,22 +2334,22 @@ def privleapd_config_reload_fail_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    util.discard_privleapd_stderr()
+    discard_privleapd_stderr()
     assert_success: bool = True
-    control_session: pl.PrivleapSession = pl.PrivleapSession(
+    control_session: PrivleapSession = PrivleapSession(
         is_control_session=True
     )
-    control_session.send_msg(pl.PrivleapControlClientReloadMsg())
-    control_server_msg: pl.PrivleapMsg = control_session.get_msg()
+    control_session.send_msg(PrivleapControlClientReloadMsg())
+    control_server_msg: PrivleapMsg = control_session.get_msg()
     if not isinstance(
-        control_server_msg, pl.PrivleapControlServerControlErrorMsg
+        control_server_msg, PrivleapControlServerControlErrorMsg
     ):
         logging.error(
             "privleapd returned unexpected message type: %s",
             type(control_server_msg),
         )
         assert_success = False
-    if not util.compare_privleapd_stderr(
+    if not compare_privleapd_stderr(
         PlTestData.config_reload_failure_lines
     ):
         assert_success = False
@@ -2336,7 +2369,7 @@ def privleapd_assert_command(
 
     global privleapd_asserts_passed
     global privleapd_asserts_failed
-    if util.assert_command_result(
+    if assert_command_result(
         command_data, exit_code, stdout_data, stderr_data
     ):
         logging.info("Assert passed: %s", command_data)
@@ -2385,7 +2418,7 @@ def run_privleapd_tests() -> None:
         stderr_data=PlTestData.privleapd_verify_not_running_twice_fail,
     )
     # ---
-    util.stop_privleapd_subprocess()
+    stop_privleapd_subprocess()
     privleapd_assert_command(
         ["sudo", "-u", PlTestGlobal.test_username, "/usr/bin/privleapd"],
         exit_code=1,
@@ -2397,7 +2430,7 @@ def run_privleapd_tests() -> None:
         "",
         "Write config file that privleapd will ignore",
     )
-    util.start_privleapd_subprocess([])
+    start_privleapd_subprocess([])
     privleapd_assert_command(
         ["leapctl", "--create", PlTestGlobal.test_username],
         exit_code=0,
@@ -2415,7 +2448,7 @@ def run_privleapd_tests() -> None:
         stderr_data=PlTestData.test_act_invalid_unauthorized,
     )
     # ---
-    util.stop_privleapd_subprocess()
+    stop_privleapd_subprocess()
     privleapd_assert_function(
         write_new_config_file,
         "crash_config_file",
@@ -2550,7 +2583,7 @@ def run_privleapd_tests() -> None:
         "Remove config file with missing auth data",
     )
     # ---
-    util.start_privleapd_subprocess([])
+    start_privleapd_subprocess([])
     privleapd_assert_function(
         privleapd_control_disconnect_test,
         "",
@@ -2939,22 +2972,22 @@ def main() -> NoReturn:
         format="%(funcName)s: %(levelname)s: %(message)s", level=logging.INFO
     )
     print_test_header()
-    util.ensure_running_as_root()
-    util.stop_privleapd_service()
-    util.setup_test_account(
+    ensure_running_as_root()
+    stop_privleapd_service()
+    setup_test_account(
         PlTestGlobal.test_username, PlTestGlobal.test_home_dir
     )
-    util.setup_test_account("alttest", Path("/home/alttest"))
-    util.displace_old_privleap_config()
-    util.write_privleap_test_config()
+    setup_test_account("alttest", Path("/home/alttest"))
+    displace_old_privleap_config()
+    write_privleap_test_config()
 
     run_leapctl_tests()
     run_leaprun_tests()
     run_privleapd_tests()
 
-    util.restore_old_privleap_config()
-    util.stop_privleapd_subprocess()
-    util.start_privleapd_service()
+    restore_old_privleap_config()
+    stop_privleapd_subprocess()
+    start_privleapd_service()
     print_result_summary()
     if PlTestGlobal.all_asserts_passed:
         sys.exit(0)
