@@ -1072,7 +1072,7 @@ class PrivleapAction:
 
         if target_group is not None:
             orig_target_group: str = target_group
-            target_group = PrivleapCommon.normalize_user_id(target_group)
+            target_group = PrivleapCommon.normalize_group_id(target_group)
             if target_group is None:
                 raise ValueError(
                     f"Group '{orig_target_group}' specified by field "
