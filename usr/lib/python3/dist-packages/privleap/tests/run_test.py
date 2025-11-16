@@ -1324,6 +1324,11 @@ def write_new_config_file(bad_config_file: str) -> bool:
                 PlTestGlobal.privleap_conf_dir, "missing_auth.conf"
             )
             target_contents = PlTestData.missing_auth_config_file
+        case "nonexistent_restrict_config_file":
+            target_path = Path(
+                PlTestGlobal.privleap_conf_dir, "nonexistent_restrict.conf"
+            )
+            target_contents = PlTestData.nonexistent_restrict_config_file
         case _:
             return False
 
@@ -2105,6 +2110,12 @@ def privleapd_check_signal_response_test(test_type: str) -> bool:
             )
             test_action = "test-act-privleap-grouppermit"
             target_user = "alttest"
+        case "test-act-nonexistent-restrict":
+            expect_unauthorized = True
+            expect_privleapd_stderr = (
+                PlTestData.test_act_nonexistent_restrict_lines
+            )
+            test_action = "test-act-nonexistent-restrict"
 
     if test_action is None:
         return False
@@ -2975,6 +2986,33 @@ def run_privleapd_tests() -> None:
         ["leapctl", "--destroy", "alttest"],
         exit_code=0,
         stdout_data=PlTestData.alttest_socket_destroyed,
+    )
+    # ---
+    privleapd_assert_function(
+        write_new_config_file,
+        "nonexistent_restrict_config_file",
+        "Write config file with nonexistent authorized user",
+    )
+    privleapd_assert_function(
+        privleapd_config_reload_test,
+        "",
+        "Test privleapd config reload with nonexistent restrict config",
+    )
+    privleapd_assert_function(
+        privleapd_check_signal_response_test,
+        "test-act-nonexistent-restrict",
+        "Test nonexistent authorized user action"
+    )
+    privleapd_assert_function(
+        try_remove_file,
+        str(Path(PlTestGlobal.privleap_conf_dir, "nonexistent_restrict.conf")),
+        "Remove nonexistent authorized user config file",
+    )
+    privleapd_assert_function(
+        privleapd_config_reload_test,
+        "",
+        "Test privleapd config reload with nonexistent restrict config "
+        "removed",
     )
     # ---
 

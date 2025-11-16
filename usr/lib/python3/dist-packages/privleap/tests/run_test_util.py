@@ -684,6 +684,11 @@ AuthorizedUsers=root
     missing_auth_config_file: str = """[action:test-act-missing-auth]
 Command=echo 'test-act-missing-auth'
 """
+    nonexistent_restrict_config_file: str = """\
+[action:test-act-nonexistent-restrict]
+Command=echo 'test-act-nonexistent-restrict'
+AuthorizedUsers=nonexistent
+"""
     test_username_create_error: bytes = (
         b"ERROR: privleapd encountered an error while creating a comm "
         b"socket for account '" + PlTestGlobal.test_username_bytes + b"'!\n"
@@ -1328,4 +1333,9 @@ Command=echo 'test-act-missing-auth'
     test_act_privleap_grouppermit_alttest_kick_lines: list[str] = [
         "handle_comm_session: WARNING: Ending session and destroying comm "
         + "socket for no-longer-allowed account 'alttest'\n"
+    ]
+    test_act_nonexistent_restrict_lines: list[str] = [
+        "auth_signal_request: WARNING: Action run request: Account "
+        + f"'{PlTestGlobal.test_username}' is not authorized to run action "
+        + "'test-act-nonexistent-restrict'\n"
     ]

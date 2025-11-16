@@ -1018,6 +1018,7 @@ class PrivleapAction:
         self.auth_groups: list[str] = []
         self.target_user: str | None = None
         self.target_group: str | None = None
+        self.auth_restricted: bool = False
 
         if action_name is None:
             raise ValueError("action_name is empty")
@@ -1035,6 +1036,7 @@ class PrivleapAction:
             raise ValueError("No authorized users or groups provided!")
 
         if auth_users is not None:
+            self.auth_restricted = True
             for raw_auth_user in auth_users:
                 auth_user: str | None = PrivleapCommon.normalize_user_id(
                     raw_auth_user
@@ -1048,6 +1050,7 @@ class PrivleapAction:
                 self.auth_users.append(auth_user)
 
         if auth_groups is not None:
+            self.auth_restricted = True
             for raw_auth_group in auth_groups:
                 auth_group: str | None = PrivleapCommon.normalize_group_id(
                     raw_auth_group

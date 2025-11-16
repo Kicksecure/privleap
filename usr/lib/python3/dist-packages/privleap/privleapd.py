@@ -572,15 +572,14 @@ def authorize_user(
         # Root account, automatically grant access to everything
         return PrivleapdAuthStatus.AUTHORIZED
 
-    no_auth_users: bool = False
-    no_auth_groups: bool = False
+    if not action.auth_restricted:
+        # Action has no restrictions, grant access
+        return PrivleapdAuthStatus.AUTHORIZED
 
     if len(action.auth_users) != 0:
         # Action exists but has restrictions on what users can run it.
         if user_name in action.auth_users:
             return PrivleapdAuthStatus.AUTHORIZED
-    else:
-        no_auth_users = True
 
     if len(action.auth_groups) != 0:
         # Action exists but has restrictions on what groups can run it.
@@ -594,12 +593,6 @@ def authorize_user(
         for group in group_list:
             if group in action.auth_groups:
                 return PrivleapdAuthStatus.AUTHORIZED
-    else:
-        no_auth_groups = True
-
-    if no_auth_users and no_auth_groups:
-        # Action has no restrictions, grant access
-        return PrivleapdAuthStatus.AUTHORIZED
 
     # Action had restrictions that could not be met, deny access
     return PrivleapdAuthStatus.UNAUTHORIZED
