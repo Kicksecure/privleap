@@ -2390,6 +2390,34 @@ def privleapd_config_reload_fail_test(bogus: str) -> bool:
     return assert_success
 
 
+def privleapd_config_reload_with_kick_test(bogus: str) -> bool:
+    """
+    Reloads privleapd's configuration, and checks if no-longer-allowed users
+      were kicked in the process.
+    """
+
+    if bogus != "":
+        return False
+    discard_privleapd_stderr()
+    assert_success: bool = True
+    control_session: PrivleapSession = PrivleapSession(
+        is_control_session=True
+    )
+    control_session.send_msg(PrivleapControlClientReloadMsg())
+    control_server_msg: PrivleapMsg = control_session.get_msg()
+    if not isinstance(control_server_msg, PrivleapControlServerOkMsg):
+        logging.error(
+            "privleapd returned unexpected message type: %s",
+            type(control_server_msg),
+        )
+        assert_success = False
+    if not compare_privleapd_stderr(
+        PlTestData.config_reload_success_with_kick_lines
+    ):
+        assert_success = False
+    return assert_success
+
+
 def privleapd_assert_command(
     command_data: list[str],
     exit_code: int,
@@ -2982,10 +3010,46 @@ def run_privleapd_tests() -> None:
         "test-act-privleap-grouppermit-alttest-success",
         "Test privleapd action run with allowed user alttest",
     )
+    # ---
     privleapd_assert_command(
-        ["leapctl", "--destroy", "alttest"],
+        ["leapctl", "--create", "alttest2"],
         exit_code=0,
-        stdout_data=PlTestData.alttest_socket_destroyed,
+        stdout_data=PlTestData.alttest2_socket_created,
+    )
+    privleapd_assert_command(
+        ["usermod", "-r", "-G", "privleap", "alttest"],
+        exit_code=0,
+        stdout_data=b"",
+    )
+    privleapd_assert_command(
+        ["usermod", "-r", "-G", "privleap", "alttest2"],
+        exit_code=0,
+        stdout_data=b"",
+    )
+    privleapd_assert_function(
+        privleapd_config_reload_with_kick_test,
+        "",
+        "Test privleapd config reload with multiple no-longer-allowed users",
+    )
+    privleapd_assert_function(
+        check_socket_absent,
+        "/run/privleapd/comm/alttest",
+        "Test alttest socket no longer exists"
+    )
+    privleapd_assert_function(
+        check_socket_absent,
+        "/run/privleapd/comm/alttest2",
+        "Test alttest2 socket no longer exists"
+    )
+    privleapd_assert_command(
+        ["usermod", "-a", "-G", "privleap", "alttest"],
+        exit_code=0,
+        stdout_data=b"",
+    )
+    privleapd_assert_command(
+        ["usermod", "-a", "-G", "privleap", "alttest2"],
+        exit_code=0,
+        stdout_data=b"",
     )
     # ---
     privleapd_assert_function(
@@ -3090,6 +3154,7 @@ def main() -> NoReturn:
         PlTestGlobal.test_username, PlTestGlobal.test_home_dir
     )
     setup_test_account("alttest", Path("/home/alttest"))
+    setup_test_account("alttest2", Path("/home/alttest2"))
     displace_old_privleap_config()
     write_privleap_test_config()
 

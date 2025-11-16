@@ -177,6 +177,30 @@ def is_user_allowed(user_name: str) -> bool:
     return user_in_allowed_group(user_name)
 
 
+def prune_disallowed_comm_sockets() -> None:
+    """
+    Remove comm sockets for users who are no longer allowed to connect to
+    privleap.
+    """
+
+    user_names_to_kick: list[str] = []
+
+    for sock in PrivleapdGlobal.socket_list:
+        if sock.socket_type != PrivleapSocketType.COMMUNICATION:
+            continue
+        assert sock.user_name is not None
+        if is_user_allowed(sock.user_name):
+            continue
+        user_names_to_kick.append(sock.user_name)
+
+    for user_name in user_names_to_kick:
+        logging.info(
+            "Destroying comm socket for no-longer-allowed account '%s'",
+            user_name,
+        )
+        _, _ = destroy_comm_socket(user_name)
+
+
 def handle_control_create_msg(
     control_session: PrivleapSession,
     control_msg: PrivleapControlClientCreateMsg,
@@ -365,6 +389,7 @@ def handle_control_reload_msg(control_session: PrivleapSession) -> None:
 
     if parse_config_files():
         logging.info("Handled RELOAD message, configuration reloaded")
+        prune_disallowed_comm_sockets()
         send_msg_safe(control_session, PrivleapControlServerOkMsg())
     else:
         logging.warning("Handled RELOAD message, configuration was invalid!")

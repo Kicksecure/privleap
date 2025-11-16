@@ -770,6 +770,9 @@ AuthorizedUsers=nonexistent
     alttest_socket_not_permitted: bytes = (
         b"ERROR: Account 'alttest' is not permitted to have a comm socket!\n"
     )
+    alttest2_socket_created: bytes = (
+        b"Comm socket created for account 'alttest2'.\n"
+    )
     leapctl_help: bytes = (
         b"leapctl <--create|--destroy> <user>\n"
         + b"leapctl --reload\n"
@@ -1249,6 +1252,14 @@ AuthorizedUsers=nonexistent
     config_reload_success_lines: list[str] = [
         "handle_control_reload_msg: INFO: Handled RELOAD message, "
         + "configuration reloaded\n"
+    ]
+    config_reload_success_with_kick_lines: list[str] = [
+        "handle_control_reload_msg: INFO: Handled RELOAD message, "
+        + "configuration reloaded\n",
+        "prune_disallowed_comm_sockets: INFO: Destroying comm socket for "
+        + "no-longer-allowed account 'alttest'\n",
+        "prune_disallowed_comm_sockets: INFO: Destroying comm socket for "
+        + "no-longer-allowed account 'alttest2'\n",
     ]
     test_act_added1_success_lines: list[str] = [
         "handle_signal_message: INFO: Triggered action 'test-act-added1' "
