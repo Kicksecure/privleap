@@ -81,6 +81,7 @@ class PrivleapdGlobal:
     check_config_mode = False
     debug_mode = False
     sdnotify_object: sdnotify.SystemdNotifier = sdnotify.SystemdNotifier()
+    old_umask: int = 0
 
 
 class PrivleapdAuthStatus(Enum):
@@ -375,6 +376,7 @@ def run_action(
             calling_user,
             target_user,
             target_group,
+            str(PrivleapdGlobal.old_umask),
             "/usr/bin/bash",
             "-c",
             "--",
@@ -992,6 +994,7 @@ def populate_state_dir() -> None:
     if not PrivleapCommon.state_dir.exists():
         try:
             PrivleapCommon.state_dir.mkdir(parents=True)
+            PrivleapCommon.state_dir.chmod(0o755)
         except Exception as e:
             logging.critical(
                 "Cannot create '%s'!",
@@ -1009,6 +1012,7 @@ def populate_state_dir() -> None:
     if not PrivleapCommon.comm_dir.exists():
         try:
             PrivleapCommon.comm_dir.mkdir(parents=True)
+            PrivleapCommon.comm_dir.chmod(0o755)
         except Exception as e:
             logging.critical(
                 "Cannot create '%s'!",
@@ -1023,8 +1027,19 @@ def populate_state_dir() -> None:
         )
         sys.exit(1)
 
-    with open(PrivleapdGlobal.pid_file_path, "w", encoding="utf-8") as pid_file:
-        pid_file.write(str(os.getpid()) + "\n")
+    try:
+        with open(
+            PrivleapdGlobal.pid_file_path, "w", encoding="utf-8"
+        ) as pid_file:
+            pid_file.write(str(os.getpid()) + "\n")
+        PrivleapdGlobal.pid_file_path.chmod(0o644)
+    except Exception as e:
+        logging.critical(
+            "Cannot create PID file at '%s'!",
+            str(PrivleapdGlobal.pid_file_path),
+            exc_info=e,
+        )
+        sys.exit(1)
 
 
 def open_control_socket() -> None:
@@ -1137,6 +1152,11 @@ def main() -> NoReturn:
     """
     Main function.
     """
+
+    ## Set restrictive umask to prevent any file permission vulnerability
+    ## window during socket creation, this denies all privileges for
+    ## non-owners.
+    PrivleapdGlobal.old_umask = os.umask(0o077)
 
     logging.basicConfig(
         format="%(funcName)s: %(levelname)s: %(message)s", level=logging.INFO

@@ -34,7 +34,8 @@ if len(sys.argv) < 5:
 calling_user: str = sys.argv[1]
 target_user: str = sys.argv[2]
 target_group: str = sys.argv[3]
-command_arr: list[str] = sys.argv[4:]
+init_umask: str = sys.argv[4]
+command_arr: list[str] = sys.argv[5:]
 
 try:
     target_user_info: pwd.struct_passwd = pwd.getpwnam(target_user)
@@ -42,6 +43,17 @@ try:
     _ = grp.getgrnam(target_group)
 except Exception:
     sys.exit(255)
+
+## privleapd uses a restrictive umask internally, but individual processes are
+## expected to use a PAM-provided umask if set in PAM, or the default umask
+## originally set on the privleapd process by systemd if no umask is set by
+## PAM. We restore the umask from before privleapd locks its own umask down
+## here. PAM can override this later if desirable.
+try:
+    init_umask_int: int = int(init_umask)
+except Exception:
+    sys.exit(255)
+os.umask(init_umask_int)
 
 pam_obj: Any = PAM.pam()
 pam_obj.start("privleapd")
