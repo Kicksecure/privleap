@@ -1087,7 +1087,11 @@ class PrivleapAction:
 
 
 ConfigData: TypeAlias = Tuple[
-    list[PrivleapAction], list[str], list[str], list[str]
+    list[PrivleapAction],
+    list[str],
+    list[str],
+    list[str],
+    list[str],
 ]
 
 
@@ -1143,7 +1147,7 @@ class PrivleapCommon:
         action_output_list: list[PrivleapAction] = []
         persistent_user_output_list: list[str] = []
         allowed_user_output_list: list[str] = []
-        allowed_user_groups_list: list[str] = []
+        allowed_group_output_list: list[str] = []
         expected_disallowed_user_output_list: list[str] = []
         current_section_type: PrivleapConfigSection = PrivleapConfigSection.NONE
         line_idx: int = 0
@@ -1299,8 +1303,8 @@ class PrivleapCommon:
                             config_val
                         )
                         if config_val is not None:
-                            if config_val not in allowed_user_groups_list:
-                                allowed_user_groups_list.append(config_val)
+                            if config_val not in allowed_group_output_list:
+                                allowed_group_output_list.append(config_val)
                     else:
                         return (
                             f"{config_file}:{line_idx}:error:Unrecognized "
@@ -1418,20 +1422,11 @@ class PrivleapCommon:
                 )
             )
 
-        for group in allowed_user_groups_list:
-            group_info: grp.struct_group = grp.getgrnam(group)
-            for user_name in group_info.gr_mem:
-                if user_name not in allowed_user_output_list:
-                    allowed_user_output_list.append(user_name)
-            for user in pwd.getpwall():
-                if user.pw_gid == group_info.gr_gid:
-                    if user.pw_name not in allowed_user_output_list:
-                        allowed_user_output_list.append(user.pw_name)
-
         return (
             action_output_list,
             persistent_user_output_list,
             allowed_user_output_list,
+            allowed_group_output_list,
             expected_disallowed_user_output_list,
         )
 

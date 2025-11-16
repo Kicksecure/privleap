@@ -762,6 +762,9 @@ Command=echo 'test-act-missing-auth'
     alttest_socket_destroyed: bytes = (
         b"Comm socket destroyed for account 'alttest'.\n"
     )
+    alttest_socket_not_permitted: bytes = (
+        b"ERROR: Account 'alttest' is not permitted to have a comm socket!\n"
+    )
     leapctl_help: bytes = (
         b"leapctl <--create|--destroy> <user>\n"
         + b"leapctl --reload\n"
@@ -930,6 +933,8 @@ Command=echo 'test-act-missing-auth'
         "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
     destroy_invalid_user_socket_lines: list[str] = [
+        "destroy_comm_socket: INFO: Could not destroy comm socket for account "
+        + "'nonexistent', account has no comm socket open\n",
         "handle_control_destroy_msg: INFO: Handled DESTROY message for account "
         + "'nonexistent', socket did not exist\n"
     ]
@@ -964,12 +969,17 @@ Command=echo 'test-act-missing-auth'
         "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
     destroy_missing_user_socket_lines: list[str] = [
-        "handle_control_destroy_msg: WARNING: Handling DESTROY, no socket to "
-        + f"delete at '/run/privleapd/comm/{PlTestGlobal.test_username}'\n",
+        "destroy_comm_socket: WARNING: Destroying comm socket for account "
+        + f"'{PlTestGlobal.test_username}', no UNIX socket to delete at "
+        + f"'/run/privleapd/comm/{PlTestGlobal.test_username}'\n",
+        "destroy_comm_socket: INFO: Successfully destroyed comm socket for "
+        + f"account '{PlTestGlobal.test_username}'\n",
         "handle_control_destroy_msg: INFO: Handled DESTROY message for account "
         + f"'{PlTestGlobal.test_username}', socket destroyed\n",
     ]
     destroy_user_socket_and_bail_lines: list[str] = [
+        "destroy_comm_socket: INFO: Successfully destroyed comm socket for "
+        + f"account '{PlTestGlobal.test_username}'\n",
         "handle_control_destroy_msg: INFO: Handled DESTROY message for "
         + f"account '{PlTestGlobal.test_username}', socket destroyed\n",
         "send_msg_safe: ERROR: Could not send 'OK'\n",
@@ -984,6 +994,8 @@ Command=echo 'test-act-missing-auth'
         b"ensure_running_as_root: CRITICAL: privleapd must run as root!\n"
     )
     destroy_bad_user_socket_and_bail_lines: list[str] = [
+        "destroy_comm_socket: INFO: Could not destroy comm socket for account "
+        + f"'{PlTestGlobal.test_username}', account has no comm socket open\n",
         "handle_control_destroy_msg: INFO: Handled DESTROY message for account "
         + f"'{PlTestGlobal.test_username}', socket did not exist\n",
         "send_msg_safe: ERROR: Could not send 'NOUSER'\n",
@@ -1306,4 +1318,14 @@ Command=echo 'test-act-missing-auth'
         "get_client_initial_msg: WARNING: Did not read SIGNAL or "
         + "ACCESS_CHECK as first message from client run by account "
         + f"'{PlTestGlobal.test_username}', forcibly closing connection.\n"
+    ]
+    test_act_privleap_grouppermit_alttest_success_lines: list[str] = [
+        "handle_signal_message: INFO: Triggered action "
+        + "'test-act-privleap-grouppermit' for account 'alttest'\n",
+        "send_action_results: INFO: Action 'test-act-privleap-grouppermit' "
+        + "requested by account 'alttest' completed\n",
+    ]
+    test_act_privleap_grouppermit_alttest_kick_lines: list[str] = [
+        "handle_comm_session: WARNING: Ending session and destroying comm "
+        + "socket for no-longer-allowed account 'alttest'\n"
     ]
