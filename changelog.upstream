@@ -1,3 +1,46 @@
+commit 094f6f1796033ea05a3e5fb93a2be4f52e0bf0d7
+Merge: 405ad7b ed781df
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Tue Nov 18 02:12:57 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/arraybolt3/trixie'
+
+commit ed781df3dbeee4aa6ea1c95c99cb3de789d9b65f
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Nov 16 17:16:39 2025 -0600
+
+    Prune sockets for disallowed users on config reload
+
+commit 50facae84703ee779f9a8fd9db20f02edad8a556
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Nov 16 16:43:15 2025 -0600
+
+    Avoid allowing anyone to run an action that has user/group restrictions for only nonexistent users/groups
+
+commit ddf5e8442f681c4ddb5a12adb57bc2edae8c78d9
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Nov 16 16:09:35 2025 -0600
+
+    Make privleapd pick up changes to group ownership immediately, kick disallowed users who manage to connect to privleapd anyway, minor additional test refactoring (inspired by code from ChatGPT Codex)
+
+commit 911ddeeeec0fe7150dd10663e1925273ef3661ce
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Nov 16 13:09:47 2025 -0600
+
+    Harden umask as defense-in-depth against socket ownership vulnerabilities
+
+commit 62eb599964dd9ade5c4e48131a816cbc355a3044
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Sun Nov 16 13:09:10 2025 -0600
+
+    Fix wrong function call for normalizing a group ID
+
+commit 405ad7b75637498983f228f8c4cf9ed6020c583c
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Fri Nov 14 06:56:20 2025 +0000
+
+    bumped changelog version
+
 commit d06f3db017c61f4c1fe52c2be3b7c9326441ee76
 Merge: d913bb6 bf27bd5
 Author: Patrick Schleizer <adrelanos@whonix.org>
