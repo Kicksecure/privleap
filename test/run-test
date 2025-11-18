@@ -1,6 +1,7 @@
-#!/bin/bash
+#!/usr/bin/python3 -su
 
 ## Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
 ## See the file COPYING for copying conditions.
 
-python3 test/run-test --no-service-handling
+from privleap.tests.run_test import main
+main()

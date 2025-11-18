@@ -1018,6 +1018,7 @@ class PrivleapAction:
         self.auth_groups: list[str] = []
         self.target_user: str | None = None
         self.target_group: str | None = None
+        self.auth_restricted: bool = False
 
         if action_name is None:
             raise ValueError("action_name is empty")
@@ -1035,6 +1036,7 @@ class PrivleapAction:
             raise ValueError("No authorized users or groups provided!")
 
         if auth_users is not None:
+            self.auth_restricted = True
             for raw_auth_user in auth_users:
                 auth_user: str | None = PrivleapCommon.normalize_user_id(
                     raw_auth_user
@@ -1048,6 +1050,7 @@ class PrivleapAction:
                 self.auth_users.append(auth_user)
 
         if auth_groups is not None:
+            self.auth_restricted = True
             for raw_auth_group in auth_groups:
                 auth_group: str | None = PrivleapCommon.normalize_group_id(
                     raw_auth_group
@@ -1072,7 +1075,7 @@ class PrivleapAction:
 
         if target_group is not None:
             orig_target_group: str = target_group
-            target_group = PrivleapCommon.normalize_user_id(target_group)
+            target_group = PrivleapCommon.normalize_group_id(target_group)
             if target_group is None:
                 raise ValueError(
                     f"Group '{orig_target_group}' specified by field "
@@ -1087,7 +1090,11 @@ class PrivleapAction:
 
 
 ConfigData: TypeAlias = Tuple[
-    list[PrivleapAction], list[str], list[str], list[str]
+    list[PrivleapAction],
+    list[str],
+    list[str],
+    list[str],
+    list[str],
 ]
 
 
@@ -1143,7 +1150,7 @@ class PrivleapCommon:
         action_output_list: list[PrivleapAction] = []
         persistent_user_output_list: list[str] = []
         allowed_user_output_list: list[str] = []
-        allowed_user_groups_list: list[str] = []
+        allowed_group_output_list: list[str] = []
         expected_disallowed_user_output_list: list[str] = []
         current_section_type: PrivleapConfigSection = PrivleapConfigSection.NONE
         line_idx: int = 0
@@ -1299,8 +1306,8 @@ class PrivleapCommon:
                             config_val
                         )
                         if config_val is not None:
-                            if config_val not in allowed_user_groups_list:
-                                allowed_user_groups_list.append(config_val)
+                            if config_val not in allowed_group_output_list:
+                                allowed_group_output_list.append(config_val)
                     else:
                         return (
                             f"{config_file}:{line_idx}:error:Unrecognized "
@@ -1418,20 +1425,11 @@ class PrivleapCommon:
                 )
             )
 
-        for group in allowed_user_groups_list:
-            group_info: grp.struct_group = grp.getgrnam(group)
-            for user_name in group_info.gr_mem:
-                if user_name not in allowed_user_output_list:
-                    allowed_user_output_list.append(user_name)
-            for user in pwd.getpwall():
-                if user.pw_gid == group_info.gr_gid:
-                    if user.pw_name not in allowed_user_output_list:
-                        allowed_user_output_list.append(user.pw_name)
-
         return (
             action_output_list,
             persistent_user_output_list,
             allowed_user_output_list,
+            allowed_group_output_list,
             expected_disallowed_user_output_list,
         )
 

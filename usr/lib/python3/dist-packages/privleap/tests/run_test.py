@@ -33,24 +33,6 @@ from pathlib import Path
 from typing import NoReturn, Tuple, IO, TypeAlias
 from collections.abc import Callable
 
-from run_test_util import (
-  assert_command_result,
-  compare_privleapd_stderr,
-  discard_privleapd_stderr,
-  displace_old_privleap_config,
-  ensure_running_as_root,
-  PlTestData,
-  PlTestGlobal,
-  restore_old_privleap_config,
-  setup_test_account,
-  socket_send_raw_bytes,
-  start_privleapd_service,
-  start_privleapd_subprocess,
-  stop_privleapd_service,
-  stop_privleapd_subprocess,
-  write_privleap_test_config,
-)
-
 from privleap.privleap import (
   PrivleapCommClientAccessCheckMsg,
   PrivleapCommClientSignalMsg,
@@ -73,6 +55,24 @@ from privleap.privleap import (
   PrivleapSession,
   PrivleapSocket,
   PrivleapSocketType,
+)
+
+from .run_test_util import (
+    assert_command_result,
+    compare_privleapd_stderr,
+    discard_privleapd_stderr,
+    displace_old_privleap_config,
+    ensure_running_as_root,
+    PlTestData,
+    PlTestGlobal,
+    restore_old_privleap_config,
+    setup_test_account,
+    socket_send_raw_bytes,
+    start_privleapd_service,
+    start_privleapd_subprocess,
+    stop_privleapd_service,
+    stop_privleapd_subprocess,
+    write_privleap_test_config,
 )
 
 leapctl_asserts_passed: int = 0
@@ -133,6 +133,14 @@ def try_remove_file(path_str: str) -> bool:
     except Exception:
         return False
     return True
+
+
+def check_socket_absent(path_str: str) -> bool:
+    """
+    Checks if a socket is absent or not.
+    """
+
+    return not Path(path_str).is_socket()
 
 
 def init_fake_server_dirs() -> None:
@@ -1316,6 +1324,11 @@ def write_new_config_file(bad_config_file: str) -> bool:
                 PlTestGlobal.privleap_conf_dir, "missing_auth.conf"
             )
             target_contents = PlTestData.missing_auth_config_file
+        case "nonexistent_restrict_config_file":
+            target_path = Path(
+                PlTestGlobal.privleap_conf_dir, "nonexistent_restrict.conf"
+            )
+            target_contents = PlTestData.nonexistent_restrict_config_file
         case _:
             return False
 
@@ -1638,7 +1651,7 @@ def privleapd_create_blocked_user_socket_and_bail_test(bogus: str) -> bool:
 def privleapd_destroy_missing_user_socket_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      destroyed for a user who's socket on the filesystem has been deleted.
+      destroyed for a user whose socket on the filesystem has been deleted.
     """
 
     if bogus != "":
@@ -1980,6 +1993,7 @@ def privleapd_send_grouprestrict_signal_and_bail_test(bogus: str) -> bool:
 
 def privleapd_check_signal_response_helper(
     test_action: str,
+    target_user: str,
 ) -> Tuple[bytes, bytes, int, bool, bool]:
     """
     Test how privleapd handles a comm client that requests a specific action to
@@ -1987,9 +2001,7 @@ def privleapd_check_signal_response_helper(
       to privleapd_check_signal_response_test.
     """
 
-    comm_session: PrivleapSession = PrivleapSession(
-        PlTestGlobal.test_username
-    )
+    comm_session: PrivleapSession = PrivleapSession(target_user)
     comm_session.send_msg(PrivleapCommClientSignalMsg(test_action))
     accumulated_stdout: bytes = b""
     accumulated_stderr: bytes = b""
@@ -2050,8 +2062,10 @@ def privleapd_check_signal_response_test(test_type: str) -> bool:
     expect_stderr_data: bytes = b""
     expect_exitcode: int = 0
     expect_unauthorized: bool = False
+    expect_error_result: bool = False
     expect_privleapd_stderr: list[str] = []
     test_action: str | None = None
+    target_user: str = PlTestGlobal.test_username
     match test_type:
         case "test-act-invalid-bash":
             expect_stderr_data = (
@@ -2082,6 +2096,26 @@ def privleapd_check_signal_response_test(test_type: str) -> bool:
                 PlTestData.test_act_userpermit_success_lines
             )
             test_action = "test-act-userpermit"
+        case "test-act-privleap-grouppermit-alttest-success":
+            expect_stdout_data = b"test-act-privleap-grouppermit\n"
+            expect_privleapd_stderr = (
+                PlTestData.test_act_privleap_grouppermit_alttest_success_lines
+            )
+            test_action = "test-act-privleap-grouppermit"
+            target_user = "alttest"
+        case "test-act-privleap-grouppermit-alttest-kick":
+            expect_error_result = True
+            expect_privleapd_stderr = (
+                PlTestData.test_act_privleap_grouppermit_alttest_kick_lines
+            )
+            test_action = "test-act-privleap-grouppermit"
+            target_user = "alttest"
+        case "test-act-nonexistent-restrict":
+            expect_unauthorized = True
+            expect_privleapd_stderr = (
+                PlTestData.test_act_nonexistent_restrict_lines
+            )
+            test_action = "test-act-nonexistent-restrict"
 
     if test_action is None:
         return False
@@ -2098,11 +2132,11 @@ def privleapd_check_signal_response_test(test_type: str) -> bool:
         returned_exitcode,
         returned_unauthorized,
         error_result,
-    ) = privleapd_check_signal_response_helper(test_action)
+    ) = privleapd_check_signal_response_helper(test_action, target_user)
 
     assert_success: bool = True
-    if error_result:
-        logging.error("Error during signal test!")
+    if error_result != expect_error_result:
+        logging.error("Error result mismatch! Got error: %s", error_result)
         assert_success = False
     if accumulated_stdout != expect_stdout_data:
         logging.error("stdout mismatch!")
@@ -2351,6 +2385,34 @@ def privleapd_config_reload_fail_test(bogus: str) -> bool:
         assert_success = False
     if not compare_privleapd_stderr(
         PlTestData.config_reload_failure_lines
+    ):
+        assert_success = False
+    return assert_success
+
+
+def privleapd_config_reload_with_kick_test(bogus: str) -> bool:
+    """
+    Reloads privleapd's configuration, and checks if no-longer-allowed users
+      were kicked in the process.
+    """
+
+    if bogus != "":
+        return False
+    discard_privleapd_stderr()
+    assert_success: bool = True
+    control_session: PrivleapSession = PrivleapSession(
+        is_control_session=True
+    )
+    control_session.send_msg(PrivleapControlClientReloadMsg())
+    control_server_msg: PrivleapMsg = control_session.get_msg()
+    if not isinstance(control_server_msg, PrivleapControlServerOkMsg):
+        logging.error(
+            "privleapd returned unexpected message type: %s",
+            type(control_server_msg),
+        )
+        assert_success = False
+    if not compare_privleapd_stderr(
+        PlTestData.config_reload_success_with_kick_lines
     ):
         assert_success = False
     return assert_success
@@ -2903,6 +2965,120 @@ def run_privleapd_tests() -> None:
         "Remove bad added actions config file",
     )
     # ---
+    privleapd_assert_command(
+        ["leapctl", "--create", "alttest"],
+        exit_code=0,
+        stdout_data=PlTestData.alttest_socket_created,
+    )
+    privleapd_assert_function(
+        privleapd_check_signal_response_test,
+        "test-act-privleap-grouppermit-alttest-success",
+        "Test privleapd action run with allowed user alttest",
+    )
+    privleapd_assert_command(
+        ["usermod", "-r", "-G", "privleap", "alttest"],
+        exit_code=0,
+        stdout_data=b"",
+    )
+    privleapd_assert_function(
+        privleapd_check_signal_response_test,
+        "test-act-privleap-grouppermit-alttest-kick",
+        "Test privleapd action run with no longer allowed user alttest",
+    )
+    privleapd_assert_function(
+        check_socket_absent,
+        "/run/privleapd/comm/alttest",
+        "Test alttest socket no longer exists"
+    )
+    privleapd_assert_command(
+        ["leapctl", "--create", "alttest"],
+        exit_code=2,
+        stderr_data=PlTestData.alttest_socket_not_permitted,
+    )
+    privleapd_assert_command(
+        ["usermod", "-a", "-G", "privleap", "alttest"],
+        exit_code=0,
+        stdout_data=b"",
+    )
+    privleapd_assert_command(
+        ["leapctl", "--create", "alttest"],
+        exit_code=0,
+        stdout_data=PlTestData.alttest_socket_created,
+    )
+    privleapd_assert_function(
+        privleapd_check_signal_response_test,
+        "test-act-privleap-grouppermit-alttest-success",
+        "Test privleapd action run with allowed user alttest",
+    )
+    # ---
+    privleapd_assert_command(
+        ["leapctl", "--create", "alttest2"],
+        exit_code=0,
+        stdout_data=PlTestData.alttest2_socket_created,
+    )
+    privleapd_assert_command(
+        ["usermod", "-r", "-G", "privleap", "alttest"],
+        exit_code=0,
+        stdout_data=b"",
+    )
+    privleapd_assert_command(
+        ["usermod", "-r", "-G", "privleap", "alttest2"],
+        exit_code=0,
+        stdout_data=b"",
+    )
+    privleapd_assert_function(
+        privleapd_config_reload_with_kick_test,
+        "",
+        "Test privleapd config reload with multiple no-longer-allowed users",
+    )
+    privleapd_assert_function(
+        check_socket_absent,
+        "/run/privleapd/comm/alttest",
+        "Test alttest socket no longer exists"
+    )
+    privleapd_assert_function(
+        check_socket_absent,
+        "/run/privleapd/comm/alttest2",
+        "Test alttest2 socket no longer exists"
+    )
+    privleapd_assert_command(
+        ["usermod", "-a", "-G", "privleap", "alttest"],
+        exit_code=0,
+        stdout_data=b"",
+    )
+    privleapd_assert_command(
+        ["usermod", "-a", "-G", "privleap", "alttest2"],
+        exit_code=0,
+        stdout_data=b"",
+    )
+    # ---
+    privleapd_assert_function(
+        write_new_config_file,
+        "nonexistent_restrict_config_file",
+        "Write config file with nonexistent authorized user",
+    )
+    privleapd_assert_function(
+        privleapd_config_reload_test,
+        "",
+        "Test privleapd config reload with nonexistent restrict config",
+    )
+    privleapd_assert_function(
+        privleapd_check_signal_response_test,
+        "test-act-nonexistent-restrict",
+        "Test nonexistent authorized user action"
+    )
+    privleapd_assert_function(
+        try_remove_file,
+        str(Path(PlTestGlobal.privleap_conf_dir, "nonexistent_restrict.conf")),
+        "Remove nonexistent authorized user config file",
+    )
+    privleapd_assert_function(
+        privleapd_config_reload_test,
+        "",
+        "Test privleapd config reload with nonexistent restrict config "
+        "removed",
+    )
+    # ---
 
     logging.info(
         "privleapd passed asserts: %s, failed asserts: %s",
@@ -2978,6 +3154,7 @@ def main() -> NoReturn:
         PlTestGlobal.test_username, PlTestGlobal.test_home_dir
     )
     setup_test_account("alttest", Path("/home/alttest"))
+    setup_test_account("alttest2", Path("/home/alttest2"))
     displace_old_privleap_config()
     write_privleap_test_config()
 
@@ -2993,7 +3170,3 @@ def main() -> NoReturn:
         sys.exit(0)
     else:
         sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
