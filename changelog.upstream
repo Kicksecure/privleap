@@ -1,3 +1,34 @@
+commit 9db99f38c67f1ef9cae694d0f41b00f5879371cf
+Merge: f92a92d 08fb5f5
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Wed Nov 19 02:06:05 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/arraybolt3/trixie'
+
+commit 08fb5f57e1260b1d96b58dd6a9365886855afae1
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Tue Nov 18 23:37:49 2025 -0600
+
+    Add check for insecure config file permissions
+
+commit d89b3ac336e7343799b06a9a450948e0411362ce
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Tue Nov 18 21:57:15 2025 -0600
+
+    Explicitly drop all supplementary groups
+
+commit 783fce5012f5fd2f29a57bdc5e6cca60cac288fc
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Tue Nov 18 20:58:17 2025 -0600
+
+    Rework leaprun signal handler to reduce the risk of terminate messages not being sent
+
+commit f92a92dbf08b8c86c9845b88f7e988300a270257
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Tue Nov 18 07:23:11 2025 +0000
+
+    bumped changelog version
+
 commit 094f6f1796033ea05a3e5fb93a2be4f52e0bf0d7
 Merge: 405ad7b ed781df
 Author: Patrick Schleizer <adrelanos@whonix.org>
