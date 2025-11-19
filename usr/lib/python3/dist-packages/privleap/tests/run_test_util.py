@@ -1350,3 +1350,14 @@ AuthorizedUsers=nonexistent
         + f"'{PlTestGlobal.test_username}' is not authorized to run action "
         + "'test-act-nonexistent-restrict'\n"
     ]
+    insecure_permissions_on_file_lines: list[str] = [
+        "parse_config_file: ERROR: Error parsing config: "
+        + "'Config file '/etc/privleap/conf.d/added_actions.conf' has "
+        + "insecure permissions; it must be owned by 'root:root' and not be "
+        + "world-writable!'\n"
+    ]
+    insecure_permissions_on_config_dir_lines: list[str] = [
+        "parse_config_files: ERROR: Configuration directory "
+        + "'/etc/privleap/conf.d' has insecure permissions; it must be owned "
+        + "by 'root:root' and not be world-writable!\n"
+    ]
