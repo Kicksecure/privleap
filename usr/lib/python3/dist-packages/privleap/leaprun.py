@@ -18,7 +18,9 @@ import getpass
 import select
 import os
 import pwd
+import signal
 from typing import cast, Union, NoReturn, Tuple
+from types import FrameType
 
 from .privleap import (
   PrivleapCommClientAccessCheckMsg,
@@ -54,7 +56,8 @@ class LeaprunGlobal:
         | PrivleapCommClientAccessCheckMsg
         | None
     ) = None
-    terminate_session = False
+    in_response_handler: bool = False
+    terminate_session: bool = False
     comm_session: PrivleapSession | None = None
 
 
@@ -218,6 +221,8 @@ def handle_response() -> NoReturn:
     Handles the signal response from the server.
     """
 
+    LeaprunGlobal.in_response_handler = True
+
     assert LeaprunGlobal.comm_session is not None
     assert LeaprunGlobal.signal_name is not None
     try:
@@ -254,19 +259,16 @@ def handle_response() -> NoReturn:
                     check_terminate_session()
                     assert LeaprunGlobal.comm_session.backend_socket is not None
 
-                    try:
-                        ready_streams: Tuple[
-                            list[int], list[int], list[int]
-                        ] = select.select(
-                            [
-                                LeaprunGlobal.comm_session.backend_socket.fileno()
-                            ],
-                            [],
-                            [],
-                        )
-                    except KeyboardInterrupt:
-                        LeaprunGlobal.terminate_session = True
-                        continue
+                    ready_streams: Tuple[
+                        list[int], list[int], list[int]
+                    ] = select.select(
+                        [
+                            LeaprunGlobal.comm_session.backend_socket.fileno()
+                        ],
+                        [],
+                        [],
+                        0.1,
+                    )
 
                     if (
                         LeaprunGlobal.comm_session.backend_socket.fileno()
@@ -288,10 +290,25 @@ def handle_response() -> NoReturn:
             unexpected_msg_error(comm_msg)
 
 
+# pylint: disable=unused-argument
+def signal_handler(sig: int, frame: FrameType | None) -> None:
+    """
+    SIGINT / SIGTERM handler for aborting an operation.
+    """
+
+    if LeaprunGlobal.in_response_handler:
+        LeaprunGlobal.terminate_session = True
+    else:
+        sys.exit(128)
+
+
 def main() -> NoReturn:
     """
     Main function.
     """
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
     end_of_options = False
     for arg in sys.argv[1:]:
