@@ -1139,6 +1139,22 @@ class PrivleapCommon:
         return False
 
     @staticmethod
+    def check_secure_file_permissions(file_id: str | int) -> bool:
+        """
+        Returns True if the file pointed to by the path or file descriptor in
+          file_id is owned by UID 0 / GID 0 and is not world-writable.
+        """
+
+        stat_result: os.stat_result = os.stat(file_id)
+        if stat_result.st_uid != 0:
+            return False
+        if stat_result.st_gid != 0:
+            return False
+        if stat_result.st_mode & stat.S_IWOTH:
+            return False
+        return True
+
+    @staticmethod
     # pylint: disable=too-many-locals, too-many-branches, too-many-statements, too-many-return-statements
     # TODO: Split this up somehow.
     def parse_config_file(config_file: Path) -> ConfigData | str:
@@ -1165,6 +1181,17 @@ class PrivleapCommon:
         current_target_group: str | None = None
         first_header_parsed: bool = False
         with open(config_file, "r", encoding="utf-8") as conf_stream:
+            if not PrivleapCommon.check_secure_file_permissions(
+                ## We check the file descriptor, NOT THE FILE PATH, to avoid
+                ## a TOCTOU vulnerability in the event we're handling a
+                ## symlink.
+                conf_stream.fileno()
+            ):
+                return (
+                    f"Config file '{config_file}' has insecure permissions; "
+                    "it must be owned by 'root:root' and not be "
+                    "world-writable!"
+                )
             for line in conf_stream:
                 line_idx += 1
                 line = line.strip()

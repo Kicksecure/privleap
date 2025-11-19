@@ -848,14 +848,14 @@ AuthorizedUsers=nonexistent
         + PlTestGlobal.test_username_bytes
         + b") groups=1002("
         + PlTestGlobal.test_username_bytes
-        + b"),0(root)\n"
+        + b")\n"
     )
     test_act_target_group: bytes = (
         b"uid=0(root) gid=1002("
         + PlTestGlobal.test_username_bytes
         + b") groups=1002("
         + PlTestGlobal.test_username_bytes
-        + b"),0(root)\n"
+        + b")\n"
     )
     test_act_target_user_and_group: bytes = (
         b"uid=1002("
@@ -883,7 +883,7 @@ AuthorizedUsers=nonexistent
     test_act_userdata: bytes = (
         b"/home/privleaptest\n"
         b"uid=1002(privleaptest) gid=1002(privleaptest) "
-        b"groups=1002(privleaptest),0(root)\n"
+        b"groups=1002(privleaptest)\n"
         b"SHELL=/usr/bin/bash\n"
         b"AUTOPKGTEST_NORMAL_USER=unshare\n"
         b"PWD=/home/privleaptest\n"
@@ -1349,4 +1349,15 @@ AuthorizedUsers=nonexistent
         "auth_signal_request: WARNING: Action run request: Account "
         + f"'{PlTestGlobal.test_username}' is not authorized to run action "
         + "'test-act-nonexistent-restrict'\n"
+    ]
+    insecure_permissions_on_file_lines: list[str] = [
+        "parse_config_file: ERROR: Error parsing config: "
+        + "'Config file '/etc/privleap/conf.d/added_actions.conf' has "
+        + "insecure permissions; it must be owned by 'root:root' and not be "
+        + "world-writable!'\n"
+    ]
+    insecure_permissions_on_config_dir_lines: list[str] = [
+        "parse_config_files: ERROR: Configuration directory "
+        + "'/etc/privleap/conf.d' has insecure permissions; it must be owned "
+        + "by 'root:root' and not be world-writable!\n"
     ]

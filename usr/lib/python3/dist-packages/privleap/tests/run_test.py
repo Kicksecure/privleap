@@ -1340,6 +1340,65 @@ def write_new_config_file(bad_config_file: str) -> bool:
         return False
 
 
+def privleapd_set_insecure_owner(target_path: str) -> bool:
+    """
+    Sets the ownership of the specified file or directory to 1000:1000.
+    """
+
+    try:
+        os.chown(
+            target_path,1000,1000,
+        )
+    except Exception:
+        return False
+    return True
+
+
+def privleapd_set_insecure_mode(target_path: str) -> bool:
+    """
+    Sets the mode of the specified file or directory to 777.
+    """
+
+    try:
+        os.chmod(
+            target_path,0o777,
+        )
+    except Exception:
+        return False
+    return True
+
+
+def privleapd_set_secure_owner(target_path: str) -> bool:
+    """
+    Sets the ownership of the specified file or directory to root:root.
+    """
+
+    try:
+        os.chown(target_path,0,0)
+    except Exception:
+        return False
+    return True
+
+
+def privleapd_set_secure_mode(target_path: str) -> bool:
+    """
+    Sets the mode of the specified file or directory to 644 for files, or 755
+      for directories.
+    """
+
+    ## We don't actually use the 644 codepath here (we never have the need to
+    ## set a file's permissions back to a secure value), but in case we do in
+    ## the future, we handle that edge case too.
+    try:
+        if Path(target_path).is_dir():
+            os.chmod(target_path, 0o755)
+        else:
+            os.chmod(target_path, 0o644)
+    except Exception:
+        return False
+    return True
+
+
 def privleapd_check_persistent_users_test(bogus: str) -> bool:
     """
     Ensures all persistent users configured in privleapd's test configuration
@@ -1393,6 +1452,14 @@ def privleapd_bad_config_file_test(test_type: str) -> bool:
             )
         case "missing_auth_config_file":
             expect_privleapd_stderr = PlTestData.missing_auth_config_file_lines
+        case "insecure_permissions_on_file":
+            expect_privleapd_stderr = (
+                PlTestData.insecure_permissions_on_file_lines
+            )
+        case "insecure_permissions_on_config_dir":
+            expect_privleapd_stderr = (
+                PlTestData.insecure_permissions_on_config_dir_lines
+            )
     start_privleapd_subprocess([], allow_error_output=True)
     if not compare_privleapd_stderr(expect_privleapd_stderr):
         stop_privleapd_subprocess()
@@ -2643,6 +2710,80 @@ def run_privleapd_tests() -> None:
         try_remove_file,
         str(Path(PlTestGlobal.privleap_conf_dir, "missing_auth.conf")),
         "Remove config file with missing auth data",
+    )
+    # ---
+    privleapd_assert_function(
+        write_new_config_file,
+        "added_actions_config_file",
+        "Write config file for insecure ownership test",
+    )
+    privleapd_assert_function(
+        privleapd_set_insecure_owner,
+        str(Path(PlTestGlobal.privleap_conf_dir, "added_actions.conf")),
+        "Set insecure ownership on new config file",
+    )
+    privleapd_assert_function(
+        privleapd_bad_config_file_test,
+        "insecure_permissions_on_file",
+        "Test privleapd behavior with config file with insecure ownership",
+    )
+    privleapd_assert_function(
+        try_remove_file,
+        str(Path(PlTestGlobal.privleap_conf_dir, "added_actions.conf")),
+        "Remove config file with insecure ownership",
+    )
+    # ---
+    privleapd_assert_function(
+        write_new_config_file,
+        "added_actions_config_file",
+        "Write config file for insecure mode test",
+    )
+    privleapd_assert_function(
+        privleapd_set_insecure_mode,
+        str(Path(PlTestGlobal.privleap_conf_dir, "added_actions.conf")),
+        "Set insecure mode on new config file",
+    )
+    privleapd_assert_function(
+        privleapd_bad_config_file_test,
+        "insecure_permissions_on_file",
+        "Test privleapd behavior with config file with insecure mode",
+    )
+    privleapd_assert_function(
+        try_remove_file,
+        str(Path(PlTestGlobal.privleap_conf_dir, "added_actions.conf")),
+        "Remove config file with insecure ownership",
+    )
+    # ---
+    privleapd_assert_function(
+        privleapd_set_insecure_owner,
+        str(PlTestGlobal.privleap_conf_dir),
+        "Make config directory ownership insecure",
+    )
+    privleapd_assert_function(
+        privleapd_bad_config_file_test,
+        "insecure_permissions_on_config_dir",
+        "Test privleapd behavior with insecure config directory ownership",
+    )
+    privleapd_assert_function(
+        privleapd_set_secure_owner,
+        str(PlTestGlobal.privleap_conf_dir),
+        "Make config directory ownership secure again",
+    )
+    # ---
+    privleapd_assert_function(
+        privleapd_set_insecure_mode,
+        str(PlTestGlobal.privleap_conf_dir),
+        "Make config directory mode insecure",
+    )
+    privleapd_assert_function(
+        privleapd_bad_config_file_test,
+        "insecure_permissions_on_config_dir",
+        "Test privleapd behavior with insecure config directory mode",
+    )
+    privleapd_assert_function(
+        privleapd_set_secure_mode,
+        str(PlTestGlobal.privleap_conf_dir),
+        "Make config directory mode secure again",
     )
     # ---
     start_privleapd_subprocess([])

@@ -1084,6 +1084,22 @@ def parse_config_files() -> bool:
     Parses all config files under /etc/privleap/conf.d.
     """
 
+    if not PrivleapdGlobal.config_dir.is_dir(follow_symlinks=False):
+        logging.error(
+            "Configuration directory '%s' is not a directory!",
+            str(PrivleapdGlobal.config_dir),
+        )
+        return False
+    if not PrivleapCommon.check_secure_file_permissions(
+        str(PrivleapdGlobal.config_dir)
+    ):
+        logging.error(
+            "Configuration directory '%s' has insecure permissions; it must "
+            "be owned by 'root:root' and not be world-writable!",
+            str(PrivleapdGlobal.config_dir)
+        )
+        return False
+
     config_file_list: list[Path] = []
     for config_file in PrivleapdGlobal.config_dir.iterdir():
         if not config_file.is_file():
@@ -1107,6 +1123,10 @@ def parse_config_files() -> bool:
             continue
 
         try:
+            ## Permission checks on each individual config file are done by
+            ## PrivleapCommon.parse_config_file() *after* the files are
+            ## opened. This allows us to permit symlinks in the config
+            ## directory without having a TOCTOU vulnerability.
             if not parse_config_file(
                 config_file,
                 temp_action_list,
