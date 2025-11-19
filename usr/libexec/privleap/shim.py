@@ -95,6 +95,7 @@ try:
         stdin=subprocess.DEVNULL,
         user=target_user,
         group=target_group,
+        extra_groups=[],
         env=action_env,
         cwd=target_cwd,
         check=False,

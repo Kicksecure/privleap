@@ -848,14 +848,14 @@ AuthorizedUsers=nonexistent
         + PlTestGlobal.test_username_bytes
         + b") groups=1002("
         + PlTestGlobal.test_username_bytes
-        + b"),0(root)\n"
+        + b")\n"
     )
     test_act_target_group: bytes = (
         b"uid=0(root) gid=1002("
         + PlTestGlobal.test_username_bytes
         + b") groups=1002("
         + PlTestGlobal.test_username_bytes
-        + b"),0(root)\n"
+        + b")\n"
     )
     test_act_target_user_and_group: bytes = (
         b"uid=1002("
@@ -883,7 +883,7 @@ AuthorizedUsers=nonexistent
     test_act_userdata: bytes = (
         b"/home/privleaptest\n"
         b"uid=1002(privleaptest) gid=1002(privleaptest) "
-        b"groups=1002(privleaptest),0(root)\n"
+        b"groups=1002(privleaptest)\n"
         b"SHELL=/usr/bin/bash\n"
         b"AUTOPKGTEST_NORMAL_USER=unshare\n"
         b"PWD=/home/privleaptest\n"
