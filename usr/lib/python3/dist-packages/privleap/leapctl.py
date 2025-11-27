@@ -14,22 +14,23 @@
 """leapctl.py - privleapd client for controlling available comm sockets."""
 
 import sys
+import time
 from typing import NoReturn
 
 from .privleap import (
-  PrivleapCommon,
-  PrivleapControlClientCreateMsg,
-  PrivleapControlClientDestroyMsg,
-  PrivleapControlClientReloadMsg,
-  PrivleapControlServerControlErrorMsg,
-  PrivleapControlServerDisallowedUserMsg,
-  PrivleapControlServerExistsMsg,
-  PrivleapControlServerExpectedDisallowedUserMsg,
-  PrivleapControlServerNouserMsg,
-  PrivleapControlServerOkMsg,
-  PrivleapControlServerPersistentUserMsg,
-  PrivleapMsg,
-  PrivleapSession,
+    PrivleapCommon,
+    PrivleapControlClientCreateMsg,
+    PrivleapControlClientDestroyMsg,
+    PrivleapControlClientReloadMsg,
+    PrivleapControlServerControlErrorMsg,
+    PrivleapControlServerDisallowedUserMsg,
+    PrivleapControlServerExistsMsg,
+    PrivleapControlServerExpectedDisallowedUserMsg,
+    PrivleapControlServerNouserMsg,
+    PrivleapControlServerOkMsg,
+    PrivleapControlServerPersistentUserMsg,
+    PrivleapMsg,
+    PrivleapSession,
 )
 
 
@@ -96,6 +97,26 @@ def unexpected_msg_error(control_msg: PrivleapMsg) -> NoReturn:
     )
     print(control_msg.serialize(), file=sys.stderr)
     cleanup_and_exit(1)
+
+
+def wait_for_control_socket() -> None:
+    """
+    Waits for up to 5 seconds for the control socket to become available.
+    """
+
+    ## NOTE: We use polling to detect the socket. In nearly all cases, the
+    ## socket will already exist, thus polling will only have to check for the
+    ## socket's existence once, which is likely very fast. The only known case
+    ## where the socket doesn't exist when leapctl is run is when the user
+    ## runs something like `sudo systemctl restart privleapd; leapctl ...`, in
+    ## which case minor delays from polling are acceptable. If in the future
+    ## polling becomes a bottleneck, we may be able to use Varlink to listen
+    ## for when the privleapd systemd unit comes up.
+
+    for _ in range(50):
+        if PrivleapCommon.control_path.is_socket():
+            return
+        time.sleep(0.1)
 
 
 def start_control_session() -> None:
@@ -263,6 +284,7 @@ def main() -> NoReturn:
             else:
                 control_user = orig_control_user
 
+    wait_for_control_socket()
     start_control_session()
 
     if control_action == "--create":
