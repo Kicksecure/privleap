@@ -19,21 +19,24 @@ import select
 import os
 import pwd
 import signal
+import time
+from pathlib import Path
 from typing import cast, Union, NoReturn, Tuple
 from types import FrameType
 
 from .privleap import (
-  PrivleapCommClientAccessCheckMsg,
-  PrivleapCommClientSignalMsg,
-  PrivleapCommClientTerminateMsg,
-  PrivleapCommServerResultExitcodeMsg,
-  PrivleapCommServerResultStderrMsg,
-  PrivleapCommServerResultStdoutMsg,
-  PrivleapCommServerTriggerErrorMsg,
-  PrivleapCommServerTriggerMsg,
-  PrivleapCommServerUnauthorizedMsg,
-  PrivleapMsg,
-  PrivleapSession,
+    PrivleapCommClientAccessCheckMsg,
+    PrivleapCommClientSignalMsg,
+    PrivleapCommClientTerminateMsg,
+    PrivleapCommon,
+    PrivleapCommServerResultExitcodeMsg,
+    PrivleapCommServerResultStderrMsg,
+    PrivleapCommServerResultStdoutMsg,
+    PrivleapCommServerTriggerErrorMsg,
+    PrivleapCommServerTriggerMsg,
+    PrivleapCommServerUnauthorizedMsg,
+    PrivleapMsg,
+    PrivleapSession,
 )
 
 Buffer = Union[bytes, bytearray, memoryview]
@@ -58,6 +61,7 @@ class LeaprunGlobal:
     ) = None
     in_response_handler: bool = False
     terminate_session: bool = False
+    user_name: str = getpass.getuser()
     comm_session: PrivleapSession | None = None
 
 
@@ -130,6 +134,21 @@ def create_output_msg() -> None:
         )
 
 
+def wait_for_comm_socket() -> None:
+    """
+    Waits for up to 5 seconds for the comm socket to become available.
+    """
+
+    ## Note: We use polling to detect the socket. See the comment in
+    ## leapctl.py in function `wait_for_control_socket()` for rationale.
+
+    target_path: Path = Path(PrivleapCommon.comm_dir, LeaprunGlobal.user_name)
+    for _ in range(50):
+        if target_path.is_socket():
+            return
+        time.sleep(0.1)
+
+
 def start_comm_session() -> None:
     """
     Starts a comm session with the server.
@@ -145,7 +164,7 @@ def start_comm_session() -> None:
         # socket that we actually *can* open. This authenticates us as a
         # side-effect, but the authentication is not dependent on us telling the
         # truth, so there isn't a vulnerability here.
-        LeaprunGlobal.comm_session = PrivleapSession(getpass.getuser())
+        LeaprunGlobal.comm_session = PrivleapSession(LeaprunGlobal.user_name)
     except Exception:
         generic_error("Could not connect to privleapd!")
 
@@ -325,6 +344,7 @@ def main() -> NoReturn:
         print_usage()
 
     create_output_msg()
+    wait_for_comm_socket()
     start_comm_session()
     send_output_msg()
     handle_response()
