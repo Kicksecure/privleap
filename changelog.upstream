@@ -1,3 +1,22 @@
+commit 46f7612ad94012d0c99ef27e299965a6c5aaf538
+Merge: e6a6aa0 5fc5f5d
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Tue Dec 2 05:52:39 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/arraybolt3/trixie'
+
+commit 5fc5f5deb160020ae3dbd6053c0117947d36430e
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Nov 26 23:29:40 2025 -0600
+
+    Indentation fixes, poll for control and comm sockets in leaprun and leapctl
+
+commit e6a6aa0535e5fbb83343e49b14e98ff38c94d956
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Wed Nov 19 07:06:51 2025 +0000
+
+    bumped changelog version
+
 commit 9db99f38c67f1ef9cae694d0f41b00f5879371cf
 Merge: f92a92d 08fb5f5
 Author: Patrick Schleizer <adrelanos@whonix.org>
