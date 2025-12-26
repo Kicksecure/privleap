@@ -63,7 +63,7 @@ Additionally, the `/usr/bin/newuidmap` and `/usr/bin/newgidmap`
 executables must be SUID-root.
 
 It is recommended, though not necessarily required, that the host system
-be running Debian 12 or a compatible derivative thereof such as
+be running Debian 13 or a compatible derivative thereof such as
 [Kicksecure](https://www.kicksecure.com/).
 
 The test suite leverages Debian's autopkgtest tool, which allows running
@@ -71,7 +71,8 @@ the test suite in an isolated environment, unaffected by the host's
 configuration for the most part. To run the tests, simply run the
 `run_autopkgtest` script from the root of the source tree. The script will
 function regardless of your current working directory when you
-call it.
+call it. Do **NOT** attempt to run the tests directly, they can cause damage
+to the system they are run on!
 
 `run_autopkgtest` creates an unshare tarball under
 `~/.cache/sbuild/trixie-amd64.tar.zst` (which is where autopkgtest

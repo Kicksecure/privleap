@@ -184,6 +184,9 @@ def displace_old_privleap_config() -> None:
     """
     Moves the existing privleap configuration dir to a backup location so we can
       put custom config in for testing purposes.
+
+    NOTE: This does **NOT** displace /usr/local/etc/privleap/conf.d. This
+      directory is not expected to exist in a testing environment.
     """
 
     if PlTestGlobal.privleap_conf_backup_dir.exists():
