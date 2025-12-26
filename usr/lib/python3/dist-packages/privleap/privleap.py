@@ -3,7 +3,7 @@
 # Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
 # See the file COPYING for copying conditions.
 
-# pylint: disable=too-few-public-methods, too-many-lines
+# pylint: disable=too-few-public-methods, too-many-lines, unknown-option-value
 # Rationale:
 #   too-few-public-methods: privleap's message handling design uses lots of
 #     small classes
