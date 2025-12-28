@@ -70,7 +70,10 @@ class PrivleapdGlobal:
     Global variables for privleapd.
     """
 
-    config_dir: Path = Path("/etc/privleap/conf.d")
+    config_dir_list: list[Path] = [
+        Path("/etc/privleap/conf.d"),
+        Path("/usr/local/etc/privleap/conf.d"),
+    ]
     action_list: list[PrivleapAction] = []
     persistent_user_list: list[str] = []
     allowed_user_list: list[str] = []
@@ -1079,47 +1082,90 @@ def parse_config_file(
     return True
 
 
+def str_list_quote_and_comma_delimit(str_list: list[str]) -> str:
+    """
+    Turns a string list like ["abc", "def", "ghi"] into a string like
+    "'abc', 'def', 'ghi'".
+    """
+
+    out_str: str = ""
+    item_end_idx: int = len(str_list) - 1
+    for item_idx, item in enumerate(str_list):
+        out_str += f"'{item}'"
+        if item_idx != item_end_idx:
+            out_str += ", "
+    return out_str
+
+
 def parse_config_files() -> bool:
     """
     Parses all config files under /etc/privleap/conf.d.
     """
 
-    if not PrivleapdGlobal.config_dir.is_dir(follow_symlinks=False):
-        logging.error(
-            "Configuration directory '%s' is not a directory!",
-            str(PrivleapdGlobal.config_dir),
-        )
-        return False
-    if not PrivleapCommon.check_secure_file_permissions(
-        str(PrivleapdGlobal.config_dir)
-    ):
-        logging.error(
-            "Configuration directory '%s' has insecure permissions; it must "
-            "be owned by 'root:root' and not be world-writable!",
-            str(PrivleapdGlobal.config_dir)
-        )
-        return False
-
     config_file_list: list[Path] = []
-    for config_file in PrivleapdGlobal.config_dir.iterdir():
-        if not config_file.is_file():
-            continue
-        config_file_list.append(config_file)
-    config_file_list.sort()
-
     temp_action_list: list[PrivleapAction] = []
     temp_persistent_user_list: list[str] = []
     temp_allowed_user_list: list[str] = []
     temp_allowed_group_list: list[str] = []
     temp_expected_disallowed_user_list: list[str] = []
 
+    for config_dir in PrivleapdGlobal.config_dir_list:
+        temp_config_file_list: list[Path] = []
+        if not config_dir.is_dir(follow_symlinks=False):
+            logging.info(
+                "Config directory '%s' does not exist, skipping.",
+                str(config_dir)
+            )
+            continue
+        if not PrivleapCommon.check_secure_file_permissions(
+            str(config_dir)
+        ):
+            logging.warning(
+                "Config directory '%s' exists but has insecure permissions, "
+                "ignoring all files in this directory.",
+                str(config_dir)
+            )
+            continue
+
+        for config_file in config_dir.iterdir():
+            if not config_file.is_file():
+                continue
+            if not config_file.name.endswith(".conf"):
+                ## This is not a validating filter, the actual rules for
+                ## config file names are stricter than just "must end in
+                ## .conf". However, this lets us filter out things that are
+                ## obviously not config files, so that we can warn about
+                ## things that look like config files but are named
+                ## incorrectly.
+                continue
+            temp_config_file_list.append(config_file)
+        temp_config_file_list.sort()
+        config_file_list.extend(temp_config_file_list)
+
+    if len(config_file_list) == 0:
+        logging.error(
+            "No valid configuration files found! Checked paths: %s",
+            str_list_quote_and_comma_delimit(
+                [str(x) for x in PrivleapdGlobal.config_dir_list]
+            )
+        )
+        return False
+
     for config_file in config_file_list:
         if not config_file.is_file():
+            logging.warning(
+                "Config file '%s' unexpectedly no longer exists, skipping.",
+                str(config_file)
+            )
             continue
 
         if not PrivleapCommon.validate_id(
             str(config_file), PrivleapValidateType.CONFIG_FILE
         ):
+            logging.warning(
+                "Config file '%s' has an illegal name, skipping.",
+                str(config_file)
+            )
             continue
 
         try:

@@ -16,9 +16,9 @@ run_test.py - Tests for privleap. This is implemented as an entire program as
   wide variety of real-world-like tests to ensure all components of privleap
   behave as expected. This should be run using an autopkgtest.
 
-WARNING: These tests are designed to not damage the system they are ran on,
-  but the chances of system damage occurring when running this script is
-  non-zero! Do not run these tests directly, use run_autopkgtest instead.
+WARNING: Do not run these tests directly, they may damage the system they are
+  run on! Use run_autopkgtest instead to run them in an temporary, isolated
+  environment.
 """
 
 import os
@@ -124,12 +124,38 @@ def make_blocker_socket(path_str: str) -> bool:
 
 def try_remove_file(path_str: str) -> bool:
     """
-    Tries to remove a file, returning a boolean indicating if the attempts was
+    Tries to remove a file, returning a boolean indicating if the attempt was
       successful or not.
     """
 
     try:
         os.unlink(path_str)
+    except Exception:
+        return False
+    return True
+
+
+def try_create_dir(path_str: str) -> bool:
+    """
+    Tries to create a directory, returning a boolean indicating if the attempt
+      was successful or not.
+    """
+
+    try:
+        os.mkdir(path_str)
+    except Exception:
+        return False
+    return True
+
+
+def try_remove_dir(path_str: str) -> bool:
+    """
+    Tries to remove a directory, returning a boolean indicating if the attempt
+      was successful or not.
+    """
+
+    try:
+        os.rmdir(path_str)
     except Exception:
         return False
     return True
@@ -1329,6 +1355,12 @@ def write_new_config_file(bad_config_file: str) -> bool:
                 PlTestGlobal.privleap_conf_dir, "nonexistent_restrict.conf"
             )
             target_contents = PlTestData.nonexistent_restrict_config_file
+        case "system_local_config_file":
+            target_path = Path(
+                PlTestGlobal.privleap_system_local_conf_dir,
+                "system_local.conf",
+            )
+            target_contents = PlTestData.system_local_config_file
         case _:
             return False
 
@@ -2107,7 +2139,7 @@ def privleapd_check_signal_response_helper(
                 error_result = True
                 break
         except Exception:
-            logging.error("Failed to retrieve response message!")
+            logging.info("Failed to retrieve response message!")
             error_result = True
             break
     return (
@@ -2559,7 +2591,11 @@ def run_privleapd_tests() -> None:
         "",
         "Write config file that privleapd will ignore",
     )
-    start_privleapd_subprocess([])
+    start_privleapd_subprocess(
+        [],
+        allow_error_output=True,
+        expected_error_output=PlTestData.invalid_config_file_name_lines
+    )
     privleapd_assert_command(
         ["leapctl", "--create", PlTestGlobal.test_username],
         exit_code=0,
@@ -2575,6 +2611,11 @@ def run_privleapd_tests() -> None:
         ],
         exit_code=1,
         stderr_data=PlTestData.test_act_invalid_unauthorized,
+    )
+    privleapd_assert_function(
+        try_remove_file,
+        str(Path(PlTestGlobal.privleap_conf_dir, "invalid%config.conf")),
+        "Remove privleapd-ignored config file",
     )
     # ---
     stop_privleapd_subprocess()
@@ -3218,6 +3259,71 @@ def run_privleapd_tests() -> None:
         "",
         "Test privleapd config reload with nonexistent restrict config "
         "removed",
+    )
+    # ---
+    stop_privleapd_subprocess()
+    privleapd_assert_function(
+        try_remove_dir,
+        "/usr/local/etc/privleap/conf.d",
+        "Remove system-local configuration directory",
+    )
+    start_privleapd_subprocess(
+        [],
+        allow_error_output=True,
+        expected_error_output=PlTestData.missing_local_config_dir_lines,
+    )
+    privleapd_assert_command(
+        ["leapctl", "--create", PlTestGlobal.test_username],
+        exit_code=0,
+        stdout_data=PlTestData.test_username_socket_created,
+    )
+    privleapd_assert_command(
+        [
+            "sudo",
+            "-u",
+            PlTestGlobal.test_username,
+            "leaprun",
+            "test-act-free",
+        ],
+        exit_code=0,
+        stdout_data=b"test-act-free\n",
+    )
+    privleapd_assert_function(
+        try_create_dir,
+        "/usr/local/etc/privleap/conf.d",
+        "Re-create system-local configuration directory",
+    )
+    # ---
+    privleapd_assert_function(
+        write_new_config_file,
+        "system_local_config_file",
+        "Write config file in system-local config dir",
+    )
+    privleapd_assert_function(
+        privleapd_config_reload_test,
+        "",
+        "Test privleapd restartless config reload with system-local config",
+    )
+    privleapd_assert_command(
+        [
+            "sudo",
+            "-u",
+            PlTestGlobal.test_username,
+            "leaprun",
+            "test-act-system-local",
+        ],
+        exit_code=0,
+        stdout_data=b"test-act-system-local\n",
+    )
+    privleapd_assert_function(
+        try_remove_file,
+        "/usr/local/etc/privleap/conf.d/system_local.conf",
+        "Remove config-file in system-local config dir",
+    )
+    privleapd_assert_function(
+        privleapd_config_reload_test,
+        "",
+        "Test privleapd restartless config reload, no system-local config",
     )
     # ---
 

@@ -37,6 +37,7 @@ class PlTestGlobal:
     linebuf: str = ""
     privleap_conf_base_dir: Path = Path("/etc/privleap")
     privleap_conf_dir: Path = Path(f"{privleap_conf_base_dir}/conf.d")
+    privleap_system_local_conf_dir: Path = Path("/usr/local/etc/privleap/conf.d")
     privleap_conf_backup_dir: Path = Path(
         f"{privleap_conf_base_dir}/conf.d.bak"
     )
@@ -183,6 +184,9 @@ def displace_old_privleap_config() -> None:
     """
     Moves the existing privleap configuration dir to a backup location so we can
       put custom config in for testing purposes.
+
+    NOTE: This does **NOT** displace /usr/local/etc/privleap/conf.d. This
+      directory is not expected to exist in a testing environment.
     """
 
     if PlTestGlobal.privleap_conf_backup_dir.exists():
@@ -237,8 +241,41 @@ def stop_privleapd_service() -> None:
         sys.exit(1)
 
 
+def check_privleapd_error_output(expected_error_output: list[str]) -> None:
+    """
+    Checks early error output from privleapd to ensure it matches the expected
+      output. The test bails out if the check fails.
+    """
+
+    assert PlTestGlobal.privleapd_proc is not None
+    for expected_error_line in expected_error_output:
+        early_privleapd_output = proc_try_readline(
+            PlTestGlobal.privleapd_proc,
+            PlTestGlobal.base_delay,
+            read_stderr=True,
+        )
+        if early_privleapd_output is None:
+            logging.critical(
+                "privleapd did not return an expected error message "
+                "at startup! Expected message: '%s'",
+                expected_error_line,
+            )
+            sys.exit(1)
+        if early_privleapd_output != expected_error_line:
+            logging.critical(
+                "privleapd returned an unexpected error message at "
+                + "startup! Expected message: '%s', actual message: "
+                + "'%s'",
+                expected_error_line,
+                early_privleapd_output,
+            )
+            sys.exit(1)
+
+
 def start_privleapd_subprocess(
-    extra_args: list[str], allow_error_output: bool = False
+    extra_args: list[str],
+    allow_error_output: bool = False,
+    expected_error_output: list[str] | None = None
 ) -> None:
     """
     Launches privleapd as a subprocess so its output can be monitored by the
@@ -274,8 +311,11 @@ def start_privleapd_subprocess(
         fcntl.F_SETFL,
         os.O_NONBLOCK,
     )
+    early_privleapd_output: str | None
     if allow_error_output:
         time.sleep(PlTestGlobal.base_delay * 2)
+        if expected_error_output is not None:
+            check_privleapd_error_output(expected_error_output)
     else:
         privleapd_started_checks = 0
         privleapd_start_failed = False
@@ -286,8 +326,7 @@ def start_privleapd_subprocess(
                 break
             time.sleep(PlTestGlobal.base_delay)
             privleapd_started_checks += 1
-        PlTestGlobal.privleapd_test_ready_file.unlink(missing_ok=True)
-        early_privleapd_output: str | None = proc_try_readline(
+        early_privleapd_output = proc_try_readline(
             PlTestGlobal.privleapd_proc,
             PlTestGlobal.base_delay,
             read_stderr=True,
@@ -306,6 +345,7 @@ def start_privleapd_subprocess(
             sys.exit(1)
         elif privleapd_start_failed:
             sys.exit(1)
+    PlTestGlobal.privleapd_test_ready_file.unlink(missing_ok=True)
     PlTestGlobal.privleapd_running = True
 
 
@@ -369,7 +409,9 @@ def assert_command_result(
 def write_privleap_test_config() -> None:
     """
     Writes test privleap config data. Includes one legitimate config file, one
-      empty file, and one file that contains only comments.
+      empty file, and one file that contains only comments. Also creates the
+      secondary configuration directory so that notices about it not existing
+      don't appear in most instances.
     """
 
     with open(
@@ -390,6 +432,7 @@ def write_privleap_test_config() -> None:
         encoding="utf-8",
     ) as config_file:
         config_file.write("\n")
+    Path("/usr/local/etc/privleap/conf.d").mkdir(parents=True, exist_ok=True)
 
 
 def compare_privleapd_stderr(
@@ -688,6 +731,11 @@ Command=echo 'test-act-missing-auth'
 [action:test-act-nonexistent-restrict]
 Command=echo 'test-act-nonexistent-restrict'
 AuthorizedUsers=nonexistent
+"""
+    system_local_config_file: str = f"""\
+[action:test-act-system-local]
+Command=echo 'test-act-system-local'
+AuthorizedUsers={PlTestGlobal.test_username}
 """
     test_username_create_error: bytes = (
         b"ERROR: privleapd encountered an error while creating a comm "
@@ -1357,7 +1405,19 @@ AuthorizedUsers=nonexistent
         + "world-writable!'\n"
     ]
     insecure_permissions_on_config_dir_lines: list[str] = [
-        "parse_config_files: ERROR: Configuration directory "
-        + "'/etc/privleap/conf.d' has insecure permissions; it must be owned "
-        + "by 'root:root' and not be world-writable!\n"
+        "parse_config_files: WARNING: Config directory "
+        + "'/etc/privleap/conf.d' exists but has insecure permissions, "
+        + "ignoring all files in this directory.\n",
+        "parse_config_files: ERROR: No valid configuration files found! "
+        + "Checked paths: '/etc/privleap/conf.d', "
+        + "'/usr/local/etc/privleap/conf.d'\n"
+    ]
+    invalid_config_file_name_lines: list[str] = [
+        "parse_config_files: WARNING: Config file "
+        + "'/etc/privleap/conf.d/invalid%config.conf' has an illegal name, "
+        + "skipping.\n"
+    ]
+    missing_local_config_dir_lines: list[str] = [
+        "parse_config_files: INFO: Config directory "
+        + "'/usr/local/etc/privleap/conf.d' does not exist, skipping.\n"
     ]
