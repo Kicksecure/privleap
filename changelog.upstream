@@ -1,3 +1,28 @@
+commit 137bd48d846e5d5c18214b8ca03fb7d53c8cb5aa
+Merge: e8bccf8 f5123a1
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sun Dec 28 00:46:16 2025 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/arraybolt3/trixie'
+
+commit f5123a166a6ce5a427a89403b87618582144320b
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Dec 26 15:39:04 2025 -0600
+
+    Update documentation, mostly to explicitly warn against running tests without run_autopkgtest
+
+commit c79637b725abb310e569c455892092a3ebe4e3bf
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Dec 26 15:28:04 2025 -0600
+
+    Add the ability to parse config files in '/usr/local/etc/privleap/conf.d'
+
+commit e8bccf8520c612c5dffb390c3eebe632ada6431c
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Wed Dec 3 08:30:23 2025 +0000
+
+    bumped changelog version
+
 commit 46f7612ad94012d0c99ef27e299965a6c5aaf538
 Merge: e6a6aa0 5fc5f5d
 Author: Patrick Schleizer <adrelanos@whonix.org>
