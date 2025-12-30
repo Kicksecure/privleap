@@ -1112,10 +1112,13 @@ def parse_config_files() -> bool:
     for config_dir in PrivleapdGlobal.config_dir_list:
         temp_config_file_list: list[Path] = []
         if not config_dir.is_dir(follow_symlinks=False):
-            logging.info(
-                "Config directory '%s' does not exist, skipping.",
-                str(config_dir)
-            )
+            if not PrivleapdGlobal.check_config_mode:
+                ## Don't print this info when checking config, it's confusing
+                ## and breaks systemcheck.
+                logging.info(
+                    "Config directory '%s' does not exist, skipping.",
+                    str(config_dir)
+                )
             continue
         if not PrivleapCommon.check_secure_file_permissions(
             str(config_dir)
@@ -1128,9 +1131,10 @@ def parse_config_files() -> bool:
             continue
 
         for config_file in config_dir.iterdir():
-            if not config_file.is_file():
-                continue
-            if not config_file.name.endswith(".conf"):
+            if (
+                not config_file.is_file()
+                or not config_file.name.endswith(".conf")
+            ):
                 ## This is not a validating filter, the actual rules for
                 ## config file names are stricter than just "must end in
                 ## .conf". However, this lets us filter out things that are
