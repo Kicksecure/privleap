@@ -218,9 +218,7 @@ def handle_control_create_msg(
     )
     if user_name is None:
         logging.warning("Account '%s' does not exist", control_msg.user_name)
-        send_msg_safe(
-            control_session, PrivleapControlServerControlErrorMsg()
-        )
+        send_msg_safe(control_session, PrivleapControlServerControlErrorMsg())
         return
 
     if user_name in PrivleapdGlobal.expected_disallowed_user_list:
@@ -238,9 +236,7 @@ def handle_control_create_msg(
         logging.warning(
             "Account '%s' is not allowed to have a comm socket", user_name
         )
-        send_msg_safe(
-            control_session, PrivleapControlServerDisallowedUserMsg()
-        )
+        send_msg_safe(control_session, PrivleapControlServerDisallowedUserMsg())
         return
 
     for sock in PrivleapdGlobal.socket_list:
@@ -268,14 +264,12 @@ def handle_control_create_msg(
         logging.error(
             "Failed to create socket for account '%s'!", user_name, exc_info=e
         )
-        send_msg_safe(
-            control_session, PrivleapControlServerControlErrorMsg()
-        )
+        send_msg_safe(control_session, PrivleapControlServerControlErrorMsg())
         return
 
 
 def destroy_comm_socket(
-    user_name: str
+    user_name: str,
 ) -> tuple[str, PrivleapdCommDestroyResult]:
     """
     Destroys the comm socket for the specified username. Returns the real user
@@ -288,9 +282,7 @@ def destroy_comm_socket(
     # We intentionally do not require that the user exists here, so that if a
     # user has a comm socket in existence, but also has been deleted from the
     # system, the comm socket can still be cleaned up.
-    real_user_name: str | None = PrivleapCommon.normalize_user_id(
-        user_name
-    )
+    real_user_name: str | None = PrivleapCommon.normalize_user_id(user_name)
     if real_user_name is None:
         real_user_name = user_name
 
@@ -323,7 +315,7 @@ def destroy_comm_socket(
                     "Destroying comm socket for account '%s', no UNIX socket "
                     "to delete at '%s'",
                     real_user_name,
-                    str(socket_path)
+                    str(socket_path),
                 )
             remove_sock_idx = sock_idx
             break
@@ -396,9 +388,7 @@ def handle_control_reload_msg(control_session: PrivleapSession) -> None:
         send_msg_safe(control_session, PrivleapControlServerOkMsg())
     else:
         logging.warning("Handled RELOAD message, configuration was invalid!")
-        send_msg_safe(
-            control_session, PrivleapControlServerControlErrorMsg()
-        )
+        send_msg_safe(control_session, PrivleapControlServerControlErrorMsg())
 
 
 def handle_control_session(control_socket: PrivleapSocket) -> None:
@@ -527,9 +517,7 @@ def run_action(
 
 def get_client_initial_msg(
     comm_session: PrivleapSession,
-) -> (
-    PrivleapCommClientSignalMsg | PrivleapCommClientAccessCheckMsg | None
-):
+) -> PrivleapCommClientSignalMsg | PrivleapCommClientAccessCheckMsg | None:
     """
     Gets a SIGNAL or ACCESS_CHECK comm message from the client. Returns
       None if the client tries to send something other than a SIGNAL or
@@ -883,7 +871,7 @@ def handle_comm_session(comm_socket: PrivleapSocket) -> None:
         logging.warning(
             "Ending session and destroying comm socket for no-longer-allowed "
             "account '%s'",
-            comm_session.user_name
+            comm_session.user_name,
         )
         comm_session.close_session()
         _, _ = destroy_comm_socket(comm_session.user_name)
@@ -1117,23 +1105,20 @@ def parse_config_files() -> bool:
                 ## and breaks systemcheck.
                 logging.info(
                     "Config directory '%s' does not exist, skipping.",
-                    str(config_dir)
+                    str(config_dir),
                 )
             continue
-        if not PrivleapCommon.check_secure_file_permissions(
-            str(config_dir)
-        ):
+        if not PrivleapCommon.check_secure_file_permissions(str(config_dir)):
             logging.warning(
                 "Config directory '%s' exists but has insecure permissions, "
                 "ignoring all files in this directory.",
-                str(config_dir)
+                str(config_dir),
             )
             continue
 
         for config_file in config_dir.iterdir():
-            if (
-                not config_file.is_file()
-                or not config_file.name.endswith(".conf")
+            if not config_file.is_file() or not config_file.name.endswith(
+                ".conf"
             ):
                 ## This is not a validating filter, the actual rules for
                 ## config file names are stricter than just "must end in
@@ -1151,7 +1136,7 @@ def parse_config_files() -> bool:
             "No valid configuration files found! Checked paths: %s",
             str_list_quote_and_comma_delimit(
                 [str(x) for x in PrivleapdGlobal.config_dir_list]
-            )
+            ),
         )
         return False
 
@@ -1159,7 +1144,7 @@ def parse_config_files() -> bool:
         if not config_file.is_file():
             logging.warning(
                 "Config file '%s' unexpectedly no longer exists, skipping.",
-                str(config_file)
+                str(config_file),
             )
             continue
 
@@ -1168,7 +1153,7 @@ def parse_config_files() -> bool:
         ):
             logging.warning(
                 "Config file '%s' has an illegal name, skipping.",
-                str(config_file)
+                str(config_file),
             )
             continue
 
