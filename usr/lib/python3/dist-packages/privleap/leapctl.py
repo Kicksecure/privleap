@@ -125,9 +125,7 @@ def start_control_session() -> None:
     """
 
     try:
-        LeapctlGlobal.control_session = PrivleapSession(
-            is_control_session=True
-        )
+        LeapctlGlobal.control_session = PrivleapSession(is_control_session=True)
     except Exception:
         generic_error("Could not connect to privleapd!")
 
@@ -234,9 +232,7 @@ def handle_reload_request() -> NoReturn:
     assert LeapctlGlobal.control_session is not None
 
     try:
-        LeapctlGlobal.control_session.send_msg(
-            PrivleapControlClientReloadMsg()
-        )
+        LeapctlGlobal.control_session.send_msg(PrivleapControlClientReloadMsg())
     except Exception:
         generic_error("Could not request privleapd to reload configuration!")
 

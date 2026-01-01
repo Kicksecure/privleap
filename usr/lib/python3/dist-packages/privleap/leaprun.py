@@ -55,9 +55,7 @@ class LeaprunGlobal:
     signal_name: str | None = None
     check_mode: bool = False
     output_msg: (
-        PrivleapCommClientSignalMsg
-        | PrivleapCommClientAccessCheckMsg
-        | None
+        PrivleapCommClientSignalMsg | PrivleapCommClientAccessCheckMsg | None
     ) = None
     in_response_handler: bool = False
     terminate_session: bool = False
@@ -278,15 +276,15 @@ def handle_response() -> NoReturn:
                     check_terminate_session()
                     assert LeaprunGlobal.comm_session.backend_socket is not None
 
-                    ready_streams: Tuple[
-                        list[int], list[int], list[int]
-                    ] = select.select(
-                        [
-                            LeaprunGlobal.comm_session.backend_socket.fileno()
-                        ],
-                        [],
-                        [],
-                        0.1,
+                    ready_streams: Tuple[list[int], list[int], list[int]] = (
+                        select.select(
+                            [
+                                LeaprunGlobal.comm_session.backend_socket.fileno()
+                            ],
+                            [],
+                            [],
+                            0.1,
+                        )
                     )
 
                     if (

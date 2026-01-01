@@ -37,7 +37,9 @@ class PlTestGlobal:
     linebuf: str = ""
     privleap_conf_base_dir: Path = Path("/etc/privleap")
     privleap_conf_dir: Path = Path(f"{privleap_conf_base_dir}/conf.d")
-    privleap_system_local_conf_dir: Path = Path("/usr/local/etc/privleap/conf.d")
+    privleap_system_local_conf_dir: Path = Path(
+        "/usr/local/etc/privleap/conf.d"
+    )
     privleap_conf_backup_dir: Path = Path(
         f"{privleap_conf_base_dir}/conf.d.bak"
     )
@@ -275,7 +277,7 @@ def check_privleapd_error_output(expected_error_output: list[str]) -> None:
 def start_privleapd_subprocess(
     extra_args: list[str],
     allow_error_output: bool = False,
-    expected_error_output: list[str] | None = None
+    expected_error_output: list[str] | None = None,
 ) -> None:
     """
     Launches privleapd as a subprocess so its output can be monitored by the
@@ -992,7 +994,7 @@ AuthorizedUsers={PlTestGlobal.test_username}
         "destroy_comm_socket: INFO: Could not destroy comm socket for account "
         + "'nonexistent', account has no comm socket open\n",
         "handle_control_destroy_msg: INFO: Handled DESTROY message for account "
-        + "'nonexistent', socket did not exist\n"
+        + "'nonexistent', socket did not exist\n",
     ]
     create_user_socket_lines: list[str] = [
         "handle_control_create_msg: INFO: Handled CREATE message for account "
@@ -1410,7 +1412,7 @@ AuthorizedUsers={PlTestGlobal.test_username}
         + "ignoring all files in this directory.\n",
         "parse_config_files: ERROR: No valid configuration files found! "
         + "Checked paths: '/etc/privleap/conf.d', "
-        + "'/usr/local/etc/privleap/conf.d'\n"
+        + "'/usr/local/etc/privleap/conf.d'\n",
     ]
     invalid_config_file_name_lines: list[str] = [
         "parse_config_files: WARNING: Config file "
