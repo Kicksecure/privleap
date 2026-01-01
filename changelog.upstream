@@ -1,3 +1,28 @@
+commit aa4c21f73ac82cf72a41b9efa101e34bfa4e2989
+Merge: 2313469 4341686
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Thu Jan 1 12:00:48 2026 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/arraybolt3/trixie'
+
+commit 4341686cee3f99b0c298bc9676802d6b04160d83
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Mon Dec 29 20:55:35 2025 -0600
+
+    Blacken
+
+commit 1f73160ccbf36fc4526bffba5e38cb353e9cfc48
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Mon Dec 29 20:55:28 2025 -0600
+
+    Avoid INFO message about missing /usr/local/etc/privleap/conf.d when running privleapd in --check-config mode
+
+commit 23134698945c4a7b0decafba1d84fb2bf3438ed5
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sun Dec 28 06:35:59 2025 +0000
+
+    bumped changelog version
+
 commit 137bd48d846e5d5c18214b8ca03fb7d53c8cb5aa
 Merge: e8bccf8 f5123a1
 Author: Patrick Schleizer <adrelanos@whonix.org>
