@@ -11,7 +11,7 @@ set -e
 
 true "
 #####################################################################
-## INFO: BEGIN: $DPKG_MAINTSCRIPT_PACKAGE $DPKG_MAINTSCRIPT_NAME $@
+## INFO: BEGIN: $DPKG_MAINTSCRIPT_PACKAGE $DPKG_MAINTSCRIPT_NAME $*
 #####################################################################
 "
 
@@ -72,6 +72,11 @@ start_privleapd() {
    ## even present on the system, see
    ## https://github.com/ArrayBolt3/privleap/issues/7#issuecomment-2663055757
    warn_on_bad_config="$1"
+   inhibit_restart_file='/run/privleapd-inhibit-restart-on-upgrade'
+   if [ -f "${inhibit_restart_file}" ]; then
+      true "INFO: Upgrade-on-restart inhibited ('${inhibit_restart_file}' exists), not restarting."
+      return 0
+   fi
    if [ "${restarted_once}" = 'yes' ]; then
       true "INFO: restarted_once=yes"
       return 0
@@ -93,6 +98,20 @@ start_privleapd() {
    fi
 }
 
+reload_privleapd_config_maybe() {
+   ## If privleapd restart is inhibited, we should still at least tell it to
+   ## reload its configuration.
+   if [ "${restarted_once}" = 'yes' ]; then
+      true "INFO: restarted_once=yes"
+      return 0
+   fi
+   if [ ! -x "$(command -v systemctl)" ]; then
+      true "INFO: systemctl command unavailable."
+      return 0
+   fi
+   deb-systemd-invoke reload privleapd.service || true
+}
+
 case "$1" in
    configure)
       groupadd_exit_code='0'
@@ -105,6 +124,7 @@ case "$1" in
       deb-systemd-helper enable privleapd.service
       deb-systemd-helper enable leapctl@.service
       start_privleapd 'n'
+      reload_privleapd_config_maybe
    ;;
 
    abort-upgrade|abort-remove|abort-deconfigure)
@@ -112,6 +132,7 @@ case "$1" in
 
    triggered)
       start_privleapd 'y'
+      reload_privleapd_config_maybe
    ;;
 
    *)
@@ -128,7 +149,7 @@ true "INFO: Done with debhelper."
 
 true "
 #####################################################################
-## INFO: END  : $DPKG_MAINTSCRIPT_PACKAGE $DPKG_MAINTSCRIPT_NAME $@
+## INFO: END  : $DPKG_MAINTSCRIPT_PACKAGE $DPKG_MAINTSCRIPT_NAME $*
 #####################################################################
 "
 
