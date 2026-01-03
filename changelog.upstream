@@ -1,3 +1,22 @@
+commit 5253fbdf21a8de0fde2fc4cb6804856057abe908
+Merge: 8f21399 d33f615
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Jan 3 08:03:34 2026 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/arraybolt3/trixie'
+
+commit d33f61582b719702c6c5cfffa0db1444bfb3b4c8
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Fri Jan 2 12:51:39 2026 -0600
+
+    Allow inhibiting privleapd restart on upgrade
+
+commit 8f213995e4f99e37d30d3070e4b4e90dbb05ad5e
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Thu Jan 1 17:13:55 2026 +0000
+
+    bumped changelog version
+
 commit aa4c21f73ac82cf72a41b9efa101e34bfa4e2989
 Merge: 2313469 4341686
 Author: Patrick Schleizer <adrelanos@whonix.org>
