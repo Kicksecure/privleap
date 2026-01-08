@@ -1,3 +1,22 @@
+commit 99f70987be2b5953bc4c16e2746d30f19f843e6d
+Merge: 71083cc 1ba2497
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Thu Jan 8 04:11:39 2026 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/arraybolt3/trixie'
+
+commit 1ba249734fdfe1fedf3101e5d20037c8fbf645c6
+Author: Aaron Rainbolt <arraybolt3@ubuntu.com>
+Date:   Wed Jan 7 20:18:32 2026 -0600
+
+    Prevent locale settings from causing unpredictable privleap action output
+
+commit 71083cc4340941a8fec5026a689ae303bd93a5f1
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sat Jan 3 13:08:58 2026 +0000
+
+    bumped changelog version
+
 commit 5253fbdf21a8de0fde2fc4cb6804856057abe908
 Merge: 8f21399 d33f615
 Author: Patrick Schleizer <adrelanos@whonix.org>
