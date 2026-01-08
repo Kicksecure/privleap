@@ -81,6 +81,7 @@ action_env["LOGNAME"] = target_user_info.pw_name
 action_env["SHELL"] = "/usr/bin/bash"
 action_env["PWD"] = target_user_info.pw_dir
 action_env["USER"] = target_user_info.pw_name
+action_env["LC_ALL"] = "C"
 for env_var in pam_env_list:
     env_var_parts: list[str] = env_var.split("=", 1)
     action_env[env_var_parts[0]] = env_var_parts[1]
