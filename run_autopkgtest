@@ -98,12 +98,26 @@ run_autopkgtest() {
     exit 1
   fi
   if [ "$(stat -c "%u|%a" /usr/bin/newuidmap)" != '0|4755' ]; then
-    1>&2 echo 'autopkgtest requires /usr/bin/newuidmap to be SUID-root!'
-    exit 1
+    if [ -f /run/qubes/persistent-rw-only ] \
+      || [ -f /run/qubes/persistent-none ]; then
+      ## Change is ephemeral in Qubes AppVMs, therefore safe enough.
+      sudo chown root:root /usr/bin/newuidmap
+      sudo chmod 4755 /usr/bin/newuidmap
+    else
+      1>&2 echo 'autopkgtest requires /usr/bin/newuidmap to be SUID-root!'
+      exit 1
+    fi
   fi
   if [ "$(stat -c "%u|%a" /usr/bin/newgidmap)" != '0|4755' ]; then
-    1>&2 echo 'autopkgtest requires /usr/bin/newgidmap to be SUID-root!'
-    exit 1
+    if [ -f /run/qubes/persistent-rw-only ] \
+      || [ -f /run/qubes/persistent-none ]; then
+      ## Change is ephemeral in Qubes AppVMs, therefore safe enough.
+      sudo chown root:root /usr/bin/newgidmap
+      sudo chmod 4755 /usr/bin/newgidmap
+    else
+      1>&2 echo 'autopkgtest requires /usr/bin/newgidmap to be SUID-root!'
+      exit 1
+    fi
   fi
   if [ "$(pwd)" != "${privleap_project_dir}" ]; then
     cd "${privleap_project_dir}" >/dev/null || {
