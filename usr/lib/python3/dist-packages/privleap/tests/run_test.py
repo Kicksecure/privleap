@@ -177,6 +177,8 @@ def init_fake_server_dirs() -> None:
     if PlTestGlobal.privleap_state_dir.exists():
         shutil.rmtree(PlTestGlobal.privleap_state_dir)
     PlTestGlobal.privleap_state_comm_dir.mkdir(parents=True)
+    PlTestGlobal.privleap_state_dir.chmod(0o755)
+    PlTestGlobal.privleap_state_comm_dir.chmod(0o755)
 
 
 def leapctl_assert_command(
