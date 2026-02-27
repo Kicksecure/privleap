@@ -1,3 +1,32 @@
+commit a449f3f7864882071d8f6b9183b0bf2faf63f0e9
+Merge: d1eaaa9 5b83e59
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Fri Feb 27 05:17:12 2026 -0500
+
+    Merge remote-tracking branch 'ArrayBolt3/arraybolt3/trixie'
+
+commit 5b83e5984b7da01a295b3c33a432f3f7bcbd5afd
+Author: Aaron Rainbolt <arraybolt3@gmail.com>
+Date:   Wed Feb 25 23:46:16 2026 -0500
+
+    Fix improper permissions on test suite fake privleapd directories
+    
+    This unbreaks the test suite in a Kicksecure 18 AppVM under Qubes R4.3.
+    (It's probably needed to unbreak the suite on any Kicksecure 18 system
+    because of the default umask we use.)
+
+commit b01dea868bdcbe46a8dc9a8449b4f8ef04646805
+Author: Aaron Rainbolt <arraybolt3@gmail.com>
+Date:   Wed Feb 25 23:45:00 2026 -0500
+
+    Try to set the required permissions on new{uid,gid}map when running tests in a Qubes AppVM
+
+commit d1eaaa9c4b8ef38654e6971bbfc251e32b3d818c
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Wed Jan 28 06:44:59 2026 +0000
+
+    bumped changelog version
+
 commit 795ecec498b568cbc4bcdee1d7e14bd172c4c359
 Author: Patrick Schleizer <adrelanos@whonix.org>
 Date:   Wed Jan 28 01:09:58 2026 -0500
