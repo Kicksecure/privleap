@@ -64,8 +64,8 @@ def proc_try_readline(
 ) -> str | None:
     """
     Reads a line of test from the stdout or stderr of a process. Allows
-      specifying a timeout for bailing out early. The stdout (or stderr)
-      of the process must be in non-blocking mode.
+    specifying a timeout for bailing out early. The stdout (or stderr) of the
+    process must be in non-blocking mode.
     """
 
     assert proc.stdout is not None
@@ -112,7 +112,7 @@ def proc_try_readline(
 def ensure_running_as_root() -> None:
     """
     Ensures the test is running as root. The tests cannot function when
-      running as a user as they have to execute commands as root.
+    running as a user as they have to execute commands as root.
     """
 
     if os.geteuid() != 0:
@@ -123,7 +123,7 @@ def ensure_running_as_root() -> None:
 def ensure_path_lacks_files(path: Path) -> None:
     """
     Ensures all components of the provided path either do not exist or are
-      directories.
+    directories.
     """
 
     if path.exists() and not path.is_dir():
@@ -144,7 +144,7 @@ def ensure_path_lacks_files(path: Path) -> None:
 def setup_test_account(test_username: str, test_home_dir: Path) -> None:
     """
     Ensures the user account used by the test script exists and is properly
-      configured.
+    configured.
     """
 
     user_name_list: list[str] = [p.pw_name for p in pwd.getpwall()]
@@ -185,10 +185,10 @@ def setup_test_account(test_username: str, test_home_dir: Path) -> None:
 def displace_old_privleap_config() -> None:
     """
     Moves the existing privleap configuration dir to a backup location so we can
-      put custom config in for testing purposes.
+    put custom config in for testing purposes.
 
     NOTE: This does **NOT** displace /usr/local/etc/privleap/conf.d. This
-      directory is not expected to exist in a testing environment.
+    directory is not expected to exist in a testing environment.
     """
 
     if PlTestGlobal.privleap_conf_backup_dir.exists():
@@ -246,7 +246,7 @@ def stop_privleapd_service() -> None:
 def check_privleapd_error_output(expected_error_output: list[str]) -> None:
     """
     Checks early error output from privleapd to ensure it matches the expected
-      output. The test bails out if the check fails.
+    output. The test bails out if the check fails.
     """
 
     assert PlTestGlobal.privleapd_proc is not None
@@ -281,7 +281,7 @@ def start_privleapd_subprocess(
 ) -> None:
     """
     Launches privleapd as a subprocess so its output can be monitored by the
-      tester.
+    tester.
     """
 
     try:
@@ -375,7 +375,7 @@ def assert_command_result(
 ) -> bool:
     """
     Runs a command and ensures that the stdout, stderr, and exitcode match
-      expected values.
+    expected values.
     """
 
     test_result: subprocess.CompletedProcess[bytes] = subprocess.run(
@@ -411,9 +411,9 @@ def assert_command_result(
 def write_privleap_test_config() -> None:
     """
     Writes test privleap config data. Includes one legitimate config file, one
-      empty file, and one file that contains only comments. Also creates the
-      secondary configuration directory so that notices about it not existing
-      don't appear in most instances.
+    empty file, and one file that contains only comments. Also creates the
+    secondary configuration directory so that notices about it not existing
+    don't appear in most instances.
     """
 
     with open(
@@ -441,9 +441,9 @@ def compare_privleapd_stderr(
     assert_line_list: list[str], quiet: bool = False
 ) -> bool:
     """
-    Compares the stdout output of privleapd with a string list, testing to see
-      if each expected line has a corresponding returned line. The list of
-      expected lines may omit arbitrary output lines.
+    Compares the stderr output of privleapd with a string list, testing to see
+    if each expected line has a corresponding returned line. The list of
+    expected lines may omit arbitrary output lines.
     """
 
     assert PlTestGlobal.privleapd_proc is not None
@@ -501,7 +501,7 @@ def discard_privleapd_stderr() -> None:
 def start_privleapd_service() -> None:
     """
     Starts the privleapd service. This should only be called once all testing is
-      done.
+    done.
     """
 
     if PlTestGlobal.no_service_handling:
@@ -516,7 +516,7 @@ def start_privleapd_service() -> None:
 def socket_send_raw_bytes(sock: socket.socket, buf: bytes) -> bool:
     """
     Sends a buffer of bytes through a socket, coping with partial sends
-      properly.
+    properly.
     """
     buf_sent: int = 0
     while buf_sent < len(buf):
@@ -738,6 +738,11 @@ AuthorizedUsers=nonexistent
 [action:test-act-system-local]
 Command=echo 'test-act-system-local'
 AuthorizedUsers={PlTestGlobal.test_username}
+"""
+    new_persistent_users_config_file: str = """\
+[persistent-users]
+User=alttest
+User=alttest2
 """
     test_username_create_error: bytes = (
         b"ERROR: privleapd encountered an error while creating a comm "

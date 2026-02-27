@@ -194,7 +194,7 @@ def send_output_msg() -> None:
 def check_terminate_session() -> None:
     """
     Checks if the user has attempted to terminate the session, and instructs
-      the server to terminate the running action if so.
+    the server to terminate the running action if so.
     """
 
     if LeaprunGlobal.terminate_session:

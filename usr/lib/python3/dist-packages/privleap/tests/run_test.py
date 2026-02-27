@@ -12,13 +12,13 @@
 
 """
 run_test.py - Tests for privleap. This is implemented as an entire program as
-  unit testing would not exercise the code sufficiently. This runs through a
-  wide variety of real-world-like tests to ensure all components of privleap
-  behave as expected. This should be run using an autopkgtest.
+unit testing would not exercise the code sufficiently. This runs through a wide
+variety of real-world-like tests to ensure all components of privleap behave
+as expected. This should be run using an autopkgtest.
 
 WARNING: Do not run these tests directly, they may damage the system they are
-  run on! Use run_autopkgtest instead to run them in an temporary, isolated
-  environment.
+run on! Use run_autopkgtest instead to run them in an temporary, isolated
+environment.
 """
 
 import os
@@ -125,7 +125,7 @@ def make_blocker_socket(path_str: str) -> bool:
 def try_remove_file(path_str: str) -> bool:
     """
     Tries to remove a file, returning a boolean indicating if the attempt was
-      successful or not.
+    successful or not.
     """
 
     try:
@@ -138,7 +138,7 @@ def try_remove_file(path_str: str) -> bool:
 def try_create_dir(path_str: str) -> bool:
     """
     Tries to create a directory, returning a boolean indicating if the attempt
-      was successful or not.
+    was successful or not.
     """
 
     try:
@@ -151,7 +151,7 @@ def try_create_dir(path_str: str) -> bool:
 def try_remove_dir(path_str: str) -> bool:
     """
     Tries to remove a directory, returning a boolean indicating if the attempt
-      was successful or not.
+    was successful or not.
     """
 
     try:
@@ -159,14 +159,6 @@ def try_remove_dir(path_str: str) -> bool:
     except Exception:
         return False
     return True
-
-
-def check_socket_absent(path_str: str) -> bool:
-    """
-    Checks if a socket is absent or not.
-    """
-
-    return not Path(path_str).is_socket()
 
 
 def init_fake_server_dirs() -> None:
@@ -189,7 +181,7 @@ def leapctl_assert_command(
 ) -> None:
     """
     Runs a command for leapctl tests, testing the output against expected values
-      and recording the result as a passed or failed assertion.
+    and recording the result as a passed or failed assertion.
     """
 
     global leapctl_asserts_passed
@@ -208,7 +200,7 @@ def leapctl_assert_function(
 ) -> None:
     """
     Runs a function that returns a boolean, passing the given string argument.
-      Records the result as a passed or failed assertion.
+    Records the result as a passed or failed assertion.
     """
 
     global leapctl_asserts_passed
@@ -225,7 +217,7 @@ def leapctl_assert_function(
 def leapctl_create_deleteme_user(bogus: str) -> bool:
     """
     Creates a user account for testing deleting a comm socket for a user that
-      doesn't exist anymore.
+    doesn't exist anymore.
     """
 
     if bogus != "":
@@ -240,7 +232,7 @@ def leapctl_create_deleteme_user(bogus: str) -> bool:
 def leapctl_delete_deleteme_user(bogus: str) -> bool:
     """
     Deletes a user account for testing deleting a comm socket for a user that
-      doesn't exist anymore.
+    doesn't exist anymore.
     """
 
     if bogus != "":
@@ -255,7 +247,7 @@ def leapctl_delete_deleteme_user(bogus: str) -> bool:
 def leapctl_server_error_test(bogus: str) -> bool:
     """
     Tests leapctl against a fake server that always errors out regardless of
-      the requested action.
+    the requested action.
     """
 
     if bogus != "":
@@ -284,7 +276,7 @@ def leapctl_server_error_test(bogus: str) -> bool:
 def leapctl_server_cutoff_test(bogus: str) -> bool:
     """
     Tests leapctl against a fake server that always immediately disconnects any
-      incoming connection.
+    incoming connection.
     """
 
     if bogus != "":
@@ -568,7 +560,7 @@ def leaprun_assert_command(
 ) -> None:
     """
     Runs a command for leaprun tests, testing the output against expected values
-      and recording the result as a passed or failed assertion.
+    and recording the result as a passed or failed assertion.
     """
 
     global leaprun_asserts_passed
@@ -589,7 +581,7 @@ def leaprun_assert_function(
 ) -> None:
     """
     Runs a function that returns a boolean, passing the given string argument.
-      Records the result as a passed or failed assertion.
+    Records the result as a passed or failed assertion.
     """
 
     global leaprun_asserts_passed
@@ -691,7 +683,7 @@ def leaprun_filter_env_var_test_stdout(
 ) -> bytes:
     """
     Filters out non-deterministic environment variables from the output of the
-      leaprun env var tests.
+    leaprun env var tests.
     """
 
     if not is_stdout:
@@ -1298,7 +1290,7 @@ def write_config_file_with_bad_name(bogus: str) -> bool:
 def write_new_config_file(bad_config_file: str) -> bool:
     """
     Writes a config file other than the default unit-test.conf file. Used for
-      testing various things that involve changing configuration.
+    testing various things that involve changing configuration.
     """
 
     target_path: Path
@@ -1357,6 +1349,11 @@ def write_new_config_file(bad_config_file: str) -> bool:
                 "system_local.conf",
             )
             target_contents = PlTestData.system_local_config_file
+        case "new_persistent_users_config_file":
+            target_path = Path(
+                PlTestGlobal.privleap_conf_dir, "new_persistent_users.conf"
+            )
+            target_contents = PlTestData.new_persistent_users_config_file
         case _:
             return False
 
@@ -1414,7 +1411,7 @@ def privleapd_set_secure_owner(target_path: str) -> bool:
 def privleapd_set_secure_mode(target_path: str) -> bool:
     """
     Sets the mode of the specified file or directory to 644 for files, or 755
-      for directories.
+    for directories.
     """
 
     ## We don't actually use the 644 codepath here (we never have the need to
@@ -1433,7 +1430,7 @@ def privleapd_set_secure_mode(target_path: str) -> bool:
 def privleapd_check_persistent_users_test(bogus: str) -> bool:
     """
     Ensures all persistent users configured in privleapd's test configuration
-      have comm sockets created automatically.
+    have comm sockets created automatically.
     """
 
     if bogus != "":
@@ -1517,7 +1514,7 @@ def privleapd_bad_config_file_check_test(bogus: str) -> bool:
 def privleapd_control_disconnect_test(bogus: str) -> bool:
     """
     Tests how privleapd handles a control client that connects and then
-      instantly disconnects.
+    instantly disconnects.
     """
 
     if bogus != "":
@@ -1531,7 +1528,7 @@ def privleapd_control_disconnect_test(bogus: str) -> bool:
 def privleapd_create_invalid_user_socket_test(bogus: str) -> bool:
     """
     Tests how privleapd handles a control client that requests a socket to be
-      created for a user that does not exist.
+    created for a user that does not exist.
     """
 
     if bogus != "":
@@ -1558,8 +1555,8 @@ def privleapd_create_invalid_user_socket_test(bogus: str) -> bool:
 def privleapd_create_invalid_user_socket_and_bail_test(bogus: str) -> bool:
     """
     Tests how privleapd handles a control client that requests a socket to be
-      created for a user that does not exist, and then disconnects before
-      privleapd can send a reply.
+    created for a user that does not exist, and then disconnects before
+    privleapd can send a reply.
     """
 
     if bogus != "":
@@ -1583,7 +1580,7 @@ def privleapd_create_invalid_user_socket_and_bail_test(bogus: str) -> bool:
 def privleapd_destroy_invalid_user_socket_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      destroyed for a user that does not exist.
+    destroyed for a user that does not exist.
     """
 
     if bogus != "":
@@ -1610,7 +1607,7 @@ def privleapd_destroy_invalid_user_socket_test(bogus: str) -> bool:
 def privleapd_create_user_socket_twice_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      created for the same (existing) user twice in a row.
+    created for the same (existing) user twice in a row.
     """
     if bogus != "":
         return False
@@ -1648,8 +1645,8 @@ def privleapd_create_user_socket_twice_test(bogus: str) -> bool:
 def privleapd_create_existing_user_socket_and_bail_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      created for a user that already has a socket created, and then disconnects
-      before privleapd can send a reply.
+    created for a user that already has a socket created, and then disconnects
+    before privleapd can send a reply.
     """
 
     if bogus != "":
@@ -1675,7 +1672,7 @@ def privleapd_create_existing_user_socket_and_bail_test(bogus: str) -> bool:
 def privleapd_create_blocked_user_socket_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      created for a user that has a blocker socket in the way.
+    created for a user that has a blocker socket in the way.
     """
 
     if bogus != "":
@@ -1704,8 +1701,8 @@ def privleapd_create_blocked_user_socket_test(bogus: str) -> bool:
 def privleapd_create_blocked_user_socket_and_bail_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      created for a user that has a blocker socket in the way, and then
-      disconnects before privleapd can send a reply.
+    created for a user that has a blocker socket in the way, and then
+    disconnects before privleapd can send a reply.
     """
 
     if bogus != "":
@@ -1731,7 +1728,7 @@ def privleapd_create_blocked_user_socket_and_bail_test(bogus: str) -> bool:
 def privleapd_destroy_missing_user_socket_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      destroyed for a user whose socket on the filesystem has been deleted.
+    destroyed for a user whose socket on the filesystem has been deleted.
     """
 
     if bogus != "":
@@ -1770,7 +1767,7 @@ def privleapd_destroy_missing_user_socket_test(bogus: str) -> bool:
 def privleapd_create_expected_disallowed_socket_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      created for a user that is marked as "expected disallowed".
+    created for a user that is marked as "expected disallowed".
     """
 
     if bogus != "":
@@ -1799,8 +1796,8 @@ def privleapd_create_expected_disallowed_socket_test(bogus: str) -> bool:
 def privleapd_destroy_user_socket_and_bail_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      destroyed for a user with a socket in existence, and then disconnects
-      before privleapd can send a reply.
+    destroyed for a user with a socket in existence, and then disconnects
+    before privleapd can send a reply.
     """
 
     if bogus != "":
@@ -1833,8 +1830,8 @@ def privleapd_destroy_user_socket_and_bail_test(bogus: str) -> bool:
 def privleapd_destroy_bad_user_socket_and_bail_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      destroyed for a user with a socket in existence, and then disconnects
-      before privleapd can send a reply.
+    destroyed for a user with a socket in existence, and then disconnects
+    before privleapd can send a reply.
     """
 
     if bogus != "":
@@ -1860,7 +1857,7 @@ def privleapd_destroy_bad_user_socket_and_bail_test(bogus: str) -> bool:
 def privleapd_send_invalid_control_message_test(bogus: str) -> bool:
     """
     Test how privleapd handles an entirely invalid message sent by a control
-      client.
+    client.
     """
 
     if bogus != "":
@@ -1909,7 +1906,7 @@ def privleapd_send_corrupted_control_message_test(bogus: str) -> bool:
 def privleapd_bail_comm_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that immediately disconnects after
-      connecting.
+    connecting.
     """
 
     if bogus != "":
@@ -1946,7 +1943,7 @@ def privleapd_send_invalid_comm_message_test(bogus: str) -> bool:
 def privleapd_send_nonexistent_signal_and_bail_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that requests a nonexistent action
-      to be run, and then disconnects before privleapd can send a reply.
+    to be run, and then disconnects before privleapd can send a reply.
     """
 
     if bogus != "":
@@ -1982,8 +1979,8 @@ def privleapd_send_nonexistent_signal_and_bail_test(bogus: str) -> bool:
 def privleapd_send_userrestrict_signal_and_bail_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that requests an action to be run
-      that the user is not permitted to run, and then disconnects before
-      privleapd can send a reply.
+    that the user is not permitted to run, and then disconnects before
+    privleapd can send a reply.
     """
 
     if bogus != "":
@@ -2021,8 +2018,8 @@ def privleapd_send_userrestrict_signal_and_bail_test(bogus: str) -> bool:
 def privleapd_send_grouprestrict_signal_and_bail_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that requests an action to be run
-      that the user is not in a group that is permitted to run, and then
-      disconnects before privleapd can send a reply.
+    that the user is not in a group that is permitted to run, and then
+    disconnects before privleapd can send a reply.
     """
 
     if bogus != "":
@@ -2063,8 +2060,8 @@ def privleapd_check_signal_response_helper(
 ) -> Tuple[bytes, bytes, int, bool, bool]:
     """
     Test how privleapd handles a comm client that requests a specific action to
-      be run. This function actually runs the action, and sends the result back
-      to privleapd_check_signal_response_test.
+    be run. This function actually runs the action, and sends the result back
+    to privleapd_check_signal_response_test.
     """
 
     comm_session: PrivleapSession = PrivleapSession(target_user)
@@ -2117,7 +2114,7 @@ def privleapd_check_signal_response_helper(
 def privleapd_check_signal_response_test(test_type: str) -> bool:
     """
     Test how privleapd handles a comm client that requests a specific action to
-      be run. General test function usable for basically any signal.
+    be run. General test function usable for basically any signal.
     """
 
     expect_stdout_data: bytes = b""
@@ -2225,8 +2222,8 @@ def privleapd_check_signal_response_test(test_type: str) -> bool:
 def privleapd_send_valid_signal_and_bail_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that requests an action to be run
-      that is valid and that the user can run, and then disconnects before
-      privleapd can send a reply.
+    that is valid and that the user can run, and then disconnects before
+    privleapd can send a reply.
     """
 
     if bogus != "":
@@ -2250,7 +2247,7 @@ def privleapd_send_valid_signal_and_bail_test(bogus: str) -> bool:
 def privleapd_allowed_action_access_check_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that checks if they are allowed to
-      run an action that they are allowed to run.
+    run an action that they are allowed to run.
     """
 
     if bogus != "":
@@ -2273,7 +2270,7 @@ def privleapd_allowed_action_access_check_test(bogus: str) -> bool:
 def privleapd_disallowed_action_access_check_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that checks if they are allowed to
-      run an action that they are allowed to run.
+    run an action that they are allowed to run.
     """
 
     if bogus != "":
@@ -2326,7 +2323,7 @@ def privleapd_leaprun_terminate_test(bogus: str) -> bool:
 def privleapd_terminate_sent_first_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that send a TERMINATE message
-      as the first message.
+    as the first message.
     """
 
     if bogus != "":
@@ -2343,7 +2340,7 @@ def privleapd_terminate_sent_first_test(bogus: str) -> bool:
 def privleapd_invalid_ascii_test(idx_str: str) -> bool:
     """
     Test how privleapd handles a comm client that sends well-formed messages
-      with invalid ASCII contents.
+    with invalid ASCII contents.
     """
 
     idx: int = int(idx_str)
@@ -2433,7 +2430,7 @@ def privleapd_config_reload_fail_test(bogus: str) -> bool:
 def privleapd_config_reload_with_kick_test(bogus: str) -> bool:
     """
     Reloads privleapd's configuration, and checks if no-longer-allowed users
-      were kicked in the process.
+    were kicked in the process.
     """
 
     if bogus != "":
@@ -2464,7 +2461,7 @@ def privleapd_assert_command(
 ) -> None:
     """
     Runs a command for leaprun tests, testing the output against expected values
-      and recording the result as a passed or failed assertion.
+    and recording the result as a passed or failed assertion.
     """
 
     global privleapd_asserts_passed
@@ -2483,7 +2480,7 @@ def privleapd_assert_function(
 ) -> None:
     """
     Runs a function that returns a boolean, passing the given string argument.
-      Records the result as a passed or failed assertion.
+    Records the result as a passed or failed assertion.
     """
 
     global privleapd_asserts_passed
@@ -3105,8 +3102,8 @@ def run_privleapd_tests() -> None:
         "Test privleapd action run with no longer allowed user alttest",
     )
     privleapd_assert_function(
-        check_socket_absent,
-        "/run/privleapd/comm/alttest",
+        test_if_path_not_exists,
+        str(Path(PlTestGlobal.privleap_state_dir, "comm", "alttest")),
         "Test alttest socket no longer exists",
     )
     privleapd_assert_command(
@@ -3151,13 +3148,56 @@ def run_privleapd_tests() -> None:
         "Test privleapd config reload with multiple no-longer-allowed users",
     )
     privleapd_assert_function(
-        check_socket_absent,
-        "/run/privleapd/comm/alttest",
+        test_if_path_not_exists,
+        str(Path(PlTestGlobal.privleap_state_dir, "comm", "alttest")),
         "Test alttest socket no longer exists",
     )
     privleapd_assert_function(
-        check_socket_absent,
-        "/run/privleapd/comm/alttest2",
+        test_if_path_not_exists,
+        str(Path(PlTestGlobal.privleap_state_dir, "comm", "alttest2")),
+        "Test alttest2 socket no longer exists",
+    )
+    # We don't add privleap group membership back to the alttest accounts yet
+    # since we need them to be missing that membership for the next test.
+    # ---
+    privleapd_assert_function(
+        write_new_config_file,
+        "new_persistent_users_config_file",
+        "Write config file with new persistent users",
+    )
+    privleapd_assert_function(
+        privleapd_config_reload_test,
+        "",
+        "Test privleapd restartless config reload with new persistent users",
+    )
+    privleapd_assert_function(
+        test_if_path_exists,
+        str(Path(PlTestGlobal.privleap_state_dir, "comm", "alttest")),
+        "Ensure alttest user socket exists",
+    )
+    privleapd_assert_function(
+        test_if_path_exists,
+        str(Path(PlTestGlobal.privleap_state_dir, "comm", "alttest2")),
+        "Ensure alttest2 user socket exists",
+    )
+    privleapd_assert_function(
+        try_remove_file,
+        str(Path(PlTestGlobal.privleap_conf_dir, "new_persistent_users.conf")),
+        "Remove config file with new persistent users",
+    )
+    privleapd_assert_function(
+        privleapd_config_reload_with_kick_test,
+        "",
+        "Test privleapd config reload with removed persistent users",
+    )
+    privleapd_assert_function(
+        test_if_path_not_exists,
+        str(Path(PlTestGlobal.privleap_state_dir, "comm", "alttest")),
+        "Test alttest socket no longer exists",
+    )
+    privleapd_assert_function(
+        test_if_path_not_exists,
+        str(Path(PlTestGlobal.privleap_state_dir, "comm", "alttest2")),
         "Test alttest2 socket no longer exists",
     )
     privleapd_assert_command(

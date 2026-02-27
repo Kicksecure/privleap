@@ -37,7 +37,7 @@ class PrivleapSocketType(Enum):
 class PrivleapValidateType(Enum):
     """
     Enum for selecting what kind of value to validate, used by
-      PrivleapCommon.parse_config_file().
+    PrivleapCommon.parse_config_file().
     """
 
     USER_GROUP_NAME = 1
@@ -49,7 +49,7 @@ class PrivleapValidateType(Enum):
 class PrivleapConfigSection(Enum):
     """
     Enum for internal use by the config file parser. Specifies what type of
-      section the parser is currently in.
+    section the parser is currently in.
     """
 
     ACTION = 1
@@ -103,7 +103,7 @@ class PrivleapControlClientDestroyMsg(PrivleapMsg):
     Sent from client to server.
 
     Requests destruction of a previously created comm socket for a specified
-      user.
+    user.
     """
 
     name = "DESTROY"
@@ -138,7 +138,7 @@ class PrivleapControlServerOkMsg(PrivleapMsg):
     Sent from server to client.
 
     Indicates that the requested creation or destruction operation was
-      successful.
+    successful.
     """
 
     name = "OK"
@@ -163,7 +163,7 @@ class PrivleapControlServerExistsMsg(PrivleapMsg):
     Sent from server to client.
 
     Indicates that the requested creation operation specified a user that
-      already has a comm socket.
+    already has a comm socket.
     """
 
     name = "EXISTS"
@@ -176,7 +176,7 @@ class PrivleapControlServerNouserMsg(PrivleapMsg):
     Sent from server to client.
 
     Indicates that the requested destruction operation specified a user that
-      does not have a comm socket.
+    does not have a comm socket.
     """
 
     name = "NOUSER"
@@ -189,8 +189,8 @@ class PrivleapControlServerPersistentUserMsg(PrivleapMsg):
     Sent from server to client.
 
     Indicates that the requested destruction operation specified a user that
-      is configured as persistent, and thus cannot have their comm socket
-      destroyed.
+    is configured as persistent, and thus cannot have their comm socket
+    destroyed.
     """
 
     name = "PERSISTENT_USER"
@@ -203,8 +203,8 @@ class PrivleapControlServerDisallowedUserMsg(PrivleapMsg):
     Sent from server to client.
 
     Indicates that the requested creation operation specified a user that is
-      not configured as allowed, and thus cannot have a comm socket created
-      for them.
+    not configured as allowed, and thus cannot have a comm socket created
+    for them.
     """
 
     name = "DISALLOWED_USER"
@@ -217,10 +217,9 @@ class PrivleapControlServerExpectedDisallowedUserMsg(PrivleapMsg):
     Sent from server to client.
 
     Indicates that the requested creation operation specified a user that is
-      configured as disallowed and expected. The user thus cannot have a
-      comm socket created for them, but the client should take into account
-      that its request was expected and indicate this to the user as
-      appropriate.
+    configured as disallowed and expected. The user thus cannot have a comm
+    socket created for them, but the client should take into account that its
+    request was expected and indicate this to the user as appropriate.
     """
 
     name = "EXPECTED_DISALLOWED_USER"
@@ -274,6 +273,7 @@ class PrivleapCommClientAccessCheckMsg(PrivleapMsg):
 class PrivleapCommClientTerminateMsg(PrivleapMsg):
     """
     Privleapd message.
+
     Sent from client to server.
 
     Instructs the server to terminate the action previously triggered by the
@@ -302,7 +302,7 @@ class PrivleapCommServerTriggerErrorMsg(PrivleapMsg):
     Sent from server to client.
 
     Indicates that the user was authorized to run the requested action, but
-      launching the action's command failed.
+    launching the action's command failed.
     """
 
     name = "TRIGGER_ERROR"
@@ -327,7 +327,8 @@ class PrivleapCommServerResultStdoutMsg(PrivleapMsg):
 
 
 class PrivleapCommServerResultStderrMsg(PrivleapMsg):
-    """Privleap message.
+    """
+    Privleap message.
 
     Sent from server to client.
 
@@ -350,7 +351,7 @@ class PrivleapCommServerResultExitcodeMsg(PrivleapMsg):
     Sent from server to client.
 
     Indicates that the requested action has completed, and exited with the
-      specified exit code.
+    specified exit code.
     """
 
     name = "RESULT_EXITCODE"
@@ -381,8 +382,8 @@ class PrivleapCommServerUnauthorizedMsg(PrivleapMsg):
     Sent from server to client.
 
     Indicates that the user is not authorized to run the requested action. It
-      is possible the action doesn't exist, although this is not communicated
-      clearly to the client for security reasons.
+    is possible the action doesn't exist, although this is not communicated
+    clearly to the client for security reasons.
     """
 
     name = "UNAUTHORIZED"
@@ -391,7 +392,7 @@ class PrivleapCommServerUnauthorizedMsg(PrivleapMsg):
 class PrivleapSession:
     """
     A connection between a privleap server and client. Used to pass privleap
-      messages back and forth.
+    messages back and forth.
     """
 
     # Only an extremely poorly designed client or server will ever fail to work
@@ -474,12 +475,12 @@ class PrivleapSession:
           get_msg() if you want to get an actual PrivleapMsg object back.
 
         DO NOT USE __recv_msg() ON THE SERVER! This is intentionally vulnerable
-          to a denial-of-service attack where the remote process deliberately
-          sends data slowly (or just refuses to send data at all) in order to
-          lock up the server process. This is safe for the client (which may
-          need to receive very large amounts of data from the server), but
-          dangerous for the server (which needs to not lock up if a client tries
-          to cause large delays).
+        to a denial-of-service attack where the remote process deliberately
+        sends data slowly (or just refuses to send data at all) in order to
+        lock up the server process. This is safe for the client (which may
+        need to receive very large amounts of data from the server), but
+        dangerous for the server (which needs to not lock up if a client tries
+        to cause large delays).
         """
 
         assert self.backend_socket is not None
@@ -520,14 +521,14 @@ class PrivleapSession:
     def __recv_msg_cautious(self) -> bytes:
         """
         Receives a low-level message from the backend socket. You should use
-          get_msg() if you want to get an actual PrivleapMsg object back.
+        get_msg() if you want to get an actual PrivleapMsg object back.
 
         While there aren't security issues with doing so, you probably shouldn't
-          use __recv_msg_cautious() on the client. It may result in a disconnect
-          while the server is still trying to send data to the client. It bails
-          out if a read times out, or if it takes more than five combined loop
-          iterations to read a message (thus giving at most ~0.5 seconds for the
-          client to send a whole message).
+        use __recv_msg_cautious() on the client. It may result in a disconnect
+        while the server is still trying to send data to the client. It bails
+        out if a read times out, or if it takes more than five combined loop
+        iterations to read a message (thus giving at most ~0.5 seconds for the
+        client to send a whole message).
         """
 
         assert self.backend_socket is not None
@@ -576,8 +577,8 @@ class PrivleapSession:
     def __get_msg_type_field(recv_buf: bytes) -> str:
         """
         Gets the message type field from a privleap message. You should use
-          get_msg() to get a message and then use isinstance() to determine
-          which message type it is.
+        get_msg() to get a message and then use isinstance() to determine
+        which message type it is.
         """
 
         # Default to the length of the recv_buf if no space is found
@@ -605,8 +606,8 @@ class PrivleapSession:
     ) -> Tuple[list[str], bytes | None]:
         """
         Splits apart a message's data into string and binary data parameters.
-          You should use get_msg() and then use the returned object's data
-          fields to get information from a privleap message.
+        You should use get_msg() and then use the returned object's data
+        fields to get information from a privleap message.
         """
 
         output_list: list[str] = []
@@ -679,9 +680,9 @@ class PrivleapSession:
     def get_msg(self) -> PrivleapMsg:
         """
         Gets a message from the backend socket and returns it as a PrivleapMsg
-          object. The returned object's type indicates which message was
-          received, while the data fields contain the information accompanying
-          the message.
+        object. The returned object's type indicates which message was
+        received, while the data fields contain the information accompanying
+        the message.
         """
 
         if not self.is_session_open:
@@ -831,8 +832,8 @@ class PrivleapSession:
     def __send_msg(self, msg_obj: PrivleapMsg) -> None:
         """
         Sends a message to the remote client or server. **This does not validate
-          that the message being sent is appropriate coming from the sender.**
-          You should use send_msg() instead.
+        that the message being sent is appropriate coming from the sender.**
+        You should use send_msg() instead.
         """
 
         assert self.backend_socket is not None
@@ -852,7 +853,7 @@ class PrivleapSession:
     def send_msg(self, msg_obj: PrivleapMsg) -> None:
         """
         Sends a message to the remote client or server. Validates that the
-          message being sent is appropriate coming from the sender.
+        message being sent is appropriate coming from the sender.
         """
 
         assert self.backend_socket is not None
@@ -904,7 +905,7 @@ class PrivleapSession:
     def close_session(self) -> None:
         """
         Closes the session. No further messages can be sent by either side once
-          this is called.
+        this is called.
         """
 
         assert self.backend_socket is not None
@@ -916,9 +917,9 @@ class PrivleapSession:
 class PrivleapSocket:
     """
     A server-side listening socket for privleap control and comm connections.
-      Use this only on the server for listening for incoming connections. Both
-      the server and client should use PrivleapSession objects for actual
-      communication.
+    Use this only on the server for listening for incoming connections. Both
+    the server and client should use PrivleapSession objects for actual
+    communication.
     """
 
     def __init__(
@@ -974,7 +975,7 @@ class PrivleapSocket:
     def get_session(self) -> PrivleapSession:
         """
         Gets a session from the listening socket. For those used to using
-          sockets directly, this is an analogue to socket.accept().
+        sockets directly, this is an analogue to socket.accept().
         """
 
         assert self.backend_socket is not None
@@ -1117,7 +1118,7 @@ class PrivleapCommon:
     ) -> bool:
         """
         Validates id_string against a predefined regex. The regex used for
-          validation is specified by validate_type.
+        validation is specified by validate_type.
         """
 
         if len(id_string) > 100:
@@ -1142,7 +1143,7 @@ class PrivleapCommon:
     def check_secure_file_permissions(file_id: str | int) -> bool:
         """
         Returns True if the file pointed to by the path or file descriptor in
-          file_id is owned by UID 0 / GID 0 and is not world-writable.
+        file_id is owned by UID 0 / GID 0 and is not world-writable.
         """
 
         stat_result: os.stat_result = os.stat(file_id)
@@ -1466,7 +1467,7 @@ class PrivleapCommon:
     ) -> str:
         """
         Finds the line number a specific header in the specified config file is
-          at, and returns the error line for it.
+        at, and returns the error line for it.
         """
 
         line_idx: int = 0
@@ -1485,8 +1486,8 @@ class PrivleapCommon:
     def normalize_user_id(user_name: str) -> str | None:
         """
         Ensures the user with the specified name or UID exists on the system.
-          Returns None if the user doesn't exist, or the username if the user
-          does exist.
+        Returns None if the user doesn't exist, or the username if the user
+        does exist.
         """
 
         if PrivleapCommon.validate_id(
@@ -1507,8 +1508,8 @@ class PrivleapCommon:
     def normalize_group_id(group_name: str) -> str | None:
         """
         Ensures the group with the specified name or GID exists on the system.
-          Returns None if the user doesn't exist, or the username if the user
-          does exist.
+        Returns None if the user doesn't exist, or the username if the user
+        does exist.
         """
 
         if PrivleapCommon.validate_id(
