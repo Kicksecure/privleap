@@ -3,11 +3,13 @@
 # Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
 # See the file COPYING for copying conditions.
 
-# pylint: disable=broad-exception-caught
+# pylint: disable=broad-exception-caught, invalid-name
 # Rationale:
 #   broad-exception-caught: except blocks are intended to catch all possible
 #     exceptions in each instance to ensure the process exits with a special
 #     exit code in these instances.
+#   invalid-name: pylint seems to be mis-detecting some of our variables as
+#     constants. This silences those warnings.
 
 """shim.py - PAM integration shim for privleap. This exists to allow privleap
 actions to integrate seamlessly with PAM, allowing each action to have
@@ -23,10 +25,30 @@ import pwd
 import grp
 import os
 import subprocess
+import signal
 from pathlib import Path
 from typing import Any
+from types import FrameType
 
 import PAM  # type: ignore
+
+
+run_process: subprocess.Popen[bytes] | None = None
+
+
+# pylint: disable=unused-argument
+# Rationale:
+#   unused-arguments: We have no use for the arguments passed in here.
+def signal_handler(sig: int, frame: FrameType | None) -> None:
+    """
+    SIGTERM handler.
+    """
+
+    if run_process is not None:
+        run_process.terminate()
+
+
+signal.signal(signal.SIGTERM, signal_handler)
 
 if len(sys.argv) < 5:
     sys.exit(255)
@@ -91,7 +113,10 @@ if not Path(target_cwd).is_dir():
     target_cwd = "/"
 
 try:
-    exit_code: int = subprocess.run(
+    # pylint: disable=consider-using-with
+    # Rationale:
+    #   consider-using-with: Not necessary here, and likely not useful.
+    run_process = subprocess.Popen(
         command_arr,
         stdin=subprocess.DEVNULL,
         user=target_user,
@@ -99,8 +124,11 @@ try:
         extra_groups=[],
         env=action_env,
         cwd=target_cwd,
-        check=False,
-    ).returncode
+    )
+    run_process.wait()
+    exit_code = run_process.returncode
+    if exit_code < 0:
+        exit_code = 1
 except Exception:
     sys.exit(255)
 

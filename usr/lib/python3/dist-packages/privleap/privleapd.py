@@ -14,7 +14,7 @@
 import sys
 import shutil
 import select
-from threading import Thread
+from threading import Thread, Lock
 from queue import SimpleQueue
 import os
 import pwd
@@ -23,9 +23,10 @@ import subprocess
 import re
 import logging
 import time
-from enum import Enum, IntEnum
+from enum import Enum
 from pathlib import Path
-from typing import Tuple, cast, SupportsIndex, NoReturn, Any, IO
+from typing import cast, SupportsIndex, NoReturn, Any, IO
+from dataclasses import dataclass
 
 import sdnotify  # type: ignore
 
@@ -61,6 +62,27 @@ from .privleap import (
 )
 
 
+# pylint: disable=too-many-instance-attributes
+# Rationale:
+#   too-many-instance-attributes: It's not reasonably feasible to reduce the
+#     number of attributes here.
+@dataclass
+class PrivleapdSocketInfo:
+    """
+    A PrivleapSocket and associated data for checking when it should be
+    terminated.
+    """
+
+    listen_socket: PrivleapSocket
+    term_notify_read_fd: int
+    term_notify_write_fd: int
+    term_notify_read_pipe: IO[bytes] | None
+    term_notify_write_pipe: IO[bytes] | None
+    term_notify_lock: Lock = Lock()
+    term_notify_pipes_closed: bool = False
+    should_terminate: bool = False
+
+
 # pylint: disable=too-few-public-methods
 # Rationale:
 #   too-few-public-methods: This class just stores global variables, it needs no
@@ -86,7 +108,7 @@ class PrivleapdGlobal:
 
     # Readable by all threads, writable by main thread until the control
     # thread starts, then writable by control thread
-    socket_list: list[PrivleapSocket] = []
+    socket_list: list[PrivleapdSocketInfo] = []
     action_list: list[PrivleapAction] = []
     persistent_user_list: list[str] = []
     allowed_user_list: list[str] = []
@@ -105,12 +127,11 @@ class PrivleapdGlobal:
     ctm_read_pipe: IO[bytes] | None = None
     # IO for ctm_write_fd
     ctm_write_pipe: IO[bytes] | None = None
-    # main-to-control queue, for replies to control-to-main pipe messages
-    mtc_queue: SimpleQueue[int] = SimpleQueue()
     # all-to-control queue
     control_request_queue: SimpleQueue[dict[str, PrivleapSession | str]] = (
         SimpleQueue()
     )
+    socket_list_lock: Lock = Lock()
 
 
 class PrivleapdAuthStatus(Enum):
@@ -131,23 +152,6 @@ class PrivleapdCommDestroyResult(Enum):
     SUCCESS = 0
     NO_USER = 1
     PERSISTENT_USER = 2
-
-
-class PrivleapdCtmMsg(IntEnum):
-    """
-    Messages sent from the control thread to the main thread.
-    """
-
-    SOCK_MODIFY = 0
-    SOCK_MODIFY_DONE = 1
-
-
-class PrivleapdMtcMsg(IntEnum):
-    """
-    Messages sent from the main thread to the control thread.
-    """
-
-    SOCK_MODIFY_ACK = 0
 
 
 def send_msg_safe(session: PrivleapSession, msg: PrivleapMsg) -> bool:
@@ -238,7 +242,8 @@ def prune_disallowed_comm_sockets() -> None:
 
     user_names_to_kick: list[str] = []
 
-    for sock in PrivleapdGlobal.socket_list:
+    for sock_info in PrivleapdGlobal.socket_list:
+        sock: PrivleapSocket = sock_info.listen_socket
         if sock.socket_type != PrivleapSocketType.COMMUNICATION:
             continue
         assert sock.user_name is not None
@@ -254,26 +259,48 @@ def prune_disallowed_comm_sockets() -> None:
         _, _ = destroy_comm_socket(user_name)
 
 
-def socket_list_append_sync(new_sock: PrivleapSocket) -> None:
+def socket_list_add(new_sock: PrivleapSocket) -> None:
     """
-    Appends a socket to PrivleapdGlobal.socket_list, synchronizing access with
-    the main thread.
+    Sets up and appends a socket to PrivleapdGlobal.socket_list. Does not
+    synchronize access.
+
+    If called directly, may only be called by the main thread. May also be
+    called by the control thread if called via socket_list_add_sync().
+    """
+
+    term_notify_read_fd: int
+    term_notify_write_fd: int
+    term_notify_read_fd, term_notify_write_fd = os.pipe()
+    term_notify_read_pipe: IO[bytes] = os.fdopen(
+        term_notify_read_fd, "rb", buffering=0
+    )
+    term_notify_write_pipe: IO[bytes] = os.fdopen(
+        term_notify_write_fd, "wb", buffering=0
+    )
+    PrivleapdGlobal.socket_list.append(
+        PrivleapdSocketInfo(
+            new_sock,
+            term_notify_read_fd,
+            term_notify_write_fd,
+            term_notify_read_pipe,
+            term_notify_write_pipe,
+        )
+    )
+
+
+def socket_list_add_sync(new_sock: PrivleapSocket) -> None:
+    """
+    Sets up and appends a socket to PrivleapdGlobal.socket_list, synchronizing
+    access with the main thread.
 
     May only be called by the control thread.
     """
 
     assert PrivleapdGlobal.ctm_write_pipe is not None
-    PrivleapdGlobal.ctm_write_pipe.write(
-        PrivleapdCtmMsg.SOCK_MODIFY.to_bytes(1)
-    )
-    PrivleapdGlobal.ctm_write_pipe.flush()
-    mtc_msg: int = PrivleapdGlobal.mtc_queue.get()
-    assert mtc_msg == PrivleapdMtcMsg.SOCK_MODIFY_ACK
-    PrivleapdGlobal.socket_list.append(new_sock)
-    PrivleapdGlobal.ctm_write_pipe.write(
-        PrivleapdCtmMsg.SOCK_MODIFY_DONE.to_bytes(1)
-    )
-    PrivleapdGlobal.ctm_write_pipe.flush()
+    with PrivleapdGlobal.socket_list_lock:
+        while PrivleapdGlobal.ctm_write_pipe.write(b"\x00") == 0:
+            pass
+        socket_list_add(new_sock)
 
 
 def handle_control_create_msg(
@@ -313,7 +340,8 @@ def handle_control_create_msg(
         send_msg_safe(control_session, PrivleapControlServerDisallowedUserMsg())
         return
 
-    for sock in PrivleapdGlobal.socket_list:
+    for sock_info in PrivleapdGlobal.socket_list:
+        sock: PrivleapSocket = sock_info.listen_socket
         if sock.user_name == user_name:
             # User already has an open socket
             logging.info(
@@ -328,7 +356,7 @@ def handle_control_create_msg(
         comm_socket: PrivleapSocket = PrivleapSocket(
             PrivleapSocketType.COMMUNICATION, user_name
         )
-        socket_list_append_sync(comm_socket)
+        socket_list_add_sync(comm_socket)
         logging.info(
             "Handled CREATE message for account '%s', socket created", user_name
         )
@@ -342,7 +370,7 @@ def handle_control_create_msg(
         return
 
 
-def socket_list_pop_sync(sock_idx: int) -> None:
+def socket_list_stop_sync(sock_idx: int) -> None:
     """
     Removes a comm socket from the socket list, synchronizing access with the
     main thread.
@@ -351,17 +379,19 @@ def socket_list_pop_sync(sock_idx: int) -> None:
     """
 
     assert PrivleapdGlobal.ctm_write_pipe is not None
-    PrivleapdGlobal.ctm_write_pipe.write(
-        PrivleapdCtmMsg.SOCK_MODIFY.to_bytes(1)
-    )
-    PrivleapdGlobal.ctm_write_pipe.flush()
-    mtc_msg: int = PrivleapdGlobal.mtc_queue.get()
-    assert mtc_msg == PrivleapdMtcMsg.SOCK_MODIFY_ACK
-    PrivleapdGlobal.socket_list.pop(cast(SupportsIndex, sock_idx))
-    PrivleapdGlobal.ctm_write_pipe.write(
-        PrivleapdCtmMsg.SOCK_MODIFY_DONE.to_bytes(1)
-    )
-    PrivleapdGlobal.ctm_write_pipe.flush()
+    with PrivleapdGlobal.socket_list_lock:
+        while PrivleapdGlobal.ctm_write_pipe.write(b"\x00") == 0:
+            pass
+        target_socket_info: PrivleapdSocketInfo = PrivleapdGlobal.socket_list[
+            sock_idx
+        ]
+        assert target_socket_info.term_notify_write_pipe is not None
+        assert target_socket_info.term_notify_read_pipe is not None
+        target_socket_info.should_terminate = True
+        target_socket_info.listen_socket.close()
+        while target_socket_info.term_notify_write_pipe.write(b"\x00") == 0:
+            pass
+        PrivleapdGlobal.socket_list.pop(cast(SupportsIndex, sock_idx))
 
 
 def destroy_comm_socket(
@@ -391,7 +421,8 @@ def destroy_comm_socket(
         )
         return real_user_name, PrivleapdCommDestroyResult.PERSISTENT_USER
 
-    for sock_idx, sock in enumerate(PrivleapdGlobal.socket_list):
+    for sock_idx, sock_info in enumerate(PrivleapdGlobal.socket_list):
+        sock: PrivleapSocket = sock_info.listen_socket
         if sock.user_name == real_user_name:
             socket_path: Path = Path(PrivleapCommon.comm_dir, real_user_name)
             if socket_path.exists():
@@ -419,7 +450,7 @@ def destroy_comm_socket(
             break
 
     if remove_sock_idx is not None:
-        socket_list_pop_sync(remove_sock_idx)
+        socket_list_stop_sync(remove_sock_idx)
         logging.info(
             "Successfully destroyed comm socket for account '%s'",
             real_user_name,
@@ -729,41 +760,68 @@ def authorize_user(
     return PrivleapdAuthStatus.UNAUTHORIZED
 
 
-def check_action_terminate(
+def assert_action_terminate(
     comm_session: PrivleapSession, action_name: str
-) -> bool:
+) -> None:
     """
-    Checks for a TERMINATE message from the client.
+    Checks if the message from the client is a TERMINATE message, and logs an
+    error if not.
 
     May be called only by comm threads.
     """
 
-    assert comm_session.backend_socket is not None
-    ready_streams: Tuple[list[int], list[int], list[int]] = select.select(
-        [comm_session.backend_socket.fileno()], [], [], 0
-    )
-    if comm_session.backend_socket.fileno() in ready_streams[0]:
-        try:
-            comm_msg: PrivleapMsg = comm_session.get_msg()
-        except Exception as e:
-            logging.error(
-                "Could not get message from client run by account '%s'!",
-                comm_session.user_name,
-                exc_info=e,
-            )
-            return True
-        if isinstance(comm_msg, PrivleapCommClientTerminateMsg):
-            logging.info(
-                "Action '%s' prematurely terminated by account '%s'",
-                action_name,
-                comm_session.user_name,
-            )
-            return True
+    try:
+        comm_msg: PrivleapMsg = comm_session.get_msg()
+    except Exception as e:
         logging.error(
-            "Received invalid message type '%s' from client run by account '%s'!",
-            type(comm_msg).__name__,
+            "Could not get message from client run by account '%s'!",
+            comm_session.user_name,
+            exc_info=e,
+        )
+        return
+    if isinstance(comm_msg, PrivleapCommClientTerminateMsg):
+        logging.info(
+            "Action '%s' prematurely terminated by account '%s'",
+            action_name,
             comm_session.user_name,
         )
+        return
+    logging.error(
+        "Received invalid message type '%s' from client run by account '%s'!",
+        type(comm_msg).__name__,
+        comm_session.user_name,
+    )
+
+
+def check_early_action_terminate(
+    listen_socket_info: PrivleapdSocketInfo,
+    ready_fds: list[int],
+    comm_session: PrivleapSession,
+    action_name: str,
+) -> bool:
+    """
+    Checks if we should terminate the running action early. This can be
+    triggered by a client request or the destruction of a comm socket.
+    """
+
+    assert listen_socket_info.term_notify_read_pipe is not None
+    assert listen_socket_info.term_notify_write_pipe is not None
+    assert comm_session.backend_socket is not None
+
+    if listen_socket_info.should_terminate:
+        with listen_socket_info.term_notify_lock:
+            if not listen_socket_info.term_notify_pipes_closed:
+                listen_socket_info.term_notify_read_pipe.close()
+                listen_socket_info.term_notify_write_pipe.close()
+                listen_socket_info.term_notify_pipes_closed = True
+        return True
+
+    if comm_session.backend_socket.fileno() in ready_fds:
+        # The only message we expect the client may send at this point is
+        # TERMINATE. If in the future other messages are supported (for
+        # instance if stdin streaming is added), we will want to check for
+        # those messages here.
+        assert_action_terminate(comm_session, action_name)
         return True
 
     return False
@@ -773,6 +831,7 @@ def send_action_results(
     comm_session: PrivleapSession,
     action_name: str,
     action_process: subprocess.Popen[bytes],
+    listen_socket_info: PrivleapdSocketInfo,
 ) -> None:
     """
     Streams the stdout and stderr of the running action to the client, and sends
@@ -785,23 +844,33 @@ def send_action_results(
     assert action_process.stderr is not None
     assert comm_session.backend_socket is not None
 
+    epoll_obj: select.epoll = select.epoll()
+    epoll_obj.register(comm_session.backend_socket.fileno(), select.EPOLLIN)
+    epoll_obj.register(action_process.stdout.fileno(), select.EPOLLIN)
+    epoll_obj.register(action_process.stderr.fileno(), select.EPOLLIN)
+
+    # Comm threads that are currently streaming stdio from a process to a
+    # client may be stuck waiting for the process to write something to stdout
+    # or stderr. They will not notice when should_terminate is set to True. To
+    # force them to notice, the term_notify_* variables have an OS pipe set up
+    # on them, and the same epoll call that checks for process stdio also
+    # checks for a write to this pipe. We do not need to check the value
+    # written to this variable (it is always a single NULL byte), we just need
+    # to break the epoll_obj.poll() call.
+    assert listen_socket_info.term_notify_read_fd != 0
+    epoll_obj.register(listen_socket_info.term_notify_read_fd, select.EPOLLIN)
+
     try:
         stdout_done: bool = False
         stderr_done: bool = False
 
         while not stdout_done or not stderr_done:
-            select.select(
-                [
-                    action_process.stdout.fileno(),
-                    action_process.stderr.fileno(),
-                    comm_session.backend_socket.fileno(),
-                ],
-                [],
-                [],
-            )
+            ready_fds: list[int] = [x[0] for x in epoll_obj.poll()]
 
             while True:
-                if check_action_terminate(comm_session, action_name):
+                if check_early_action_terminate(
+                    listen_socket_info, ready_fds, comm_session, action_name
+                ):
                     return
 
                 stdout_buf: bytes | None = action_process.stdout.read(1024)
@@ -833,6 +902,7 @@ def send_action_results(
         action_process.wait()
 
     finally:
+        epoll_obj.close()
         action_process.stdout.close()
         action_process.stderr.close()
         action_process.terminate()
@@ -937,19 +1007,34 @@ def auth_signal_request(
 
 
 def handle_signal_message(
-    desired_action: PrivleapAction, comm_session: PrivleapSession
+    desired_action: PrivleapAction,
+    comm_session: PrivleapSession,
+    listen_socket_info: PrivleapdSocketInfo,
 ) -> None:
     """
     Handles a SIGNAL message from the client.
 
+    The control thread may signal to this comm thread to terminate the
+    session. The termination flag is checked both in this function and in
+    send_action_results() so this request can be obeyed.
+
     May only be called by comm threads.
     """
+
+    if listen_socket_info.should_terminate:
+        return
 
     assert comm_session.user_name is not None
     try:
         action_process: subprocess.Popen[bytes] = run_action(
             desired_action, comm_session.user_name
         )
+        if listen_socket_info.should_terminate:
+            action_process.stdout.close()
+            action_process.stderr.close()
+            action_process.terminate()
+            action_process.wait()
+            return
     except Exception as e:
         logging.error(
             "Action '%s' authorized for account '%s', but trigger failed!",
@@ -972,11 +1057,16 @@ def handle_signal_message(
     send_msg_safe(comm_session, PrivleapCommServerTriggerMsg())
     assert desired_action.action_name is not None
     send_action_results(
-        comm_session, desired_action.action_name, action_process
+        comm_session,
+        desired_action.action_name,
+        action_process,
+        listen_socket_info,
     )
 
 
-def handle_comm_session(comm_session: PrivleapSession) -> None:
+def handle_comm_session(
+    comm_session: PrivleapSession, listen_socket_info: PrivleapdSocketInfo
+) -> None:
     """
     Handle comm sessions.
 
@@ -1013,7 +1103,9 @@ def handle_comm_session(comm_session: PrivleapSession) -> None:
             return
 
         if isinstance(comm_msg, PrivleapCommClientSignalMsg):
-            handle_signal_message(desired_action, comm_session)
+            handle_signal_message(
+                desired_action, comm_session, listen_socket_info
+            )
         elif isinstance(comm_msg, PrivleapCommClientAccessCheckMsg):
             # We already authorized the request above, so we can simply tell the
             # client about that now.
@@ -1023,7 +1115,7 @@ def handle_comm_session(comm_session: PrivleapSession) -> None:
         comm_session.close_session()
 
 
-def handle_comm_socket_conn(comm_socket: PrivleapSocket) -> None:
+def handle_comm_socket_conn(comm_socket_info: PrivleapdSocketInfo) -> None:
     """
     Handles comm socket connections, for running actions.
 
@@ -1031,11 +1123,13 @@ def handle_comm_socket_conn(comm_socket: PrivleapSocket) -> None:
     """
 
     try:
-        comm_session: PrivleapSession = comm_socket.get_session()
+        comm_session: PrivleapSession = (
+            comm_socket_info.listen_socket.get_session()
+        )
     except Exception as e:
         logging.error(
             "Could not start comm session with client run by account '%s'!",
-            comm_socket.user_name,
+            comm_socket_info.listen_socket.user_name,
             exc_info=e,
         )
         return
@@ -1044,7 +1138,9 @@ def handle_comm_socket_conn(comm_socket: PrivleapSocket) -> None:
     # own reference to the thread. See:
     # https://stackoverflow.com/a/42428333/19474638
     comm_thread: Thread = Thread(
-        target=handle_comm_session, args=[comm_session], daemon=True
+        target=handle_comm_session,
+        args=[comm_session, comm_socket_info],
+        daemon=True,
     )
     comm_thread.start()
 
@@ -1423,7 +1519,9 @@ def open_control_socket() -> None:
         logging.critical("Failed to open control socket!", exc_info=e)
         sys.exit(1)
 
-    PrivleapdGlobal.socket_list.append(control_socket)
+    PrivleapdGlobal.socket_list.append(
+        PrivleapdSocketInfo(control_socket, 0, 0, None, None)
+    )
 
 
 def open_persistent_comm_sockets(in_control_thread: bool) -> None:
@@ -1444,7 +1542,10 @@ def open_persistent_comm_sockets(in_control_thread: bool) -> None:
         try:
             if in_control_thread:
                 socket_already_exists: bool = False
-                for existing_socket in PrivleapdGlobal.socket_list:
+                for existing_socket_info in PrivleapdGlobal.socket_list:
+                    existing_socket: PrivleapSocket = (
+                        existing_socket_info.listen_socket
+                    )
                     if existing_socket.socket_type != (
                         PrivleapSocketType.COMMUNICATION
                     ):
@@ -1459,12 +1560,12 @@ def open_persistent_comm_sockets(in_control_thread: bool) -> None:
                 new_comm_socket = PrivleapSocket(
                     PrivleapSocketType.COMMUNICATION, user_name
                 )
-                socket_list_append_sync(new_comm_socket)
+                socket_list_add_sync(new_comm_socket)
             else:
                 new_comm_socket = PrivleapSocket(
                     PrivleapSocketType.COMMUNICATION, user_name
                 )
-                PrivleapdGlobal.socket_list.append(new_comm_socket)
+                socket_list_add(new_comm_socket)
             # We intentionally don't log the creation of persistent user
             # sockets since privleap currently doesn't output log information
             # during early startup unless something is wrong. The test suite
@@ -1494,9 +1595,11 @@ def prep_sock_notify_pipe() -> None:
     """
 
     PrivleapdGlobal.ctm_read_fd, PrivleapdGlobal.ctm_write_fd = os.pipe()
-    PrivleapdGlobal.ctm_read_pipe = os.fdopen(PrivleapdGlobal.ctm_read_fd, "rb")
+    PrivleapdGlobal.ctm_read_pipe = os.fdopen(
+        PrivleapdGlobal.ctm_read_fd, "rb", buffering=0
+    )
     PrivleapdGlobal.ctm_write_pipe = os.fdopen(
-        PrivleapdGlobal.ctm_write_fd, "wb"
+        PrivleapdGlobal.ctm_write_fd, "wb", buffering=0
     )
 
 
@@ -1541,61 +1644,67 @@ def main_loop() -> NoReturn:
     """
 
     assert PrivleapdGlobal.ctm_read_pipe is not None
+    epoll_fd_set: set[int] = set()
+    epoll_obj: select.epoll = select.epoll()
+    epoll_obj.register(PrivleapdGlobal.ctm_read_fd, select.EPOLLIN)
+    socket_list_changed: bool = True
 
     while True:
-        read_sock_list: list[int] = [
-            sock_obj.backend_socket.fileno()
-            for sock_obj in PrivleapdGlobal.socket_list
-            if sock_obj.backend_socket is not None
-        ]
-        read_sock_list.append(PrivleapdGlobal.ctm_read_fd)
-        ready_socket_list: Tuple[list[int], list[int], list[int]] = (
-            select.select(
-                read_sock_list,
-                [],
-                [],
-                5,
-            )
-        )
+        if socket_list_changed:
+            read_sock_fileno_list: list[int] = [
+                sock_obj.backend_socket.fileno()
+                for sock_obj in [
+                    x.listen_socket for x in PrivleapdGlobal.socket_list
+                ]
+                if sock_obj.backend_socket is not None
+            ]
+            read_sock_fileno_set: set[int] = set(read_sock_fileno_list)
+            for register_fileno in read_sock_fileno_set - epoll_fd_set:
+                epoll_obj.register(register_fileno, select.EPOLLIN)
+            epoll_fd_set.update(read_sock_fileno_set)
+            for remove_fileno in epoll_fd_set - read_sock_fileno_set:
+                epoll_fd_set.remove(remove_fileno)
+            socket_list_changed = False
+
+        epoll_event_fd_list: list[int] = [x[0] for x in epoll_obj.poll(5)]
         PrivleapdGlobal.sdnotify_object.notify("WATCHDOG=1")
 
-        if PrivleapdGlobal.ctm_read_fd in ready_socket_list[0]:
-            ctm_msg: bytes = PrivleapdGlobal.ctm_read_pipe.read(1)
-            ctm_msg_int: int = int.from_bytes(ctm_msg)
-            match ctm_msg_int:
-                case PrivleapdCtmMsg.SOCK_MODIFY:
-                    # Connection change, i.e. adding or removing a socket. The
-                    # main thread needs to synchronize with the control thread
-                    # when this is done to prevent losing track of or not
-                    # noticing a new socket.
-                    PrivleapdGlobal.mtc_queue.put(
-                        PrivleapdMtcMsg.SOCK_MODIFY_ACK
-                    )
-                    ctm_msg = PrivleapdGlobal.ctm_read_pipe.read(1)
-                    ctm_msg_int = int.from_bytes(ctm_msg)
-                    assert ctm_msg_int == PrivleapdCtmMsg.SOCK_MODIFY_DONE
-                    continue
-                case _:
-                    logging.critical(
-                        "Unexpected control-to-main message '%s'!",
-                        ctm_msg_int,
-                    )
-                    sys.exit(1)
+        if PrivleapdGlobal.ctm_read_fd in epoll_event_fd_list:
+            # Connection change, i.e. adding or removing a socket. The
+            # main thread needs to synchronize with the control thread
+            # when this is done to prevent losing track of or not
+            # noticing a new socket.
+            PrivleapdGlobal.ctm_read_pipe.read(1)
+            with PrivleapdGlobal.socket_list_lock:
+                pass
+            socket_list_changed = True
+            continue
 
-        for ready_socket_fileno in ready_socket_list[0]:
-            ready_sock_obj: PrivleapSocket | None = None
-            for sock_obj in PrivleapdGlobal.socket_list:
-                assert sock_obj.backend_socket is not None
-                if sock_obj.backend_socket.fileno() == ready_socket_fileno:
-                    ready_sock_obj = sock_obj
-                    break
-            if ready_sock_obj is None:
-                logging.critical("privleapd lost track of a socket!")
-                sys.exit(1)
-            if ready_sock_obj.socket_type == PrivleapSocketType.CONTROL:
-                handle_control_socket_conn(ready_sock_obj)
-            else:
-                handle_comm_socket_conn(ready_sock_obj)
+        # Note that if we get this far, PrivleapdGlobal.ctm_read_fd is NOT in
+        # epoll_event_fd_list, so we don't need to check for its presence and
+        # can assume all fds correspond to active sockets.
+        with PrivleapdGlobal.socket_list_lock:
+            for ready_socket_fileno in epoll_event_fd_list:
+                ready_sock_info_obj: PrivleapdSocketInfo | None = None
+                for sock_info_obj in PrivleapdGlobal.socket_list:
+                    sock_obj = sock_info_obj.listen_socket
+                    assert sock_obj.backend_socket is not None
+                    if sock_obj.backend_socket.fileno() == (
+                        ready_socket_fileno
+                    ):
+                        ready_sock_info_obj = sock_info_obj
+                        break
+                if ready_sock_info_obj is None:
+                    logging.critical("privleapd lost track of a socket!")
+                    sys.exit(1)
+                if ready_sock_info_obj.listen_socket.socket_type == (
+                    PrivleapSocketType.CONTROL
+                ):
+                    handle_control_socket_conn(
+                        ready_sock_info_obj.listen_socket
+                    )
+                else:
+                    handle_comm_socket_conn(ready_sock_info_obj)
 
 
 def print_usage() -> None:

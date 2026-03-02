@@ -378,15 +378,29 @@ def assert_command_result(
     expected values.
     """
 
+    should_capture_output: bool = True
+    if stdout_data == b"" and stderr_data == b"":
+        should_capture_output = False
+    if not should_capture_output and filter_func is not None:
+        logging.error(
+            "Cannot specify filter_func without specifying "
+            + "stdout_data or stderr_data!"
+        )
+        sys.exit(1)
     test_result: subprocess.CompletedProcess[bytes] = subprocess.run(
-        command_data, check=False, capture_output=True
+        command_data, check=False, capture_output=should_capture_output
     )
     logging.info("Ran command: %s", command_data)
     logging.info("Exit code: %s", test_result.returncode)
     logging.info("Stdout: %s", test_result.stdout)
     logging.info("Stderr: %s", test_result.stderr)
     assert_failed: bool = False
-    if filter_func is None:
+    stdout_result: bytes
+    stderr_result: bytes
+    if not should_capture_output:
+        stdout_result = b""
+        stderr_result = b""
+    elif filter_func is None:
         stdout_result = test_result.stdout
         stderr_result = test_result.stderr
     else:
@@ -657,6 +671,10 @@ TargetUser={PlTestGlobal.test_username}
 
 [action:test-act-noreturn]
 Command=sleep infinity
+AuthorizedUsers={PlTestGlobal.test_username}
+
+[action:test-act-interrupt]
+Command=fn() {{ touch /test-act-interrupt; }}; trap fn TERM; sleep infinity & wait $!
 AuthorizedUsers={PlTestGlobal.test_username}
 
 [expected-disallowed-users]
@@ -1382,8 +1400,9 @@ User=alttest2
     leaprun_terminate_lines: list[str] = [
         "handle_signal_message: INFO: Triggered action 'test-act-noreturn' "
         + f"for account '{PlTestGlobal.test_username}'\n",
-        "check_action_terminate: INFO: Action 'test-act-noreturn' prematurely "
-        + f"terminated by account '{PlTestGlobal.test_username}'\n",
+        "assert_action_terminate: INFO: Action 'test-act-noreturn' "
+        + "prematurely terminated by account "
+        + f"'{PlTestGlobal.test_username}'\n",
         "send_action_results: INFO: Action 'test-act-noreturn' requested by "
         + f"account '{PlTestGlobal.test_username}' completed\n",
     ]

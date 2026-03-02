@@ -991,6 +991,14 @@ class PrivleapSocket:
             session_socket, user_name=self.user_name, is_control_session=False
         )
 
+    def close(self) -> None:
+        """
+        Close the listening socket.
+        """
+
+        assert self.backend_socket is not None
+        self.backend_socket.close()
+
 
 class PrivleapAction:
     """

@@ -3303,6 +3303,37 @@ def run_privleapd_tests() -> None:
         "Test privleapd restartless config reload, no system-local config",
     )
     # ---
+    privleapd_assert_command(
+        [
+            "bash",
+            "-c",
+            f"sudo -u {PlTestGlobal.test_username} "
+            + "leaprun test-act-interrupt & sleep 1; disown; exit 0",
+        ],
+        exit_code=0,
+    )
+    privleapd_assert_command(
+        ["leapctl", "--destroy", PlTestGlobal.test_username],
+        exit_code=0,
+        stdout_data=PlTestData.test_username_socket_destroyed,
+    )
+    time.sleep(0.1)
+    privleapd_assert_function(
+        test_if_path_exists,
+        "/test-act-interrupt",
+        "Test privleapd action termination upon comm socket destruction",
+    )
+    privleapd_assert_function(
+        try_remove_file,
+        "/test-act-interrupt",
+        "Remove flag file left by test-act-interrupt",
+    )
+    privleapd_assert_command(
+        ["leapctl", "--create", PlTestGlobal.test_username],
+        exit_code=0,
+        stdout_data=PlTestData.test_username_socket_created,
+    )
+    # ---
 
     logging.info(
         "privleapd passed asserts: %s, failed asserts: %s",
