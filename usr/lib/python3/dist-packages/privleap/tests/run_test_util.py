@@ -45,9 +45,6 @@ class PlTestGlobal:
     )
     privleapd_proc: subprocess.Popen[str] | None = None
     privleapd_test_ready_file: Path = Path("/tmp/privleapd-ready-for-test")
-    test_username: str = "privleaptest"
-    test_username_bytes: bytes = test_username.encode("utf-8")
-    test_home_dir: Path = Path(f"/home/{test_username}")
     privleap_state_dir: Path = Path("/run/privleapd")
     privleap_state_comm_dir: Path = Path(privleap_state_dir, "comm")
     base_delay: float = 0.1
@@ -546,9 +543,9 @@ class PlTestData:
     Data for privleap tests.
     """
 
-    primary_test_config_file: str = f"""[action:test-act-free]
+    primary_test_config_file: str = """[action:test-act-free]
 Command=echo 'test-act-free'
-AuthorizedUsers={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
 
 [persistent-users]
 # UID 3 = sys
@@ -565,10 +562,10 @@ AuthorizedGroups=sys
 [action:test-act-grouppermit-userrestrict]
 Command=echo 'test-act-grouppermit-userrestrict'
 AuthorizedUsers=sys
-AuthorizedGroups={PlTestGlobal.test_username}
+AuthorizedGroups=privleaptestone
 
 [allowed-users]
-User={PlTestGlobal.test_username}
+User=privleaptestone
 User=_apt
 User=daemon
 User=deleteme
@@ -578,12 +575,12 @@ Group=idontexist
 
 [action:test-act-grouprestrict-userpermit]
 Command=echo 'test-act-grouprestrict-userpermit'
-AuthorizedUsers={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
 AuthorizedGroups=sys
 
 [action:test-act-userpermit]
 Command=echo 'test-act-userpermit'
-AuthorizedUsers={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
 
 [action:test-act-privleap-grouppermit]
 Command=echo 'test-act-privleap-grouppermit'
@@ -595,12 +592,12 @@ User=uucp
 
 [action:test-act-grouppermit]
 Command=echo 'test-act-grouppermit'
-AuthorizedGroups={PlTestGlobal.test_username}
+AuthorizedGroups=privleaptestone
 
 [action:test-act-grouppermit-userpermit]
 Command=echo 'test-act-grouppermit-userpermit'
-AuthorizedUsers={PlTestGlobal.test_username}
-AuthorizedGroups={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
+AuthorizedGroups=privleaptestone
 
 # Not all groups have a corresponding username, this tests that edge case
 [action:test-act-sudopermit]
@@ -609,73 +606,73 @@ AuthorizedGroups=sudo
 
 [action:test-act-multiuser-permit]
 Command=echo 'test-act-multiuser-permit'
-AuthorizedUsers={PlTestGlobal.test_username},3,messagebus
+AuthorizedUsers=privleaptestone,3,messagebus
 
 [action:test-act-multigroup-permit]
 Command=echo 'test-act-multigroup-permit'
-AuthorizedGroups={PlTestGlobal.test_username},3,messagebus
+AuthorizedGroups=privleaptestone,3,messagebus
 
 [action:test-act-multiuser-multigroup-permit]
 Command=echo 'test-act-multiuser-multigroup-permit'
-AuthorizedUsers={PlTestGlobal.test_username},sys
+AuthorizedUsers=privleaptestone,sys
 AuthorizedGroups=sys,messagebus
 
 [action:test-act-exit240]
 Command=echo 'test-act-exit240'; exit 240
-AuthorizedUsers={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
 
 [action:test-act-stderr]
 Command=1>&2 echo 'test-act-stderr'
-AuthorizedUsers={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
 
 [action:test-act-stdout-stderr-interleaved]
 Command=echo 'stdout00'; 1>&2 echo 'stderr00'; echo 'stdout01'; 1>&2 echo 'stderr01'
-AuthorizedUsers={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
 
 [action:test-act-invalid-bash]
 Command=ahem, this will not work
-AuthorizedUsers={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
 
 [action:test-act-target-user]
 Command=id
-TargetUser={PlTestGlobal.test_username}
-AuthorizedUsers={PlTestGlobal.test_username}
+TargetUser=privleaptestone
+AuthorizedUsers=privleaptestone
 
 [action:test-act-target-group]
 Command=id
-TargetGroup={PlTestGlobal.test_username}
+TargetGroup=privleaptestone
 AuthorizedUsers=root
 
 [action:test-act-target-user-and-group]
 Command=id
-AuthorizedUsers={PlTestGlobal.test_username}
-TargetUser={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
+TargetUser=privleaptestone
 TargetGroup=root
 
 [action:test-act-missing-user]
 Command=echo 'test-act-missing-user'
-AuthorizedUsers={PlTestGlobal.test_username},nonexistent
+AuthorizedUsers=privleaptestone,nonexistent
 
 [action:test-act-multi-equals]
 Command=echo abc=def
-AuthorizedUsers={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
 
 [action:test-act-rootdata]
 Command=pwd; id; env
-AuthorizedUsers={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
 
 [action:test-act-userdata]
 Command=pwd; id; env
-AuthorizedUsers={PlTestGlobal.test_username}
-TargetUser={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
+TargetUser=privleaptestone
 
 [action:test-act-noreturn]
 Command=sleep infinity
-AuthorizedUsers={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
 
 [action:test-act-interrupt]
-Command=fn() {{ touch /test-act-interrupt; }}; trap fn TERM; sleep infinity & wait $!
-AuthorizedUsers={PlTestGlobal.test_username}
+Command=fn() { touch /test-act-interrupt; }; trap fn TERM; sleep infinity & wait $!
+AuthorizedUsers=privleaptestone
 
 [expected-disallowed-users]
 User=irc
@@ -720,25 +717,25 @@ AuthorizedUsers=root
 Command=echo 'test-@ct-invalidaction'
 AuthorizedUsers=root
 """
-    added_actions_config_file: str = f"""[action:test-act-added1]
+    added_actions_config_file: str = """[action:test-act-added1]
 Command=echo 'test-act-added1'
-AuthorizedUsers={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
 
 [action:test-act-added2]
 Command=echo 'test-act-added2'
-AuthorizedUsers={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
 """
-    added_actions_bad_config_file: str = f"""[action:test-act-added1]
+    added_actions_bad_config_file: str = """[action:test-act-added1]
 Command=echo 'test-act-added1'
-AuthorizedUsers={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
 
 [action:test-act-added2]
 Command=echo 'test-act-added2'
-AuthorizedUsers={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
 
 [action:test-act-added-bad]
 Commandecho 'test-act-added-bad'
-AuthorizedUsers={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
 """
     unrecognized_header_config_file: str = """[unrecognized-header]
 Command=echo 'unrecognized-header'
@@ -752,19 +749,19 @@ Command=echo 'test-act-missing-auth'
 Command=echo 'test-act-nonexistent-restrict'
 AuthorizedUsers=nonexistent
 """
-    system_local_config_file: str = f"""\
+    system_local_config_file: str = """\
 [action:test-act-system-local]
 Command=echo 'test-act-system-local'
-AuthorizedUsers={PlTestGlobal.test_username}
+AuthorizedUsers=privleaptestone
 """
     new_persistent_users_config_file: str = """\
 [persistent-users]
-User=alttest
-User=alttest2
+User=privleaptesttwo
+User=privleaptestthree
 """
-    test_username_create_error: bytes = (
+    privleaptestone_create_error: bytes = (
         b"ERROR: privleapd encountered an error while creating a comm "
-        b"socket for account '" + PlTestGlobal.test_username_bytes + b"'!\n"
+        b"socket for account 'privleaptestone'!\n"
     )
     privleapd_invalid_response: bytes = (
         b"ERROR: privleapd didn't return a valid response!\n"
@@ -777,25 +774,17 @@ User=alttest2
     )
     apt_socket_created: bytes = b"Comm socket created for account '_apt'.\n"
     apt_socket_destroyed: bytes = b"Comm socket destroyed for account '_apt'.\n"
-    test_username_socket_created: bytes = (
-        b"Comm socket created for account '"
-        + PlTestGlobal.test_username_bytes
-        + b"'.\n"
+    privleaptestone_socket_created: bytes = (
+        b"Comm socket created for account 'privleaptestone'.\n"
     )
-    test_username_socket_destroyed: bytes = (
-        b"Comm socket destroyed for account '"
-        + PlTestGlobal.test_username_bytes
-        + b"'.\n"
+    privleaptestone_socket_destroyed: bytes = (
+        b"Comm socket destroyed for account 'privleaptestone'.\n"
     )
-    test_username_socket_missing: bytes = (
-        b"Comm socket does not exist for account '"
-        + PlTestGlobal.test_username_bytes
-        + b"'.\n"
+    privleaptestone_socket_missing: bytes = (
+        b"Comm socket does not exist for account 'privleaptestone'.\n"
     )
-    test_username_socket_exists: bytes = (
-        b"Comm socket already exists for account '"
-        + PlTestGlobal.test_username_bytes
-        + b"'.\n"
+    privleaptestone_socket_exists: bytes = (
+        b"Comm socket already exists for account 'privleaptestone'.\n"
     )
     privleapd_connection_failed: bytes = (
         b"ERROR: Could not connect to privleapd!\n"
@@ -834,17 +823,17 @@ User=alttest2
         b"Account 'news' is not permitted to have a comm socket, as "
         b"expected, ok.\n"
     )
-    alttest_socket_created: bytes = (
-        b"Comm socket created for account 'alttest'.\n"
+    privleaptesttwo_socket_created: bytes = (
+        b"Comm socket created for account 'privleaptesttwo'.\n"
     )
-    alttest_socket_destroyed: bytes = (
-        b"Comm socket destroyed for account 'alttest'.\n"
+    privleaptesttwo_socket_destroyed: bytes = (
+        b"Comm socket destroyed for account 'privleaptesttwo'.\n"
     )
-    alttest_socket_not_permitted: bytes = (
-        b"ERROR: Account 'alttest' is not permitted to have a comm socket!\n"
+    privleaptesttwo_socket_not_permitted: bytes = (
+        b"ERROR: Account 'privleaptesttwo' is not permitted to have a comm socket!\n"
     )
-    alttest2_socket_created: bytes = (
-        b"Comm socket created for account 'alttest2'.\n"
+    privleaptestthree_socket_created: bytes = (
+        b"Comm socket created for account 'privleaptestthree'.\n"
     )
     leapctl_help: bytes = (
         b"leapctl <--create|--destroy> <user>\n"
@@ -862,21 +851,16 @@ User=alttest2
         + b"           communication socket for.\n"
     )
     test_act_free_authorized: bytes = (
-        b"Account '"
-        + PlTestGlobal.test_username_bytes
-        + b"' (1002) is authorized to run action 'test-act-free'.\n"
+        b"Account 'privleaptestone' (1002) is authorized to run action "
+        + b"'test-act-free'.\n"
     )
     test_act_userrestrict_unauthorized: bytes = (
-        b"ERROR: Account '"
-        + PlTestGlobal.test_username_bytes
-        + b"' (1002) is unauthorized to run action "
-        + b"'test-act-userrestrict'.\n"
+        b"ERROR: Account 'privleaptestone' (1002) is unauthorized to run "
+        + b"action 'test-act-userrestrict'.\n"
     )
     test_act_grouprestrict_unauthorized: bytes = (
-        b"ERROR: Account '"
-        + PlTestGlobal.test_username_bytes
-        + b"' (1002) is unauthorized to run action "
-        + b"'test-act-grouprestrict'.\n"
+        b"ERROR: Account 'privleaptestone' (1002) is unauthorized to run "
+        + b"action 'test-act-grouprestrict'.\n"
     )
     test_act_multiuser_permit_unauthorized: bytes = (
         b"ERROR: Account 'bin' (2) is unauthorized to run action "
@@ -891,49 +875,31 @@ User=alttest2
         b"'test-act-multiuser-multigroup-permit'.\n"
     )
     test_act_nonexistent_unauthorized: bytes = (
-        b"ERROR: Account '"
-        + PlTestGlobal.test_username_bytes
-        + b"' (1002) is unauthorized to run action "
-        + b"'test-act-nonexistent'.\n"
+        b"ERROR: Account 'privleaptestone' (1002) is unauthorized to run "
+        + b"action 'test-act-nonexistent'.\n"
     )
     test_act_added1_unauthorized: bytes = (
-        b"ERROR: Account '"
-        + PlTestGlobal.test_username_bytes
-        + b"' (1002) is unauthorized to run action "
-        + b"'test-act-added1'.\n"
+        b"ERROR: Account 'privleaptestone' (1002) is unauthorized to run "
+        + b"action 'test-act-added1'.\n"
     )
     test_act_added2_unauthorized: bytes = (
-        b"ERROR: Account '"
-        + PlTestGlobal.test_username_bytes
-        + b"' (1002) is unauthorized to run action "
-        + b"'test-act-added2'.\n"
+        b"ERROR: Account 'privleaptestone' (1002) is unauthorized to run "
+        + b"action 'test-act-added2'.\n"
     )
     test_act_invalid_unauthorized: bytes = (
-        b"ERROR: Account '"
-        + PlTestGlobal.test_username_bytes
-        + b"' (1002) is unauthorized to run action "
-        + b"'test-act-invalid'.\n"
+        b"ERROR: Account 'privleaptestone' (1002) is unauthorized to run "
+        + b"action 'test-act-invalid'.\n"
     )
     test_act_target_user: bytes = (
-        b"uid=1002("
-        + PlTestGlobal.test_username_bytes
-        + b") gid=1002("
-        + PlTestGlobal.test_username_bytes
-        + b") groups=1002("
-        + PlTestGlobal.test_username_bytes
-        + b")\n"
+        b"uid=1002(privleaptestone) gid=1002(privleaptestone) groups=1002("
+        + b"privleaptestone)\n"
     )
     test_act_target_group: bytes = (
-        b"uid=0(root) gid=1002("
-        + PlTestGlobal.test_username_bytes
-        + b") groups=1002("
-        + PlTestGlobal.test_username_bytes
-        + b")\n"
+        b"uid=0(root) gid=1002(privleaptestone) "
+        + b"groups=1002(privleaptestone)\n"
     )
     test_act_target_user_and_group: bytes = (
-        b"uid=1002("
-        + PlTestGlobal.test_username_bytes
-        + b") gid=0(root) groups=0(root)\n"
+        b"uid=1002(privleaptestone) gid=0(root) groups=0(root)\n"
     )
     test_act_rootdata: bytes = (
         b"/root\n"
@@ -955,16 +921,16 @@ User=alttest2
         b"_=/usr/bin/env\n"
     )
     test_act_userdata: bytes = (
-        b"/home/privleaptest\n"
-        b"uid=1002(privleaptest) gid=1002(privleaptest) "
-        b"groups=1002(privleaptest)\n"
+        b"/home/privleaptestone\n"
+        b"uid=1002(privleaptestone) gid=1002(privleaptestone) "
+        b"groups=1002(privleaptestone)\n"
         b"SHELL=/usr/bin/bash\n"
         b"AUTOPKGTEST_NORMAL_USER=unshare\n"
-        b"PWD=/home/privleaptest\n"
-        b"LOGNAME=privleaptest\n"
-        b"HOME=/home/privleaptest\n"
+        b"PWD=/home/privleaptestone\n"
+        b"LOGNAME=privleaptestone\n"
+        b"HOME=/home/privleaptestone\n"
         b"LANG=C.UTF-8\n"
-        b"USER=privleaptest\n"
+        b"USER=privleaptestone\n"
         b"ADT_NORMAL_USER=unshare\n"
         b"SHLVL=1\n"
         b"LC_ALL=C\n"
@@ -1023,25 +989,25 @@ User=alttest2
     ]
     create_user_socket_lines: list[str] = [
         "handle_control_create_msg: INFO: Handled CREATE message for account "
-        + f"'{PlTestGlobal.test_username}', socket created\n",
+        + "'privleaptestone', socket created\n",
         "handle_control_create_msg: INFO: Handled CREATE message for account "
-        + f"'{PlTestGlobal.test_username}', socket already exists\n",
+        + "'privleaptestone', socket already exists\n",
     ]
     create_existing_user_socket_and_bail_lines: list[str] = [
         "handle_control_create_msg: INFO: Handled CREATE message for account "
-        + f"'{PlTestGlobal.test_username}', socket already exists\n",
+        + "'privleaptestone', socket already exists\n",
         "send_msg_safe: ERROR: Could not send 'EXISTS'\n",
         "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
     create_blocked_user_socket_lines: list[str] = [
         "handle_control_create_msg: ERROR: Failed to create socket for account "
-        + f"'{PlTestGlobal.test_username}'!\n",
+        + "'privleaptestone'!\n",
         "Traceback (most recent call last):\n",
         "OSError: [Errno 98] Address already in use\n",
     ]
     create_blocked_user_socket_and_bail_lines: list[str] = [
         "handle_control_create_msg: ERROR: Failed to create socket for "
-        + f"account '{PlTestGlobal.test_username}'!\n",
+        + "account 'privleaptestone'!\n",
         "Traceback (most recent call last):\n",
         "OSError: [Errno 98] Address already in use\n",
         "send_msg_safe: ERROR: Could not send 'CONTROL_ERROR'\n",
@@ -1053,18 +1019,18 @@ User=alttest2
     ]
     destroy_missing_user_socket_lines: list[str] = [
         "destroy_comm_socket: WARNING: Destroying comm socket for account "
-        + f"'{PlTestGlobal.test_username}', no UNIX socket to delete at "
-        + f"'/run/privleapd/comm/{PlTestGlobal.test_username}'\n",
+        + "'privleaptestone', no UNIX socket to delete at "
+        + "'/run/privleapd/comm/privleaptestone'\n",
         "destroy_comm_socket: INFO: Successfully destroyed comm socket for "
-        + f"account '{PlTestGlobal.test_username}'\n",
+        + "account 'privleaptestone'\n",
         "handle_control_destroy_msg: INFO: Handled DESTROY message for account "
-        + f"'{PlTestGlobal.test_username}', socket destroyed\n",
+        + "'privleaptestone', socket destroyed\n",
     ]
     destroy_user_socket_and_bail_lines: list[str] = [
         "destroy_comm_socket: INFO: Successfully destroyed comm socket for "
-        + f"account '{PlTestGlobal.test_username}'\n",
+        + "account 'privleaptestone'\n",
         "handle_control_destroy_msg: INFO: Handled DESTROY message for "
-        + f"account '{PlTestGlobal.test_username}', socket destroyed\n",
+        + "account 'privleaptestone', socket destroyed\n",
         "send_msg_safe: ERROR: Could not send 'OK'\n",
         "Traceback (most recent call last):\n",
         "BrokenPipeError: [Errno 32] Broken pipe\n",
@@ -1078,9 +1044,9 @@ User=alttest2
     )
     destroy_bad_user_socket_and_bail_lines: list[str] = [
         "destroy_comm_socket: INFO: Could not destroy comm socket for account "
-        + f"'{PlTestGlobal.test_username}', account has no comm socket open\n",
+        + "'privleaptestone', account has no comm socket open\n",
         "handle_control_destroy_msg: INFO: Handled DESTROY message for account "
-        + f"'{PlTestGlobal.test_username}', socket did not exist\n",
+        + "'privleaptestone', socket did not exist\n",
         "send_msg_safe: ERROR: Could not send 'NOUSER'\n",
         "Traceback (most recent call last):\n",
         "BrokenPipeError: [Errno 32] Broken pipe\n",
@@ -1097,20 +1063,20 @@ User=alttest2
     ]
     bail_comm_lines: list[str] = [
         "get_client_initial_msg: ERROR: Could not get message from client run by account "
-        + f"'{PlTestGlobal.test_username}'!\n",
+        + "'privleaptestone'!\n",
         "Traceback (most recent call last):\n",
         "ConnectionAbortedError: Connection unexpectedly closed\n",
     ]
     send_invalid_comm_message_lines: list[str] = [
         "get_client_initial_msg: ERROR: Could not get message from client run by account "
-        + f"'{PlTestGlobal.test_username}'!\n",
+        + "'privleaptestone'!\n",
         "Traceback (most recent call last):\n",
         "ValueError: Invalid message type 'BOB' for socket\n",
     ]
     send_nonexistent_signal_and_bail_lines_part1: list[str] = [
         "auth_signal_request: WARNING: Action run request: Could not find "
         + "action 'nonexistent' requested by account "
-        + f"'{PlTestGlobal.test_username}'\n"
+        + "'privleaptestone'\n"
     ]
     unauthorized_broken_pipe_lines: list[str] = [
         "send_msg_safe: ERROR: Could not send 'UNAUTHORIZED'\n",
@@ -1119,29 +1085,29 @@ User=alttest2
     ]
     send_userrestrict_signal_and_bail_lines_part1: list[str] = [
         "auth_signal_request: WARNING: Action run request: Account "
-        + f"'{PlTestGlobal.test_username}' is not authorized to run action "
+        + "'privleaptestone' is not authorized to run action "
         + "'test-act-userrestrict'\n"
     ]
     send_grouprestrict_signal_and_bail_lines_part1: list[str] = [
         "auth_signal_request: WARNING: Action run request: Account "
-        + f"'{PlTestGlobal.test_username}' is not authorized to run action "
+        + "'privleaptestone' is not authorized to run action "
         + "'test-act-grouprestrict'\n"
     ]
     send_invalid_bash_signal_lines: list[str] = [
         "handle_signal_message: INFO: Triggered action 'test-act-invalid-bash' "
-        + f"for account '{PlTestGlobal.test_username}'\n",
+        + "for account 'privleaptestone'\n",
         "send_action_results: INFO: Action 'test-act-invalid-bash' requested "
-        + f"by account '{PlTestGlobal.test_username}' completed\n",
+        + "by account 'privleaptestone' completed\n",
     ]
     send_valid_signal_and_bail_lines: list[str] = [
         "handle_signal_message: INFO: Triggered action 'test-act-free' "
-        + f"for account '{PlTestGlobal.test_username}'\n",
+        + "for account 'privleaptestone'\n",
         "send_msg_safe: ERROR: Could not send 'TRIGGER'\n",
         "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
     send_random_garbage_lines: list[str] = [
         "get_client_initial_msg: ERROR: Could not get message from client "
-        + f"run by account '{PlTestGlobal.test_username}'!\n"
+        + "run by account 'privleaptestone'!\n"
     ]
     invalid_ascii_list: list[bytes] = [
         b"\x00\x00\x00\x05\x1bTEST",
@@ -1170,126 +1136,126 @@ User=alttest2
     invalid_ascii_lines_list: list[list[str]] = [
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid message type 'TEST' for socket\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: Invalid byte found in ASCII string data\n",
         ],
         [
             "auth_signal_request: WARNING: Action run request: Could not find "
             + "action 'PARAM1' requested by account "
-            + f"'{PlTestGlobal.test_username}'\n"
+            + "'privleaptestone'\n"
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
-            + f"run by account '{PlTestGlobal.test_username}'!\n",
+            + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
             "ValueError: recv_buf contains data past the last string\n",
         ],
@@ -1332,37 +1298,37 @@ User=alttest2
         "handle_control_reload_msg: INFO: Handled RELOAD message, "
         + "configuration reloaded\n",
         "prune_disallowed_comm_sockets: INFO: Destroying comm socket for "
-        + "no-longer-allowed account 'alttest'\n",
+        + "no-longer-allowed account 'privleaptesttwo'\n",
         "prune_disallowed_comm_sockets: INFO: Destroying comm socket for "
-        + "no-longer-allowed account 'alttest2'\n",
+        + "no-longer-allowed account 'privleaptestthree'\n",
     ]
     test_act_added1_success_lines: list[str] = [
         "handle_signal_message: INFO: Triggered action 'test-act-added1' "
-        + f"for account '{PlTestGlobal.test_username}'\n",
+        + "for account 'privleaptestone'\n",
         "send_action_results: INFO: Action 'test-act-added1' requested "
-        + f"by account '{PlTestGlobal.test_username}' completed\n",
+        + "by account 'privleaptestone' completed\n",
     ]
     test_act_added2_success_lines: list[str] = [
         "handle_signal_message: INFO: Triggered action 'test-act-added2' "
-        + f"for account '{PlTestGlobal.test_username}'\n",
+        + "for account 'privleaptestone'\n",
         "send_action_results: INFO: Action 'test-act-added2' requested "
-        + f"by account '{PlTestGlobal.test_username}' completed\n",
+        + "by account 'privleaptestone' completed\n",
     ]
     test_act_added1_failure_lines: list[str] = [
         "auth_signal_request: WARNING: Action run request: Could not find "
         + "action 'test-act-added1' requested by account "
-        + f"'{PlTestGlobal.test_username}'\n"
+        + "'privleaptestone'\n"
     ]
     test_act_added2_failure_lines: list[str] = [
         "auth_signal_request: WARNING: Action run request: Could not find "
         + "action 'test-act-added2' requested by account "
-        + f"'{PlTestGlobal.test_username}'\n"
+        + "'privleaptestone'\n"
     ]
     test_act_userpermit_success_lines: list[str] = [
         "handle_signal_message: INFO: Triggered action 'test-act-userpermit' "
-        + f"for account '{PlTestGlobal.test_username}'\n",
+        + "for account 'privleaptestone'\n",
         "send_action_results: INFO: Action 'test-act-userpermit' requested "
-        + f"by account '{PlTestGlobal.test_username}' completed\n",
+        + "by account 'privleaptestone' completed\n",
     ]
     config_reload_failure_lines: list[str] = [
         "parse_config_file: ERROR: Error parsing config: "
@@ -1385,12 +1351,12 @@ User=alttest2
     ]
     allowed_action_access_check_lines: list[str] = [
         "auth_signal_request: INFO: Access check: Account "
-        + f"'{PlTestGlobal.test_username}' is authorized to run action "
+        + "'privleaptestone' is authorized to run action "
         + "'test-act-free'\n"
     ]
     disallowed_action_access_check_lines: list[str] = [
         "auth_signal_request: WARNING: Access check: Account "
-        + f"'{PlTestGlobal.test_username}' is not authorized to run action "
+        + "'privleaptestone' is not authorized to run action "
         + "'test-act-userrestrict'\n"
     ]
     create_expected_disallowed_socket_lines: list[str] = [
@@ -1399,31 +1365,31 @@ User=alttest2
     ]
     leaprun_terminate_lines: list[str] = [
         "handle_signal_message: INFO: Triggered action 'test-act-noreturn' "
-        + f"for account '{PlTestGlobal.test_username}'\n",
+        + "for account 'privleaptestone'\n",
         "assert_action_terminate: INFO: Action 'test-act-noreturn' "
         + "prematurely terminated by account "
-        + f"'{PlTestGlobal.test_username}'\n",
+        + "'privleaptestone'\n",
         "send_action_results: INFO: Action 'test-act-noreturn' requested by "
-        + f"account '{PlTestGlobal.test_username}' completed\n",
+        + "account 'privleaptestone' completed\n",
     ]
     terminate_sent_first_lines: list[str] = [
         "get_client_initial_msg: WARNING: Did not read SIGNAL or "
         + "ACCESS_CHECK as first message from client run by account "
-        + f"'{PlTestGlobal.test_username}', forcibly closing connection.\n"
+        + "'privleaptestone', forcibly closing connection.\n"
     ]
-    test_act_privleap_grouppermit_alttest_success_lines: list[str] = [
+    test_act_privleap_grouppermit_privleaptesttwo_success_lines: list[str] = [
         "handle_signal_message: INFO: Triggered action "
-        + "'test-act-privleap-grouppermit' for account 'alttest'\n",
+        + "'test-act-privleap-grouppermit' for account 'privleaptesttwo'\n",
         "send_action_results: INFO: Action 'test-act-privleap-grouppermit' "
-        + "requested by account 'alttest' completed\n",
+        + "requested by account 'privleaptesttwo' completed\n",
     ]
-    test_act_privleap_grouppermit_alttest_kick_lines: list[str] = [
+    test_act_privleap_grouppermit_privleaptesttwo_kick_lines: list[str] = [
         "handle_comm_session: WARNING: Ending session and destroying comm "
-        + "socket for no-longer-allowed account 'alttest'\n"
+        + "socket for no-longer-allowed account 'privleaptesttwo'\n"
     ]
     test_act_nonexistent_restrict_lines: list[str] = [
         "auth_signal_request: WARNING: Action run request: Account "
-        + f"'{PlTestGlobal.test_username}' is not authorized to run action "
+        + "'privleaptestone' is not authorized to run action "
         + "'test-act-nonexistent-restrict'\n"
     ]
     insecure_permissions_on_file_lines: list[str] = [
