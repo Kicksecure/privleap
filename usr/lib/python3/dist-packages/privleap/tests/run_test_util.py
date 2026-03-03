@@ -51,6 +51,8 @@ class PlTestGlobal:
     privleapd_running: bool = False
     no_service_handling = False
     all_asserts_passed = True
+    multithreading_test_unexpected_stderr = False
+    multithreading_test_monitor_stop = False
 
 
 SelectInfo = Tuple[list[IO[bytes]], list[IO[bytes]], list[IO[bytes]]]
@@ -673,6 +675,10 @@ AuthorizedUsers=privleaptestone
 [action:test-act-interrupt]
 Command=fn() { touch /test-act-interrupt; }; trap fn TERM; sleep infinity & wait $!
 AuthorizedUsers=privleaptestone
+
+[action:test-act-anyone]
+Command=echo 'test-act-anyone'
+AuthorizedUsers=privleaptestone,privleaptesttwo,privleaptestthree,privleaptestfour,privleaptestfive,privleaptestsix,privleaptestseven,privleaptesteight,privleaptestnine,privleaptestten
 
 [expected-disallowed-users]
 User=irc
@@ -1415,3 +1421,20 @@ User=privleaptestthree
         "parse_config_files: INFO: Config directory "
         + "'/usr/local/etc/privleap/conf.d' does not exist, skipping.\n"
     ]
+    multithreading_test_set: set[str] = set(
+        [
+            "handle_control_create_msg: INFO: Handled CREATE message for "
+            + "account 'XXX_USERNAME_XXX', socket created",
+            "destroy_comm_socket: INFO: Successfully destroyed comm socket "
+            + "for account 'XXX_USERNAME_XXX'",
+            "handle_control_destroy_msg: INFO: Handled DESTROY message for "
+            + "account 'XXX_USERNAME_XXX', socket destroyed",
+            "auth_signal_request: INFO: Action run request: Account "
+            + "'XXX_USERNAME_XXX' is authorized to run action "
+            + "'test-act-anyone'",
+            "handle_signal_message: INFO: Triggered action 'test-act-anyone' "
+            + "for account 'XXX_USERNAME_XXX'",
+            "send_action_results: INFO: Action 'test-act-anyone' requested "
+            + "by account 'XXX_USERNAME_XXX' completed"
+        ]
+    )

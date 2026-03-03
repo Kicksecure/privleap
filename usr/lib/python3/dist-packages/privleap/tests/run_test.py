@@ -29,6 +29,8 @@ import shutil
 import socket
 import time
 import signal
+from threading import Thread
+import re
 from pathlib import Path
 from typing import NoReturn, Tuple, IO, TypeAlias
 from collections.abc import Callable
@@ -2443,6 +2445,196 @@ def privleapd_config_reload_with_kick_test(bogus: str) -> bool:
     return assert_success
 
 
+def privleapd_multithreading_test_monitor() -> None:
+    """
+    Monitors the stderr from privleapd for unexpected lines, printing errors
+    and setting a flag if an unexpected line is detected.
+    """
+
+    assert PlTestGlobal.privleapd_proc is not None
+    assert PlTestGlobal.privleapd_proc.stderr is not None
+    linebuf: str = ""
+    while True:
+        if PlTestGlobal.multithreading_test_monitor_stop:
+            break
+        while "\n" in linebuf:
+            linebuf_parts: list[str] = linebuf.split("\n", maxsplit=1)
+            linebuf = linebuf_parts[1]
+            line: str = linebuf_parts[0]
+            line = re.sub(
+                "privleaptest(one|two|three|four|five|six|seven|eight|"
+                + "nine|ten)",
+                "XXX_USERNAME_XXX",
+                line
+            )
+            if line not in PlTestData.multithreading_test_set:
+                logging.error(
+                    "Unexpected stderr line from privleapd: '%s'", line
+                )
+                PlTestGlobal.multithreading_test_unexpected_stderr = True
+            else:
+                logging.info("Valid line '%s' received from privleapd", line)
+
+        try:
+            linebuf += PlTestGlobal.privleapd_proc.stderr.read()
+        except Exception:
+            pass
+        time.sleep(0.1)
+
+
+# pylint: disable=consider-using-with
+# Rationale:
+#   consider-using-with: Not suitable for the parallel process running
+#     mechanism being used here.
+def privleapd_multithreading_test_worker(
+    mode: str, user_name: str
+) -> subprocess.Popen[bytes]:
+    """
+    Calls leapctl or leaprun to do an action asynchronously.
+    """
+
+    return_proc: subprocess.Popen[bytes]
+    match mode:
+        case "create":
+            return_proc = subprocess.Popen(
+                ["leapctl", "--create", user_name],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+            )
+        case "run":
+            return_proc = subprocess.Popen(
+                ["sudo", "-u", user_name, "leaprun", "test-act-anyone"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+            )
+        case "destroy":
+            return_proc = subprocess.Popen(
+                ["leapctl", "--destroy", user_name],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+            )
+    return return_proc
+
+
+# pylint: disable=too-many-branches
+# Rationale:
+#   too-many-branches: Using less branches isn't practical, splitting this up
+#     would only make it harder to read.
+def privleapd_multithreading_test(bogus: str) -> bool:
+    """
+    Exercises privleapd's multithreading code.
+    """
+
+    if bogus != "":
+        return False
+    discard_privleapd_stderr()
+
+    proc_list: list[subprocess.Popen[bytes]] = []
+    first_user_name_block = [
+        "privleaptestone",
+        "privleaptesttwo",
+        "privleaptestthree",
+        "privleaptestfour",
+        "privleaptestfive",
+    ]
+    second_user_name_block = [
+        "privleaptestsix",
+        "privleaptestseven",
+        "privleaptesteight",
+        "privleaptestnine",
+        "privleaptestten",
+    ]
+    monitor_thread: Thread = Thread(
+        target=privleapd_multithreading_test_monitor,
+    )
+    monitor_thread.start()
+
+    for user_name in first_user_name_block:
+        proc_list.append(
+            privleapd_multithreading_test_worker("create", user_name)
+        )
+    for proc in proc_list:
+        proc.communicate()
+    proc_list.clear()
+
+    for loop_idx in range(0, 20):
+        for first_block_user_name, second_block_user_name in zip(
+            first_user_name_block, second_user_name_block
+        ):
+            proc_list.append(
+                privleapd_multithreading_test_worker(
+                    "run", first_block_user_name
+                )
+            )
+            proc_list.append(
+                privleapd_multithreading_test_worker(
+                    "create", second_block_user_name
+                )
+            )
+        for proc in proc_list:
+            proc.communicate()
+        proc_list.clear()
+        logging.info(
+            f"Multithreading test, part 1 of iteration {loop_idx + 1} done"
+        )
+
+        for first_block_user_name, second_block_user_name in zip(
+            first_user_name_block, second_user_name_block
+        ):
+            proc_list.append(
+                privleapd_multithreading_test_worker(
+                    "destroy", first_block_user_name
+                )
+            )
+            proc_list.append(
+                privleapd_multithreading_test_worker(
+                    "run", second_block_user_name
+                )
+            )
+        for proc in proc_list:
+            proc.communicate()
+        proc_list.clear()
+        logging.info(
+            f"Multithreading test, part 2 of iteration {loop_idx + 1} done"
+        )
+
+        for first_block_user_name, second_block_user_name in zip(
+            first_user_name_block, second_user_name_block
+        ):
+            proc_list.append(
+                privleapd_multithreading_test_worker(
+                    "create", first_block_user_name
+                )
+            )
+            proc_list.append(
+                privleapd_multithreading_test_worker(
+                    "destroy", second_block_user_name
+                )
+            )
+        for proc in proc_list:
+            proc.communicate()
+        proc_list.clear()
+        logging.info(
+            f"Multithreading test, part 3 of iteration {loop_idx + 1} done"
+        )
+
+    for user_name in first_user_name_block:
+        proc_list.append(
+            privleapd_multithreading_test_worker("destroy", user_name)
+        )
+    for proc in proc_list:
+        proc.communicate()
+    proc_list.clear()
+
+    time.sleep(0.5)
+    PlTestGlobal.multithreading_test_monitor_stop = True
+    time.sleep(0.5)
+
+    if PlTestGlobal.multithreading_test_unexpected_stderr:
+        return False
+    return True
+
+
 def privleapd_assert_command(
     command_data: list[str],
     exit_code: int,
@@ -3318,6 +3510,12 @@ def run_privleapd_tests() -> None:
         "/test-act-interrupt",
         "Remove flag file left by test-act-interrupt",
     )
+    # ---
+    privleapd_assert_function(
+        privleapd_multithreading_test,
+        "",
+        "Test privleapd multithreading code",
+    )
     privleapd_assert_command(
         ["leapctl", "--create", "privleaptestone"],
         exit_code=0,
@@ -3395,9 +3593,21 @@ def main() -> NoReturn:
     print_test_header()
     ensure_running_as_root()
     stop_privleapd_service()
-    setup_test_account("privleaptestone", Path("/home/privleaptestone"))
-    setup_test_account("privleaptesttwo", Path("/home/privleaptesttwo"))
-    setup_test_account("privleaptestthree", Path("/home/privleaptestthree"))
+    for setup_account_name in [
+        "privleaptestone",
+        "privleaptesttwo",
+        "privleaptestthree",
+        "privleaptestfour",
+        "privleaptestfive",
+        "privleaptestsix",
+        "privleaptestseven",
+        "privleaptesteight",
+        "privleaptestnine",
+        "privleaptestten",
+    ]:
+        setup_test_account(
+            setup_account_name, Path(f"/home/{setup_account_name}")
+        )
     displace_old_privleap_config()
     write_privleap_test_config()
 
