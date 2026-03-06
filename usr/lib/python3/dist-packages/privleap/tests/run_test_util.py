@@ -25,7 +25,7 @@ import time
 import socket
 import fcntl
 from pathlib import Path
-from typing import Tuple, IO, Callable
+from typing import IO, Callable
 from datetime import datetime, timedelta
 
 
@@ -53,9 +53,6 @@ class PlTestGlobal:
     all_asserts_passed = True
     multithreading_test_unexpected_stderr = False
     multithreading_test_monitor_stop = False
-
-
-SelectInfo = Tuple[list[IO[bytes]], list[IO[bytes]], list[IO[bytes]]]
 
 
 def proc_try_readline(
@@ -772,6 +769,13 @@ User=privleaptestthree
     privleapd_invalid_response: bytes = (
         b"ERROR: privleapd didn't return a valid response!\n"
     )
+    privleapd_invalid_msg_seq: bytes = (
+        b"ERROR: privleapd didn't return a valid message sequence!\n"
+    )
+    privleapd_midaction_cutoff: bytes = (
+        b"ERROR: Action triggered, but privleapd closed the connection "
+        + b"before sending all output!\n"
+    )
     specified_user_missing: bytes = (
         b"ERROR: Specified user account does not exist.\n"
     )
@@ -856,9 +860,92 @@ User=privleaptestthree
         + b"    user : The username or UID of the user account to create or destroy a\n"
         + b"           communication socket for.\n"
     )
+    leaprun_help: bytes = (
+        b"leaprun [-c|--check] <action_name1> [<action_name2> ...]\n"
+        + b"\n"
+        + b"    -c, --check  : Check if the current user is authorized to "
+        + b"run an action.\n"
+        + b"    action_name1 : The name of the action leaprun should handle. "
+        + b"leaprun will\n"
+        + b"                   send a signal to trigger the named action (or "
+        + b"will ask\n"
+        + b"                   privleapd to check if the user can trigger "
+        + b"the action).\n"
+        + b"                   If using -c or --check, up to 63 action names "
+        + b"can be passed\n"
+        + b"                   to check them all at once.\n"
+    )
+    privleapd_run_request_failed: bytes = (
+        b"ERROR: Could not request privleapd to run action 'test-act-free'!\n"
+    )
+    privleapd_check_query_failed: bytes = (
+        b"ERROR: Could not query privleapd for authorization to run actions "
+        + b"'test-act-free', 'test-act-grouppermit-userrestrict', "
+        + b"'test-act-grouprestrict-userpermit'!\n"
+    )
+    privleapd_multi_unauthorized: bytes = (
+        b"ERROR: privleapd returned two 'UNAUTHORIZED' messages in the same "
+        + b"session!\n"
+    )
+    privleapd_unauth_after_trigger: bytes = (
+        b"ERROR: privleapd returned an 'UNAUTHORIZED' message after having "
+        + b"sent a 'TRIGGER' message!\n"
+    )
+    privleapd_auth_during_exec: bytes = (
+        b"ERROR: privleapd returned an 'AUTHORIZED' message when leaprun was "
+        + b"not in check mode!\n"
+    )
+    privleapd_multi_authorized: bytes = (
+        b"ERROR: privleapd returned two 'AUTHORIZED' messages in the same "
+        + b"session!\n"
+    )
+    privleapd_unexpected_access_check_end = (
+        b"ERROR: privleapd returned an 'ACCESS_CHECK_RESULTS_END' message "
+        + b"when leaprun was not in check mode!\n"
+    )
+    privleapd_access_check_end_before_results = (
+        b"ERROR: privleapd returned an 'ACCESS_CHECK_RESULTS_END' message "
+        + b"before sending an 'AUTHORIZED' or 'UNAUTHORIZED' message!\n"
+    )
+    privleapd_trigger_error_during_check = (
+        b"ERROR: privleapd returned a 'TRIGGER_ERROR' message when leaprun "
+        + b"was in check mode!\n"
+    )
+    privleapd_multi_trigger = (
+        b"ERROR: privleapd returned two 'TRIGGER' messages in the same "
+        + b"session!\n"
+    )
+    privleapd_trigger_during_check = (
+        b"ERROR: privleapd returned a 'TRIGGER' message when leaprun was "
+        + b"in check mode!\n"
+    )
+    privleapd_result_stdout_before_trigger = (
+        b"ERROR: privleapd returned a 'RESULT_STDOUT' message before a "
+        + b"'TRIGGER' message!\n"
+    )
+    privleapd_result_stderr_before_trigger = (
+        b"ERROR: privleapd returned a 'RESULT_STDERR' message before a "
+        + b"'TRIGGER' message!\n"
+    )
+    privleapd_result_exitcode_before_trigger = (
+        b"ERROR: privleapd returned a 'RESULT_EXITCODE' message before a "
+        + b"'TRIGGER' message!\n"
+    )
     test_act_free_authorized: bytes = (
         b"Account 'privleaptestone' (1002) is authorized to run action "
         + b"'test-act-free'.\n"
+    )
+    test_act_multi_auth: bytes = (
+        b"Account 'privleaptestone' (1002) is authorized to run action "
+        + b"'test-act-free'.\n"
+        + b"Account 'privleaptestone' (1002) is authorized to run action "
+        + b"'test-act-grouppermit-userrestrict'.\n"
+    )
+    test_act_multi_unauth: bytes = (
+        b"ERROR: Account 'privleaptestone' (1002) is unauthorized to run "
+        + b"action 'test-act-nonsenseabc'.\n"
+        + b"ERROR: Account 'privleaptestone' (1002) is unauthorized to run "
+        + b"action 'test-act-nonsensedef'.\n"
     )
     test_act_userrestrict_unauthorized: bytes = (
         b"ERROR: Account 'privleaptestone' (1002) is unauthorized to run "
@@ -1060,7 +1147,7 @@ User=privleaptestthree
     send_invalid_control_message_lines: list[str] = [
         "handle_control_session: ERROR: Could not get message from control client!\n",
         "Traceback (most recent call last):\n",
-        "ValueError: Invalid message type 'BOB' for socket\n",
+        "ValueError: Unrecognized message type 'BOB'\n",
     ]
     send_corrupted_control_message_lines: list[str] = [
         "handle_control_session: ERROR: Could not get message from control client!\n",
@@ -1077,7 +1164,7 @@ User=privleaptestthree
         "get_client_initial_msg: ERROR: Could not get message from client run by account "
         + "'privleaptestone'!\n",
         "Traceback (most recent call last):\n",
-        "ValueError: Invalid message type 'BOB' for socket\n",
+        "ValueError: Unrecognized message type 'BOB'\n",
     ]
     send_nonexistent_signal_and_bail_lines_part1: list[str] = [
         "auth_signal_request: WARNING: Action run request: Could not find "
@@ -1116,27 +1203,27 @@ User=privleaptestthree
         + "run by account 'privleaptestone'!\n"
     ]
     invalid_ascii_list: list[bytes] = [
-        b"\x00\x00\x00\x05\x1bTEST",
-        b"\x00\x00\x00\x05TEST\x1b",
-        b"\x00\x00\x00\x05TE\x1bST",
-        b"\x00\x00\x00\x05\x1fTEST",
-        b"\x00\x00\x00\x05TEST\x1f",
-        b"\x00\x00\x00\x05TE\x1fST",
-        b"\x00\x00\x00\x05\x7fTEST",
-        b"\x00\x00\x00\x05TEST\x7f",
-        b"\x00\x00\x00\x05TE\x7fST",
-        b"\x00\x00\x00\x04TEST",
-        b"\x00\x00\x00\x0eSIGNAL PARAM1\x1b",
-        b"\x00\x00\x00\x0eSIGNAL \x1bPARAM1",
-        b"\x00\x00\x00\x0eSIGNAL PAR\x1bAM1",
-        b"\x00\x00\x00\x0eSIGNAL PARAM1\x1f",
-        b"\x00\x00\x00\x0eSIGNAL \x1fPARAM1",
-        b"\x00\x00\x00\x0eSIGNAL PAR\x1bAM1",
-        b"\x00\x00\x00\x0eSIGNAL PARAM1\x1f",
-        b"\x00\x00\x00\x0eSIGNAL \x7fPARAM1",
-        b"\x00\x00\x00\x0eSIGNAL PAR\x7fAM1",
-        b"\x00\x00\x00\x0dSIGNAL PARAM1",
-        b"\x00\x00\x00\x0eSIGNAL  PARAM1",
+        b"\x00\x00\x00\x07\x1bTEST 0",
+        b"\x00\x00\x00\x07TEST\x1b 0",
+        b"\x00\x00\x00\x07TE\x1bST 0",
+        b"\x00\x00\x00\x07\x1fTEST 0",
+        b"\x00\x00\x00\x07TEST\x1f 0",
+        b"\x00\x00\x00\x07TE\x1fST 0",
+        b"\x00\x00\x00\x07\x7fTEST 0",
+        b"\x00\x00\x00\x07TEST\x7f 0",
+        b"\x00\x00\x00\x07TE\x7fST 0",
+        b"\x00\x00\x00\x06TEST 0",
+        b"\x00\x00\x00\x10SIGNAL 1 PARAM1\x1b",
+        b"\x00\x00\x00\x10SIGNAL 1 \x1bPARAM1",
+        b"\x00\x00\x00\x10SIGNAL 1 PAR\x1bAM1",
+        b"\x00\x00\x00\x10SIGNAL 1 PARAM1\x1f",
+        b"\x00\x00\x00\x10SIGNAL 1 \x1fPARAM1",
+        b"\x00\x00\x00\x10SIGNAL 1 PAR\x1bAM1",
+        b"\x00\x00\x00\x10SIGNAL 1 PARAM1\x1f",
+        b"\x00\x00\x00\x10SIGNAL 1 \x7fPARAM1",
+        b"\x00\x00\x00\x10SIGNAL 1 PAR\x7fAM1",
+        b"\x00\x00\x00\x0fSIGNAL 1 PARAM1",
+        b"\x00\x00\x00\x10SIGNAL 1  PARAM1",
     ]
     # TODO: Any good way to avoid all the repetition?
     invalid_ascii_lines_list: list[list[str]] = [
@@ -1198,7 +1285,7 @@ User=privleaptestthree
             "get_client_initial_msg: ERROR: Could not get message from client "
             + "run by account 'privleaptestone'!\n",
             "Traceback (most recent call last):\n",
-            "ValueError: Invalid message type 'TEST' for socket\n",
+            "ValueError: Unrecognized message type 'TEST'\n",
         ],
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
@@ -1435,6 +1522,6 @@ User=privleaptestthree
             "handle_signal_message: INFO: Triggered action 'test-act-anyone' "
             + "for account 'XXX_USERNAME_XXX'",
             "send_action_results: INFO: Action 'test-act-anyone' requested "
-            + "by account 'XXX_USERNAME_XXX' completed"
+            + "by account 'XXX_USERNAME_XXX' completed",
         ]
     )

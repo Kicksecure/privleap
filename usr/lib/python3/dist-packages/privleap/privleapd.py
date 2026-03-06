@@ -37,6 +37,7 @@ from .privleap import (
     PrivleapCommClientSignalMsg,
     PrivleapCommClientTerminateMsg,
     PrivleapCommon,
+    PrivleapCommServerAccessCheckResultsEndMsg,
     PrivleapCommServerAuthorizedMsg,
     PrivleapCommServerResultExitcodeMsg,
     PrivleapCommServerResultStderrMsg,
@@ -921,7 +922,7 @@ def send_action_results(
 
 
 def auth_signal_request(
-    comm_msg: PrivleapMsg, comm_session: PrivleapSession
+    auth_type: str, signal_name: str, user_name: str
 ) -> PrivleapAction | None:
     """
     Finds the requested action, and ensures that the calling user has the
@@ -933,44 +934,18 @@ def auth_signal_request(
     May only be called by comm threads.
     """
 
-    auth_type: str
-    if isinstance(comm_msg, PrivleapCommClientSignalMsg):
-        auth_type = "Action run request"
-    elif isinstance(comm_msg, PrivleapCommClientAccessCheckMsg):
-        auth_type = "Access check"
-    else:
-        # TODO: Make the debugging message here better.
-        logging.critical("Invalid message type provided!")
-        sys.exit(1)
-
-    assert isinstance(
-        comm_msg,
-        (PrivleapCommClientSignalMsg, PrivleapCommClientAccessCheckMsg),
-    )
-    # The auth code attempts to NOT allow a client to tell the difference
-    # between an action that doesn't exist, and one that does exist but that
-    # they aren't allowed to execute. If authentication fails or the action
-    # doesn't exist, we make sure the server takes as close to 3 seconds to
-    # reply as possible. If we wanted to cloak this list even better, we
-    # could busy-wait rather than sleeping to avoid processor load acting
-    # as a side-channel, but that would potentially allow DoS attacks which
-    # are probably a bigger threat.
-    auth_start_time: float = time.monotonic()
-    desired_action: PrivleapAction | None = lookup_desired_action(
-        comm_msg.signal_name
-    )
+    desired_action: PrivleapAction | None = lookup_desired_action(signal_name)
     auth_result: PrivleapdAuthStatus | None = None
     if desired_action is not None:
-        assert comm_session.user_name is not None
-        auth_result = authorize_user(desired_action, comm_session.user_name)
+        auth_result = authorize_user(desired_action, user_name)
 
     if auth_result != PrivleapdAuthStatus.AUTHORIZED:
         if auth_result is None:
             logging.warning(
                 "%s: Could not find action '%s' requested by account '%s'",
                 auth_type,
-                comm_msg.signal_name,
-                comm_session.user_name,
+                signal_name,
+                user_name,
             )
         else:
             assert desired_action is not None
@@ -979,35 +954,30 @@ def auth_signal_request(
                 logging.warning(
                     "%s: Account '%s' does not exist, cannot run action '%s'",
                     auth_type,
-                    comm_session.user_name,
+                    user_name,
                     desired_action.action_name,
                 )
             elif auth_result == PrivleapdAuthStatus.UNAUTHORIZED:
                 logging.warning(
                     "%s: Account '%s' is not authorized to run action '%s'",
                     auth_type,
-                    comm_session.user_name,
+                    user_name,
                     desired_action.action_name,
                 )
-        auth_end_time: float = auth_start_time + 3
-        auth_fail_sleep_time: float = auth_end_time - auth_start_time
-        if auth_fail_sleep_time > 0:
-            time.sleep(auth_fail_sleep_time)
-        send_msg_safe(comm_session, PrivleapCommServerUnauthorizedMsg())
         return None
 
     assert desired_action is not None
     logging.info(
         "%s: Account '%s' is authorized to run action '%s'",
         auth_type,
-        comm_session.user_name,
+        user_name,
         desired_action.action_name,
     )
     return desired_action
 
 
 def handle_signal_message(
-    desired_action: PrivleapAction,
+    comm_msg: PrivleapCommClientSignalMsg,
     comm_session: PrivleapSession,
     listen_socket_info: PrivleapdSocketInfo,
 ) -> None:
@@ -1020,6 +990,31 @@ def handle_signal_message(
 
     May only be called by comm threads.
     """
+
+    assert comm_session.user_name is not None
+
+    # The auth code attempts to NOT allow a client to tell the difference
+    # between an action that doesn't exist, and one that does exist but that
+    # they aren't allowed to execute. If authentication fails or the action
+    # doesn't exist, we make sure the server takes as close to 3 seconds to
+    # reply as possible. If we wanted to cloak this list even better, we
+    # could busy-wait rather than sleeping to avoid processor load acting
+    # as a side-channel, but that would potentially allow DoS attacks which
+    # are probably a bigger threat.
+    auth_start_time: float = time.monotonic()
+    desired_action: PrivleapAction | None = auth_signal_request(
+        "Action run request", comm_msg.signal_name, comm_session.user_name
+    )
+    if desired_action is None:
+        auth_end_time: float = auth_start_time + 3
+        auth_fail_sleep_time: float = auth_end_time - auth_start_time
+        if auth_fail_sleep_time > 0:
+            time.sleep(auth_fail_sleep_time)
+        send_msg_safe(
+            comm_session,
+            PrivleapCommServerUnauthorizedMsg([comm_msg.signal_name]),
+        )
+        return
 
     if listen_socket_info.should_terminate:
         return
@@ -1064,6 +1059,54 @@ def handle_signal_message(
     )
 
 
+def handle_access_check_message(
+    comm_msg: PrivleapCommClientAccessCheckMsg,
+    comm_session: PrivleapSession,
+) -> None:
+    """
+    Handles an ACCESS_CHECK message from the client.
+
+    May only be called by comm threads.
+    """
+
+    assert comm_session.user_name is not None
+
+    auth_signal_name_list: list[str] = []
+    unauth_signal_name_list: list[str] = []
+
+    # The same timing concerns in handle_signal_message's authentication
+    # mechanism apply here.
+    auth_start_time: float = time.monotonic()
+    for signal_name in comm_msg.signal_name_list:
+        desired_action: PrivleapAction | None = auth_signal_request(
+            "Access check", signal_name, comm_session.user_name
+        )
+        if desired_action is None:
+            unauth_signal_name_list.append(signal_name)
+        else:
+            auth_signal_name_list.append(signal_name)
+
+    auth_signal_name_list_len: int = len(auth_signal_name_list)
+    unauth_signal_name_list_len: int = len(unauth_signal_name_list)
+
+    if unauth_signal_name_list_len > 0:
+        auth_end_time: float = auth_start_time + 3
+        auth_fail_sleep_time: float = auth_end_time - auth_start_time
+        if auth_fail_sleep_time > 0:
+            time.sleep(auth_fail_sleep_time)
+        send_msg_safe(
+            comm_session,
+            PrivleapCommServerUnauthorizedMsg(unauth_signal_name_list),
+        )
+
+    if auth_signal_name_list_len > 0:
+        send_msg_safe(
+            comm_session, PrivleapCommServerAuthorizedMsg(auth_signal_name_list)
+        )
+
+    send_msg_safe(comm_session, PrivleapCommServerAccessCheckResultsEndMsg())
+
+
 def handle_comm_session(
     comm_session: PrivleapSession, listen_socket_info: PrivleapdSocketInfo
 ) -> None:
@@ -1095,21 +1138,10 @@ def handle_comm_session(
         if comm_msg is None:
             return
 
-        desired_action: PrivleapAction | None = auth_signal_request(
-            comm_msg, comm_session
-        )
-
-        if desired_action is None:
-            return
-
         if isinstance(comm_msg, PrivleapCommClientSignalMsg):
-            handle_signal_message(
-                desired_action, comm_session, listen_socket_info
-            )
+            handle_signal_message(comm_msg, comm_session, listen_socket_info)
         elif isinstance(comm_msg, PrivleapCommClientAccessCheckMsg):
-            # We already authorized the request above, so we can simply tell the
-            # client about that now.
-            send_msg_safe(comm_session, PrivleapCommServerAuthorizedMsg())
+            handle_access_check_message(comm_msg, comm_session)
 
     finally:
         comm_session.close_session()
