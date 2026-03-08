@@ -3328,6 +3328,51 @@ def privleapd_invalid_ascii_test(idx_str: str) -> bool:
     return False
 
 
+def privleapd_control_msg_mismatch_test(bogus: str) -> bool:
+    """
+    Test how privleapd handles receiving a comm message on the control socket.
+    """
+
+    if bogus != "":
+        return False
+    discard_privleapd_stderr()
+    control_session: PrivleapSession = PrivleapSession(is_control_session=True)
+    assert control_session.backend_socket is not None
+    # pylint: disable=protected-access
+    # Same rationale as for leaprun_server_invalid_msg_seq_test
+    control_session._PrivleapSession__send_msg(  # type: ignore [attr-defined]
+        PrivleapCommClientSignalMsg("test-act-free")
+    )
+    control_session.close_session()
+    if not compare_privleapd_stderr(
+        PlTestData.privleapd_control_msg_mismatch_lines
+    ):
+        return False
+    return True
+
+
+def privleapd_comm_msg_mismatch_test(bogus: str) -> bool:
+    """
+    Test how privleapd handles receiving a control message on the comm socket.
+    """
+
+    if bogus != "":
+        return False
+    comm_session: PrivleapSession = PrivleapSession("privleaptestone")
+    assert comm_session.backend_socket is not None
+    # pylint: disable=protected-access
+    # Same rationale as for privleapd_control_msg_mismatch_test
+    comm_session._PrivleapSession__send_msg(  # type: ignore [attr-defined]
+        PrivleapControlClientCreateMsg("wha")
+    )
+    comm_session.close_session()
+    if not compare_privleapd_stderr(
+        PlTestData.privleapd_comm_msg_mismatch_lines
+    ):
+        return False
+    return True
+
+
 def privleapd_send_random_garbage_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that sends pseudorandom data.
@@ -4122,6 +4167,18 @@ def run_privleapd_tests() -> None:
             str(i),
             f"Test privleapd invalid ASCII handling (iteration {i+1})",
         )
+    # ---
+    privleapd_assert_function(
+        privleapd_control_msg_mismatch_test,
+        "",
+        "Test privleapd control message mismatch handling",
+    )
+    # ---
+    privleapd_assert_function(
+        privleapd_comm_msg_mismatch_test,
+        "",
+        "Test privleapd comm message mismatch handling",
+    )
     # ---
     privleapd_assert_command(["/usr/bin/privleapd", "-C"], exit_code=0)
     # ---

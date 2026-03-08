@@ -1525,3 +1525,14 @@ User=privleaptestthree
             + "by account 'XXX_USERNAME_XXX' completed",
         ]
     )
+    privleapd_control_msg_mismatch_lines: list[str] = [
+        "handle_control_session: ERROR: Could not get message from control client!\n",
+        "Traceback (most recent call last):\n",
+        "ValueError: Invalid message type 'SIGNAL' for socket\n",
+    ]
+    privleapd_comm_msg_mismatch_lines: list[str] = [
+        "get_client_initial_msg: ERROR: Could not get message from client run by account "
+        + "'privleaptestone'!\n",
+        "Traceback (most recent call last):\n",
+        "ValueError: Invalid message type 'CREATE' for socket\n",
+    ]
