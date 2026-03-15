@@ -12,13 +12,13 @@
 
 """
 run_test.py - Tests for privleap. This is implemented as an entire program as
-  unit testing would not exercise the code sufficiently. This runs through a
-  wide variety of real-world-like tests to ensure all components of privleap
-  behave as expected. This should be run using an autopkgtest.
+unit testing would not exercise the code sufficiently. This runs through a wide
+variety of real-world-like tests to ensure all components of privleap behave
+as expected. This should be run using an autopkgtest.
 
 WARNING: Do not run these tests directly, they may damage the system they are
-  run on! Use run_autopkgtest instead to run them in an temporary, isolated
-  environment.
+run on! Use run_autopkgtest instead to run them in an temporary, isolated
+environment.
 """
 
 import os
@@ -29,6 +29,8 @@ import shutil
 import socket
 import time
 import signal
+from threading import Thread
+import re
 from pathlib import Path
 from typing import NoReturn, Tuple, IO, TypeAlias
 from collections.abc import Callable
@@ -37,11 +39,13 @@ from privleap.privleap import (
     PrivleapCommClientAccessCheckMsg,
     PrivleapCommClientSignalMsg,
     PrivleapCommClientTerminateMsg,
+    PrivleapCommServerAccessCheckResultsEndMsg,
     PrivleapCommServerAuthorizedMsg,
     PrivleapCommServerResultExitcodeMsg,
     PrivleapCommServerResultStderrMsg,
     PrivleapCommServerResultStdoutMsg,
     PrivleapCommServerTriggerMsg,
+    PrivleapCommServerTriggerErrorMsg,
     PrivleapCommServerUnauthorizedMsg,
     PrivleapControlClientCreateMsg,
     PrivleapControlClientDestroyMsg,
@@ -125,7 +129,7 @@ def make_blocker_socket(path_str: str) -> bool:
 def try_remove_file(path_str: str) -> bool:
     """
     Tries to remove a file, returning a boolean indicating if the attempt was
-      successful or not.
+    successful or not.
     """
 
     try:
@@ -138,7 +142,7 @@ def try_remove_file(path_str: str) -> bool:
 def try_create_dir(path_str: str) -> bool:
     """
     Tries to create a directory, returning a boolean indicating if the attempt
-      was successful or not.
+    was successful or not.
     """
 
     try:
@@ -151,7 +155,7 @@ def try_create_dir(path_str: str) -> bool:
 def try_remove_dir(path_str: str) -> bool:
     """
     Tries to remove a directory, returning a boolean indicating if the attempt
-      was successful or not.
+    was successful or not.
     """
 
     try:
@@ -159,14 +163,6 @@ def try_remove_dir(path_str: str) -> bool:
     except Exception:
         return False
     return True
-
-
-def check_socket_absent(path_str: str) -> bool:
-    """
-    Checks if a socket is absent or not.
-    """
-
-    return not Path(path_str).is_socket()
 
 
 def init_fake_server_dirs() -> None:
@@ -189,7 +185,7 @@ def leapctl_assert_command(
 ) -> None:
     """
     Runs a command for leapctl tests, testing the output against expected values
-      and recording the result as a passed or failed assertion.
+    and recording the result as a passed or failed assertion.
     """
 
     global leapctl_asserts_passed
@@ -208,7 +204,7 @@ def leapctl_assert_function(
 ) -> None:
     """
     Runs a function that returns a boolean, passing the given string argument.
-      Records the result as a passed or failed assertion.
+    Records the result as a passed or failed assertion.
     """
 
     global leapctl_asserts_passed
@@ -225,7 +221,7 @@ def leapctl_assert_function(
 def leapctl_create_deleteme_user(bogus: str) -> bool:
     """
     Creates a user account for testing deleting a comm socket for a user that
-      doesn't exist anymore.
+    doesn't exist anymore.
     """
 
     if bogus != "":
@@ -240,7 +236,7 @@ def leapctl_create_deleteme_user(bogus: str) -> bool:
 def leapctl_delete_deleteme_user(bogus: str) -> bool:
     """
     Deletes a user account for testing deleting a comm socket for a user that
-      doesn't exist anymore.
+    doesn't exist anymore.
     """
 
     if bogus != "":
@@ -255,7 +251,7 @@ def leapctl_delete_deleteme_user(bogus: str) -> bool:
 def leapctl_server_error_test(bogus: str) -> bool:
     """
     Tests leapctl against a fake server that always errors out regardless of
-      the requested action.
+    the requested action.
     """
 
     if bogus != "":
@@ -263,7 +259,7 @@ def leapctl_server_error_test(bogus: str) -> bool:
     init_fake_server_dirs()
     control_socket: PrivleapSocket = PrivleapSocket(PrivleapSocketType.CONTROL)
     with subprocess.Popen(
-        ["leapctl", "--create", PlTestGlobal.test_username],
+        ["leapctl", "--create", "privleaptestone"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     ) as leapctl_proc:
@@ -276,7 +272,7 @@ def leapctl_server_error_test(bogus: str) -> bool:
         control_socket.backend_socket.close()
         os.unlink(Path(PlTestGlobal.privleap_state_dir, "control"))
         leapctl_result: Tuple[bytes, bytes] = leapctl_proc.communicate()
-        if leapctl_result[1] == PlTestData.test_username_create_error:
+        if leapctl_result[1] == PlTestData.privleaptestone_create_error:
             return True
     return False
 
@@ -284,7 +280,7 @@ def leapctl_server_error_test(bogus: str) -> bool:
 def leapctl_server_cutoff_test(bogus: str) -> bool:
     """
     Tests leapctl against a fake server that always immediately disconnects any
-      incoming connection.
+    incoming connection.
     """
 
     if bogus != "":
@@ -295,7 +291,7 @@ def leapctl_server_cutoff_test(bogus: str) -> bool:
     # good if one of those times passes.
     for _ in range(5):
         with subprocess.Popen(
-            ["leapctl", "--create", PlTestGlobal.test_username],
+            ["leapctl", "--create", "privleaptestone"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         ) as leapctl_proc:
@@ -353,9 +349,9 @@ def run_leapctl_tests() -> None:
     )
     # ---
     leapctl_assert_command(
-        ["leapctl", "--create", PlTestGlobal.test_username],
+        ["leapctl", "--create", "privleaptestone"],
         exit_code=0,
-        stdout_data=PlTestData.test_username_socket_created,
+        stdout_data=PlTestData.privleaptestone_socket_created,
     )
     leapctl_assert_function(
         test_if_path_exists,
@@ -363,16 +359,16 @@ def run_leapctl_tests() -> None:
             Path(
                 PlTestGlobal.privleap_state_dir,
                 "comm",
-                PlTestGlobal.test_username,
+                "privleaptestone",
             )
         ),
         "Ensure test user socket exists",
     )
     # ---
     leapctl_assert_command(
-        ["leapctl", "--destroy", PlTestGlobal.test_username],
+        ["leapctl", "--destroy", "privleaptestone"],
         exit_code=0,
-        stdout_data=PlTestData.test_username_socket_destroyed,
+        stdout_data=PlTestData.privleaptestone_socket_destroyed,
     )
     leapctl_assert_function(
         test_if_path_not_exists,
@@ -380,40 +376,40 @@ def run_leapctl_tests() -> None:
             Path(
                 PlTestGlobal.privleap_state_dir,
                 "comm",
-                PlTestGlobal.test_username,
+                "privleaptestone",
             )
         ),
         "Ensure test user socket does not exist",
     )
     # ---
     leapctl_assert_command(
-        ["leapctl", "--destroy", PlTestGlobal.test_username],
+        ["leapctl", "--destroy", "privleaptestone"],
         exit_code=0,
-        stdout_data=PlTestData.test_username_socket_missing,
+        stdout_data=PlTestData.privleaptestone_socket_missing,
     )
     # ---
     leapctl_assert_command(
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leapctl",
             "--create",
-            PlTestGlobal.test_username,
+            "privleaptestone",
         ],
         exit_code=1,
         stderr_data=PlTestData.privleapd_connection_failed,
     )
     # ---
     leapctl_assert_command(
-        ["leapctl", "--create", PlTestGlobal.test_username],
+        ["leapctl", "--create", "privleaptestone"],
         exit_code=0,
-        stdout_data=PlTestData.test_username_socket_created,
+        stdout_data=PlTestData.privleaptestone_socket_created,
     )
     leapctl_assert_command(
-        ["leapctl", "--create", PlTestGlobal.test_username],
+        ["leapctl", "--create", "privleaptestone"],
         exit_code=0,
-        stdout_data=PlTestData.test_username_socket_exists,
+        stdout_data=PlTestData.privleaptestone_socket_exists,
     )
     # ---
     leapctl_assert_function(
@@ -518,14 +514,14 @@ def run_leapctl_tests() -> None:
     )
     # ---
     leapctl_assert_command(
-        ["leapctl", "--create", "alttest"],
+        ["leapctl", "--create", "privleaptesttwo"],
         exit_code=0,
-        stdout_data=PlTestData.alttest_socket_created,
+        stdout_data=PlTestData.privleaptesttwo_socket_created,
     )
     leapctl_assert_command(
-        ["leapctl", "--destroy", "alttest"],
+        ["leapctl", "--destroy", "privleaptesttwo"],
         exit_code=0,
-        stdout_data=PlTestData.alttest_socket_destroyed,
+        stdout_data=PlTestData.privleaptesttwo_socket_destroyed,
     )
     # ---
     leapctl_assert_command(
@@ -568,7 +564,7 @@ def leaprun_assert_command(
 ) -> None:
     """
     Runs a command for leaprun tests, testing the output against expected values
-      and recording the result as a passed or failed assertion.
+    and recording the result as a passed or failed assertion.
     """
 
     global leaprun_asserts_passed
@@ -589,7 +585,7 @@ def leaprun_assert_function(
 ) -> None:
     """
     Runs a function that returns a boolean, passing the given string argument.
-      Records the result as a passed or failed assertion.
+    Records the result as a passed or failed assertion.
     """
 
     global leaprun_asserts_passed
@@ -603,24 +599,58 @@ def leaprun_assert_function(
         PlTestGlobal.all_asserts_passed = False
 
 
-def leaprun_server_invalid_response_test(bogus: str) -> bool:
+def leaprun_helper_setup_fake_server(user_name: str) -> PrivleapSocket:
+    """
+    Sets up a fake server environment for leaprun testing. Returns a comm
+    socket from the server environment.
+    """
+
+    init_fake_server_dirs()
+    comm_socket: PrivleapSocket = PrivleapSocket(
+        PrivleapSocketType.COMMUNICATION,
+        user_name=user_name,
+    )
+    return comm_socket
+
+
+def leaprun_helper_teardown_fake_server(
+    comm_session: PrivleapSession,
+    comm_socket: PrivleapSocket,
+    user_name: str,
+) -> None:
+    """
+    Tears down a fake server environment for leaprun testing.
+    """
+
+    comm_session.close_session()
+    assert comm_socket.backend_socket is not None
+    comm_socket.backend_socket.shutdown(socket.SHUT_RDWR)
+    comm_socket.backend_socket.close()
+    os.unlink(
+        Path(
+            PlTestGlobal.privleap_state_dir,
+            "comm",
+            user_name,
+        )
+    )
+
+
+def leaprun_server_invalid_msg_seq_test(bogus: str) -> bool:
     """
     Tests how leapctl handles an invalid message being returned by the server.
     """
 
     if bogus != "":
         return False
-    init_fake_server_dirs()
-    comm_socket: PrivleapSocket = PrivleapSocket(
-        PrivleapSocketType.COMMUNICATION,
-        user_name=PlTestGlobal.test_username,
+    comm_socket: PrivleapSocket = leaprun_helper_setup_fake_server(
+        "privleaptestone"
     )
     with subprocess.Popen(
-        ["sudo", "-u", PlTestGlobal.test_username, "leaprun", "test-act-free"],
+        ["sudo", "-u", "privleaptestone", "leaprun", "--test", "test-act-free"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     ) as leaprun_proc:
-        comm_session = comm_socket.get_session()
+        comm_session: PrivleapSession = comm_socket.get_session()
         comm_session.get_msg()
         # noinspection PyUnresolvedReferences
         # noinspection PyProtectedMember
@@ -633,19 +663,11 @@ def leaprun_server_invalid_response_test(bogus: str) -> bool:
         comm_session._PrivleapSession__send_msg(  # type: ignore [attr-defined]
             PrivleapControlServerNouserMsg()
         )
-        comm_session.close_session()
-        assert comm_socket.backend_socket is not None
-        comm_socket.backend_socket.shutdown(socket.SHUT_RDWR)
-        comm_socket.backend_socket.close()
-        os.unlink(
-            Path(
-                PlTestGlobal.privleap_state_dir,
-                "comm",
-                PlTestGlobal.test_username,
-            )
+        leaprun_helper_teardown_fake_server(
+            comm_session, comm_socket, "privleaptestone"
         )
         leaprun_result: Tuple[bytes, bytes] = leaprun_proc.communicate()
-        if leaprun_result[1] == PlTestData.privleapd_invalid_response:
+        if leaprun_result[1] == PlTestData.privleapd_invalid_msg_seq:
             return True
     return False
 
@@ -657,33 +679,750 @@ def leaprun_server_late_cutoff_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    init_fake_server_dirs()
-    comm_socket: PrivleapSocket = PrivleapSocket(
-        PrivleapSocketType.COMMUNICATION,
-        user_name=PlTestGlobal.test_username,
+    comm_socket: PrivleapSocket = leaprun_helper_setup_fake_server(
+        "privleaptestone"
     )
     with subprocess.Popen(
-        ["sudo", "-u", PlTestGlobal.test_username, "leaprun", "test-act-free"],
+        ["sudo", "-u", "privleaptestone", "leaprun", "--test", "test-act-free"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     ) as leaprun_proc:
-        comm_session = comm_socket.get_session()
+        comm_session: PrivleapSession = comm_socket.get_session()
         comm_session.get_msg()
-        comm_session.close_session()
-        assert comm_socket.backend_socket is not None
-        comm_socket.backend_socket.shutdown(socket.SHUT_RDWR)
-        comm_socket.backend_socket.close()
-        os.unlink(
-            Path(
-                PlTestGlobal.privleap_state_dir,
-                "comm",
-                PlTestGlobal.test_username,
-            )
+        leaprun_helper_teardown_fake_server(
+            comm_session, comm_socket, "privleaptestone"
         )
         leaprun_result: Tuple[bytes, bytes] = leaprun_proc.communicate()
-        if leaprun_result[1] == PlTestData.privleapd_invalid_response:
+        if leaprun_result[1] == PlTestData.privleapd_invalid_msg_seq:
             return True
     return False
+
+
+def leaprun_server_early_cutoff_exec_test(bogus: str) -> bool:
+    """
+    Tests how leaprun handles the server cutting it off before it can send a
+    TRIGGER message.
+    """
+
+    if bogus != "":
+        return False
+    comm_socket: PrivleapSocket = leaprun_helper_setup_fake_server(
+        "privleaptestone"
+    )
+    with subprocess.Popen(
+        ["sudo", "-u", "privleaptestone", "leaprun", "--test", "test-act-free"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as leaprun_proc:
+        comm_session: PrivleapSession = comm_socket.get_session()
+        leaprun_helper_teardown_fake_server(
+            comm_session, comm_socket, "privleaptestone"
+        )
+        leaprun_result: Tuple[bytes, bytes] = leaprun_proc.communicate()
+        if leaprun_result[1] == PlTestData.privleapd_run_request_failed:
+            return True
+    return False
+
+
+def leaprun_server_early_cutoff_query_test(bogus: str) -> bool:
+    """
+    Tests how leaprun handles the server cutting it off before it can send an
+    ACCESS_CHECK message.
+    """
+
+    if bogus != "":
+        return False
+    comm_socket: PrivleapSocket = leaprun_helper_setup_fake_server(
+        "privleaptestone"
+    )
+    with subprocess.Popen(
+        [
+            "sudo",
+            "-u",
+            "privleaptestone",
+            "leaprun",
+            "--test",
+            "--check",
+            "test-act-free",
+            "test-act-grouppermit-userrestrict",
+            "test-act-grouprestrict-userpermit",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as leaprun_proc:
+        comm_session: PrivleapSession = comm_socket.get_session()
+        leaprun_helper_teardown_fake_server(
+            comm_session, comm_socket, "privleaptestone"
+        )
+        leaprun_result: Tuple[bytes, bytes] = leaprun_proc.communicate()
+        if leaprun_result[1] == PlTestData.privleapd_check_query_failed:
+            return True
+    return False
+
+
+# pylint: disable=too-many-return-statements
+# Rationale:
+#   too-many-return-statements: This can't be reasonably broken up any further.
+def leaprun_terminate_test(bogus: str) -> bool:
+    """
+    Tests that leaprun sends a "TERMINATE" message when it receives SIGTERM.
+    """
+
+    if bogus != "":
+        return False
+    comm_socket: PrivleapSocket = leaprun_helper_setup_fake_server(
+        "privleaptestone"
+    )
+    with subprocess.Popen(
+        ["sudo", "-u", "privleaptestone", "leaprun", "--test", "test-act-free"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as leaprun_proc:
+        comm_session: PrivleapSession = comm_socket.get_session()
+        return_msg: PrivleapMsg = comm_session.get_msg()
+        if not isinstance(return_msg, PrivleapCommClientSignalMsg):
+            logging.error("Did not get a 'SIGNAL' message from leaprun!")
+            return False
+        if not return_msg.signal_name == "test-act-free":
+            logging.error(
+                "Unexpected signal action '%s' from leaprun!",
+                return_msg.signal_name,
+            )
+            return False
+        comm_session.send_msg(PrivleapCommServerTriggerMsg())
+        time.sleep(0.1)
+        leaprun_proc.send_signal(signal.SIGTERM)
+        time.sleep(0.2)
+        return_msg = comm_session.get_msg()
+        if not isinstance(return_msg, PrivleapCommClientTerminateMsg):
+            logging.error("Did not get 'TERMINATE' message from leaprun!")
+            return False
+        leaprun_helper_teardown_fake_server(
+            comm_session, comm_socket, "privleaptestone"
+        )
+        leaprun_result: Tuple[bytes, bytes] = leaprun_proc.communicate()
+        if leaprun_result[0] != b"":
+            logging.error("leaprun stdout stream is not empty!")
+            return False
+        if leaprun_result[1] != b"":
+            logging.error("leaprun stderr stream is not empty!")
+            return False
+    return True
+
+
+def leaprun_midaction_cutoff_test(bogus: str) -> bool:
+    """
+    Tests how leaprun responds to a server cutoff after receiving a 'TRIGGER'
+    message.
+    """
+
+    if bogus != "":
+        return False
+    comm_socket: PrivleapSocket = leaprun_helper_setup_fake_server(
+        "privleaptestone"
+    )
+    with subprocess.Popen(
+        ["sudo", "-u", "privleaptestone", "leaprun", "--test", "test-act-free"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as leaprun_proc:
+        comm_session: PrivleapSession = comm_socket.get_session()
+        return_msg: PrivleapMsg = comm_session.get_msg()
+        if not isinstance(return_msg, PrivleapCommClientSignalMsg):
+            logging.error("Did not get a 'SIGNAL' message from leaprun!")
+            return False
+        if not return_msg.signal_name == "test-act-free":
+            logging.error(
+                "Unexpected signal action '%s' from leaprun!",
+                return_msg.signal_name,
+            )
+            return False
+        comm_session.send_msg(PrivleapCommServerTriggerMsg())
+        time.sleep(0.1)
+        leaprun_helper_teardown_fake_server(
+            comm_session, comm_socket, "privleaptestone"
+        )
+        leaprun_result: Tuple[bytes, bytes] = leaprun_proc.communicate()
+        if leaprun_result[1] != PlTestData.privleapd_midaction_cutoff:
+            logging.error(
+                "leaprun stderr stream contains unexpected data! '%s'",
+                leaprun_result[1],
+            )
+            return False
+    return True
+
+
+def leaprun_multi_unauthorized_test(bogus: str) -> bool:
+    """
+    Tests how leaprun responds to receiving multiple 'UNAUTHORIZED' messages
+    in the same session.
+    """
+
+    if bogus != "":
+        return False
+    comm_socket: PrivleapSocket = leaprun_helper_setup_fake_server(
+        "privleaptestone"
+    )
+    with subprocess.Popen(
+        [
+            "sudo",
+            "-u",
+            "privleaptestone",
+            "leaprun",
+            "--test",
+            "--check",
+            "test-act-free",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as leaprun_proc:
+        comm_session: PrivleapSession = comm_socket.get_session()
+        return_msg: PrivleapMsg = comm_session.get_msg()
+        if not isinstance(return_msg, PrivleapCommClientAccessCheckMsg):
+            logging.error("Did not get an 'ACCESS_CHECK' message from leaprun!")
+            return False
+        if len(return_msg.signal_name_list) > 1:
+            logging.error("Too many items in access check signal name list!")
+            return False
+        if return_msg.signal_name_list[0] != "test-act-free":
+            logging.error(
+                "Unexpected access check action '%s' from leaprun!",
+                return_msg.signal_name_list[0],
+            )
+            return False
+        comm_session.send_msg(
+            PrivleapCommServerUnauthorizedMsg(["test-act-free"])
+        )
+        comm_session.send_msg(
+            PrivleapCommServerUnauthorizedMsg(["test-act-free"])
+        )
+        leaprun_helper_teardown_fake_server(
+            comm_session, comm_socket, "privleaptestone"
+        )
+        leaprun_result: Tuple[bytes, bytes] = leaprun_proc.communicate()
+        if leaprun_result[1] != PlTestData.privleapd_multi_unauthorized:
+            logging.error(
+                "leaprun stderr stream contains unexpected data! '%s'",
+                leaprun_result[1],
+            )
+            return False
+    return True
+
+
+def leaprun_unauth_after_trigger_test(bogus: str) -> bool:
+    """
+    Tests how leaprun responds to receiving an 'UNAUTHORIZED' message after a
+    'TRIGGER' message.
+    """
+
+    if bogus != "":
+        return False
+    comm_socket: PrivleapSocket = leaprun_helper_setup_fake_server(
+        "privleaptestone"
+    )
+    with subprocess.Popen(
+        ["sudo", "-u", "privleaptestone", "leaprun", "--test", "test-act-free"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as leaprun_proc:
+        comm_session: PrivleapSession = comm_socket.get_session()
+        return_msg: PrivleapMsg = comm_session.get_msg()
+        if not isinstance(return_msg, PrivleapCommClientSignalMsg):
+            logging.error("Did not get a 'SIGNAL' message from leaprun!")
+            return False
+        if not return_msg.signal_name == "test-act-free":
+            logging.error(
+                "Unexpected signal action '%s' from leaprun!",
+                return_msg.signal_name,
+            )
+            return False
+        comm_session.send_msg(PrivleapCommServerTriggerMsg())
+        comm_session.send_msg(
+            PrivleapCommServerUnauthorizedMsg(["test-act-free"])
+        )
+        leaprun_helper_teardown_fake_server(
+            comm_session, comm_socket, "privleaptestone"
+        )
+        leaprun_result: Tuple[bytes, bytes] = leaprun_proc.communicate()
+        if leaprun_result[1] != PlTestData.privleapd_unauth_after_trigger:
+            logging.error(
+                "leaprun stderr stream contains unexpected data! '%s'",
+                leaprun_result[1],
+            )
+            return False
+    return True
+
+
+def leaprun_auth_during_exec_test(bogus: str) -> bool:
+    """
+    Tests how leaprun responds to receiving an 'AUTHORIZED' message when it
+    expected a 'TRIGGER' message.
+    """
+
+    if bogus != "":
+        return False
+    comm_socket: PrivleapSocket = leaprun_helper_setup_fake_server(
+        "privleaptestone"
+    )
+    with subprocess.Popen(
+        ["sudo", "-u", "privleaptestone", "leaprun", "--test", "test-act-free"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as leaprun_proc:
+        comm_session: PrivleapSession = comm_socket.get_session()
+        return_msg: PrivleapMsg = comm_session.get_msg()
+        if not isinstance(return_msg, PrivleapCommClientSignalMsg):
+            logging.error("Did not get a 'SIGNAL' message from leaprun!")
+            return False
+        if not return_msg.signal_name == "test-act-free":
+            logging.error(
+                "Unexpected signal action '%s' from leaprun!",
+                return_msg.signal_name,
+            )
+            return False
+        comm_session.send_msg(
+            PrivleapCommServerAuthorizedMsg(["test-act-free"])
+        )
+        leaprun_helper_teardown_fake_server(
+            comm_session, comm_socket, "privleaptestone"
+        )
+        leaprun_result: Tuple[bytes, bytes] = leaprun_proc.communicate()
+        if leaprun_result[1] != PlTestData.privleapd_auth_during_exec:
+            logging.error(
+                "leaprun stderr stream contains unexpected data! '%s'",
+                leaprun_result[1],
+            )
+            return False
+    return True
+
+
+def leaprun_multi_authorized_test(bogus: str) -> bool:
+    """
+    Tests how leaprun responds to receiving multiple 'AUTHORIZED' messages
+    in the same session.
+    """
+
+    if bogus != "":
+        return False
+    comm_socket: PrivleapSocket = leaprun_helper_setup_fake_server(
+        "privleaptestone"
+    )
+    with subprocess.Popen(
+        [
+            "sudo",
+            "-u",
+            "privleaptestone",
+            "leaprun",
+            "--test",
+            "--check",
+            "test-act-free",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as leaprun_proc:
+        comm_session: PrivleapSession = comm_socket.get_session()
+        return_msg: PrivleapMsg = comm_session.get_msg()
+        if not isinstance(return_msg, PrivleapCommClientAccessCheckMsg):
+            logging.error("Did not get an 'ACCESS_CHECK' message from leaprun!")
+            return False
+        if len(return_msg.signal_name_list) > 1:
+            logging.error("Too many items in access check signal name list!")
+            return False
+        if return_msg.signal_name_list[0] != "test-act-free":
+            logging.error(
+                "Unexpected access check action '%s' from leaprun!",
+                return_msg.signal_name_list[0],
+            )
+            return False
+        comm_session.send_msg(
+            PrivleapCommServerAuthorizedMsg(["test-act-free"])
+        )
+        comm_session.send_msg(
+            PrivleapCommServerAuthorizedMsg(["test-act-free"])
+        )
+        leaprun_helper_teardown_fake_server(
+            comm_session, comm_socket, "privleaptestone"
+        )
+        leaprun_result: Tuple[bytes, bytes] = leaprun_proc.communicate()
+        if leaprun_result[1] != PlTestData.privleapd_multi_authorized:
+            logging.error(
+                "leaprun stderr stream contains unexpected data! '%s'",
+                leaprun_result[1],
+            )
+            return False
+    return True
+
+
+def leaprun_access_check_end_during_exec_test(bogus: str) -> bool:
+    """
+    Tests how leaprun responds to receiving an 'ACCESS_CHECK_RESULTS_END'
+    message when it expected a 'TRIGGER' message.
+    """
+
+    if bogus != "":
+        return False
+    comm_socket: PrivleapSocket = leaprun_helper_setup_fake_server(
+        "privleaptestone"
+    )
+    with subprocess.Popen(
+        ["sudo", "-u", "privleaptestone", "leaprun", "--test", "test-act-free"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as leaprun_proc:
+        comm_session: PrivleapSession = comm_socket.get_session()
+        return_msg: PrivleapMsg = comm_session.get_msg()
+        if not isinstance(return_msg, PrivleapCommClientSignalMsg):
+            logging.error("Did not get a 'SIGNAL' message from leaprun!")
+            return False
+        if not return_msg.signal_name == "test-act-free":
+            logging.error(
+                "Unexpected signal action '%s' from leaprun!",
+                return_msg.signal_name,
+            )
+            return False
+        comm_session.send_msg(PrivleapCommServerAccessCheckResultsEndMsg())
+        leaprun_helper_teardown_fake_server(
+            comm_session, comm_socket, "privleaptestone"
+        )
+        leaprun_result: Tuple[bytes, bytes] = leaprun_proc.communicate()
+        if leaprun_result[1] != (
+            PlTestData.privleapd_unexpected_access_check_end
+        ):
+            logging.error(
+                "leaprun stderr stream contains unexpected data! '%s'",
+                leaprun_result[1],
+            )
+            return False
+    return True
+
+
+def leaprun_access_check_end_before_results_test(bogus: str) -> bool:
+    """
+    Tests how leaprun responds to receiving an 'ACCESS_CHECK_RESULTS_END'
+    message before receiving an 'AUTHORIZED' or 'UNAUTHORIZED' message.
+    """
+
+    if bogus != "":
+        return False
+    comm_socket: PrivleapSocket = leaprun_helper_setup_fake_server(
+        "privleaptestone"
+    )
+    with subprocess.Popen(
+        [
+            "sudo",
+            "-u",
+            "privleaptestone",
+            "leaprun",
+            "--test",
+            "--check",
+            "test-act-free",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as leaprun_proc:
+        comm_session: PrivleapSession = comm_socket.get_session()
+        return_msg: PrivleapMsg = comm_session.get_msg()
+        if not isinstance(return_msg, PrivleapCommClientAccessCheckMsg):
+            logging.error("Did not get an 'ACCESS_CHECK' message from leaprun!")
+            return False
+        if len(return_msg.signal_name_list) > 1:
+            logging.error("Too many items in access check signal name list!")
+            return False
+        if return_msg.signal_name_list[0] != "test-act-free":
+            logging.error(
+                "Unexpected access check action '%s' from leaprun!",
+                return_msg.signal_name_list[0],
+            )
+            return False
+        comm_session.send_msg(PrivleapCommServerAccessCheckResultsEndMsg())
+        leaprun_helper_teardown_fake_server(
+            comm_session, comm_socket, "privleaptestone"
+        )
+        leaprun_result: Tuple[bytes, bytes] = leaprun_proc.communicate()
+        if leaprun_result[1] != (
+            PlTestData.privleapd_access_check_end_before_results
+        ):
+            logging.error(
+                "leaprun stderr stream contains unexpected data! '%s'",
+                leaprun_result[1],
+            )
+            return False
+    return True
+
+
+def leaprun_trigger_error_during_check_test(bogus: str) -> bool:
+    """
+    Tests how leaprun responds to receiving a 'TRIGGER_ERROR' message in check
+    mode.
+    """
+
+    if bogus != "":
+        return False
+    comm_socket: PrivleapSocket = leaprun_helper_setup_fake_server(
+        "privleaptestone"
+    )
+    with subprocess.Popen(
+        [
+            "sudo",
+            "-u",
+            "privleaptestone",
+            "leaprun",
+            "--test",
+            "--check",
+            "test-act-free",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as leaprun_proc:
+        comm_session: PrivleapSession = comm_socket.get_session()
+        return_msg: PrivleapMsg = comm_session.get_msg()
+        if not isinstance(return_msg, PrivleapCommClientAccessCheckMsg):
+            logging.error("Did not get an 'ACCESS_CHECK' message from leaprun!")
+            return False
+        if len(return_msg.signal_name_list) > 1:
+            logging.error("Too many items in access check signal name list!")
+            return False
+        if return_msg.signal_name_list[0] != "test-act-free":
+            logging.error(
+                "Unexpected access check action '%s' from leaprun!",
+                return_msg.signal_name_list[0],
+            )
+            return False
+        comm_session.send_msg(PrivleapCommServerTriggerErrorMsg())
+        leaprun_helper_teardown_fake_server(
+            comm_session, comm_socket, "privleaptestone"
+        )
+        leaprun_result: Tuple[bytes, bytes] = leaprun_proc.communicate()
+        if leaprun_result[1] != (
+            PlTestData.privleapd_trigger_error_during_check
+        ):
+            logging.error(
+                "leaprun stderr stream contains unexpected data! '%s'",
+                leaprun_result[1],
+            )
+            return False
+    return True
+
+
+def leaprun_multi_trigger_test(bogus: str) -> bool:
+    """
+    Tests how leaprun responds to receiving multiple 'TRIGGER' messages.
+    """
+
+    if bogus != "":
+        return False
+    comm_socket: PrivleapSocket = leaprun_helper_setup_fake_server(
+        "privleaptestone"
+    )
+    with subprocess.Popen(
+        ["sudo", "-u", "privleaptestone", "leaprun", "--test", "test-act-free"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as leaprun_proc:
+        comm_session: PrivleapSession = comm_socket.get_session()
+        return_msg: PrivleapMsg = comm_session.get_msg()
+        if not isinstance(return_msg, PrivleapCommClientSignalMsg):
+            logging.error("Did not get a 'SIGNAL' message from leaprun!")
+            return False
+        if not return_msg.signal_name == "test-act-free":
+            logging.error(
+                "Unexpected signal action '%s' from leaprun!",
+                return_msg.signal_name,
+            )
+            return False
+        comm_session.send_msg(PrivleapCommServerTriggerMsg())
+        comm_session.send_msg(PrivleapCommServerTriggerMsg())
+        leaprun_helper_teardown_fake_server(
+            comm_session, comm_socket, "privleaptestone"
+        )
+        leaprun_result: Tuple[bytes, bytes] = leaprun_proc.communicate()
+        if leaprun_result[1] != PlTestData.privleapd_multi_trigger:
+            logging.error(
+                "leaprun stderr stream contains unexpected data! '%s'",
+                leaprun_result[1],
+            )
+            return False
+    return True
+
+
+def leaprun_trigger_during_check_test(bogus: str) -> bool:
+    """
+    Tests how leaprun responds to receiving a 'TRIGGER' message in check mode.
+    """
+
+    if bogus != "":
+        return False
+    comm_socket: PrivleapSocket = leaprun_helper_setup_fake_server(
+        "privleaptestone"
+    )
+    with subprocess.Popen(
+        [
+            "sudo",
+            "-u",
+            "privleaptestone",
+            "leaprun",
+            "--test",
+            "--check",
+            "test-act-free",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as leaprun_proc:
+        comm_session: PrivleapSession = comm_socket.get_session()
+        return_msg: PrivleapMsg = comm_session.get_msg()
+        if not isinstance(return_msg, PrivleapCommClientAccessCheckMsg):
+            logging.error("Did not get an 'ACCESS_CHECK' message from leaprun!")
+            return False
+        if len(return_msg.signal_name_list) > 1:
+            logging.error("Too many items in access check signal name list!")
+            return False
+        if return_msg.signal_name_list[0] != "test-act-free":
+            logging.error(
+                "Unexpected access check action '%s' from leaprun!",
+                return_msg.signal_name_list[0],
+            )
+            return False
+        comm_session.send_msg(PrivleapCommServerTriggerMsg())
+        leaprun_helper_teardown_fake_server(
+            comm_session, comm_socket, "privleaptestone"
+        )
+        leaprun_result: Tuple[bytes, bytes] = leaprun_proc.communicate()
+        if leaprun_result[1] != PlTestData.privleapd_trigger_during_check:
+            logging.error(
+                "leaprun stderr stream contains unexpected data! '%s'",
+                leaprun_result[1],
+            )
+            return False
+    return True
+
+
+def leaprun_result_stdout_before_trigger_test(bogus: str) -> bool:
+    """
+    Tests how leaprun responds to receiving a 'RESULT_STDOUT' message before
+    receiving a 'TRIGGER' message.
+    """
+
+    if bogus != "":
+        return False
+    comm_socket: PrivleapSocket = leaprun_helper_setup_fake_server(
+        "privleaptestone"
+    )
+    with subprocess.Popen(
+        ["sudo", "-u", "privleaptestone", "leaprun", "--test", "test-act-free"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as leaprun_proc:
+        comm_session: PrivleapSession = comm_socket.get_session()
+        return_msg: PrivleapMsg = comm_session.get_msg()
+        if not isinstance(return_msg, PrivleapCommClientSignalMsg):
+            logging.error("Did not get a 'SIGNAL' message from leaprun!")
+            return False
+        if not return_msg.signal_name == "test-act-free":
+            logging.error(
+                "Unexpected signal action '%s' from leaprun!",
+                return_msg.signal_name,
+            )
+            return False
+        comm_session.send_msg(PrivleapCommServerResultStdoutMsg(b"abc"))
+        leaprun_helper_teardown_fake_server(
+            comm_session, comm_socket, "privleaptestone"
+        )
+        leaprun_result: Tuple[bytes, bytes] = leaprun_proc.communicate()
+        if leaprun_result[1] != (
+            PlTestData.privleapd_result_stdout_before_trigger
+        ):
+            logging.error(
+                "leaprun stderr stream contains unexpected data! '%s'",
+                leaprun_result[1],
+            )
+            return False
+    return True
+
+
+def leaprun_result_stderr_before_trigger_test(bogus: str) -> bool:
+    """
+    Tests how leaprun responds to receiving a 'RESULT_STDERR' message before
+    receiving a 'TRIGGER' message.
+    """
+
+    if bogus != "":
+        return False
+    comm_socket: PrivleapSocket = leaprun_helper_setup_fake_server(
+        "privleaptestone"
+    )
+    with subprocess.Popen(
+        ["sudo", "-u", "privleaptestone", "leaprun", "--test", "test-act-free"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as leaprun_proc:
+        comm_session: PrivleapSession = comm_socket.get_session()
+        return_msg: PrivleapMsg = comm_session.get_msg()
+        if not isinstance(return_msg, PrivleapCommClientSignalMsg):
+            logging.error("Did not get a 'SIGNAL' message from leaprun!")
+            return False
+        if not return_msg.signal_name == "test-act-free":
+            logging.error(
+                "Unexpected signal action '%s' from leaprun!",
+                return_msg.signal_name,
+            )
+            return False
+        comm_session.send_msg(PrivleapCommServerResultStderrMsg(b"abc"))
+        leaprun_helper_teardown_fake_server(
+            comm_session, comm_socket, "privleaptestone"
+        )
+        leaprun_result: Tuple[bytes, bytes] = leaprun_proc.communicate()
+        if leaprun_result[1] != (
+            PlTestData.privleapd_result_stderr_before_trigger
+        ):
+            logging.error(
+                "leaprun stderr stream contains unexpected data! '%s'",
+                leaprun_result[1],
+            )
+            return False
+    return True
+
+
+def leaprun_result_exitcode_before_trigger_test(bogus: str) -> bool:
+    """
+    Tests how leaprun responds to receiving a 'RESULT_EXITCODE' message before
+    receiving a 'TRIGGER' message.
+    """
+
+    if bogus != "":
+        return False
+    comm_socket: PrivleapSocket = leaprun_helper_setup_fake_server(
+        "privleaptestone"
+    )
+    with subprocess.Popen(
+        ["sudo", "-u", "privleaptestone", "leaprun", "--test", "test-act-free"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as leaprun_proc:
+        comm_session: PrivleapSession = comm_socket.get_session()
+        return_msg: PrivleapMsg = comm_session.get_msg()
+        if not isinstance(return_msg, PrivleapCommClientSignalMsg):
+            logging.error("Did not get a 'SIGNAL' message from leaprun!")
+            return False
+        if not return_msg.signal_name == "test-act-free":
+            logging.error(
+                "Unexpected signal action '%s' from leaprun!",
+                return_msg.signal_name,
+            )
+            return False
+        comm_session.send_msg(PrivleapCommServerResultExitcodeMsg(0))
+        leaprun_helper_teardown_fake_server(
+            comm_session, comm_socket, "privleaptestone"
+        )
+        leaprun_result: Tuple[bytes, bytes] = leaprun_proc.communicate()
+        if leaprun_result[1] != (
+            PlTestData.privleapd_result_exitcode_before_trigger
+        ):
+            logging.error(
+                "leaprun stderr stream contains unexpected data! '%s'",
+                leaprun_result[1],
+            )
+            return False
+    return True
 
 
 def leaprun_filter_env_var_test_stdout(
@@ -691,7 +1430,7 @@ def leaprun_filter_env_var_test_stdout(
 ) -> bytes:
     """
     Filters out non-deterministic environment variables from the output of the
-      leaprun env var tests.
+    leaprun env var tests.
     """
 
     if not is_stdout:
@@ -727,36 +1466,134 @@ def run_leaprun_tests() -> None:
     """
 
     # ---
-    start_privleapd_subprocess([])
     leaprun_assert_command(
-        ["sudo", "-u", PlTestGlobal.test_username, "leaprun", "test"],
+        ["sudo", "-u", "privleaptestone", "leaprun"],
         exit_code=1,
-        stderr_data=PlTestData.privleapd_connection_failed,
-    )
-    # ---
-    leaprun_assert_command(
-        ["leapctl", "--create", PlTestGlobal.test_username],
-        exit_code=0,
-        stdout_data=PlTestData.test_username_socket_created,
-    )
-    stop_privleapd_subprocess()
-    leaprun_assert_command(
-        ["sudo", "-u", PlTestGlobal.test_username, "leaprun", "test-act-free"],
-        exit_code=1,
-        stderr_data=PlTestData.privleapd_connection_failed,
-    )
-    # ---
-    start_privleapd_subprocess([])
-    leaprun_assert_command(
-        ["leapctl", "--create", PlTestGlobal.test_username],
-        exit_code=0,
-        stdout_data=PlTestData.test_username_socket_created,
+        stdout_data=PlTestData.leaprun_help,
     )
     leaprun_assert_command(
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
+            "leaprun",
+            "test-act-free",
+            "test-act-grouprestrict-userpermit",
+        ],
+        exit_code=1,
+        stdout_data=PlTestData.leaprun_help,
+    )
+    leaprun_assert_command(
+        ["sudo", "-u", "privleaptestone", "leaprun", "--check"],
+        exit_code=1,
+        stdout_data=PlTestData.leaprun_help,
+    )
+    leaprun_assert_command(
+        [
+            "sudo",
+            "-u",
+            "privleaptestone",
+            "leaprun",
+            "--check",
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
+            "14",
+            "15",
+            "16",
+            "17",
+            "18",
+            "19",
+            "20",
+            "21",
+            "22",
+            "23",
+            "24",
+            "25",
+            "26",
+            "27",
+            "28",
+            "29",
+            "30",
+            "31",
+            "32",
+            "33",
+            "34",
+            "35",
+            "36",
+            "37",
+            "38",
+            "39",
+            "40",
+            "41",
+            "42",
+            "43",
+            "44",
+            "45",
+            "46",
+            "47",
+            "48",
+            "49",
+            "50",
+            "51",
+            "52",
+            "53",
+            "54",
+            "55",
+            "56",
+            "57",
+            "58",
+            "59",
+            "60",
+            "61",
+            "62",
+            "63",
+            "64",
+        ],
+        exit_code=1,
+        stdout_data=PlTestData.leaprun_help,
+    )
+    # ---
+    start_privleapd_subprocess([])
+    leaprun_assert_command(
+        ["sudo", "-u", "privleaptestone", "leaprun", "test"],
+        exit_code=1,
+        stderr_data=PlTestData.privleapd_connection_failed,
+    )
+    # ---
+    leaprun_assert_command(
+        ["leapctl", "--create", "privleaptestone"],
+        exit_code=0,
+        stdout_data=PlTestData.privleaptestone_socket_created,
+    )
+    stop_privleapd_subprocess()
+    leaprun_assert_command(
+        ["sudo", "-u", "privleaptestone", "leaprun", "test-act-free"],
+        exit_code=1,
+        stderr_data=PlTestData.privleapd_connection_failed,
+    )
+    # ---
+    start_privleapd_subprocess([])
+    leaprun_assert_command(
+        ["leapctl", "--create", "privleaptestone"],
+        exit_code=0,
+        stdout_data=PlTestData.privleaptestone_socket_created,
+    )
+    leaprun_assert_command(
+        [
+            "sudo",
+            "-u",
+            "privleaptestone",
             "leaprun",
             "test-act-nonexistent",
         ],
@@ -768,7 +1605,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-userrestrict",
         ],
@@ -780,7 +1617,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-grouprestrict",
         ],
@@ -792,7 +1629,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-grouppermit-userrestrict",
         ],
@@ -804,7 +1641,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-grouprestrict-userpermit",
         ],
@@ -816,7 +1653,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-target-user",
         ],
@@ -825,19 +1662,25 @@ def run_leaprun_tests() -> None:
     )
     # ---
     leaprun_assert_command(
-        ["leapctl", "--create", "alttest"],
+        ["leapctl", "--create", "privleaptesttwo"],
         exit_code=0,
-        stdout_data=PlTestData.alttest_socket_created,
+        stdout_data=PlTestData.privleaptesttwo_socket_created,
     )
     leaprun_assert_command(
-        ["sudo", "-u", "alttest", "leaprun", "test-act-privleap-grouppermit"],
+        [
+            "sudo",
+            "-u",
+            "privleaptesttwo",
+            "leaprun",
+            "test-act-privleap-grouppermit",
+        ],
         exit_code=0,
         stdout_data=b"test-act-privleap-grouppermit\n",
     )
     leaprun_assert_command(
-        ["leapctl", "--destroy", "alttest"],
+        ["leapctl", "--destroy", "privleaptesttwo"],
         exit_code=0,
-        stdout_data=PlTestData.alttest_socket_destroyed,
+        stdout_data=PlTestData.privleaptesttwo_socket_destroyed,
     )
     # ---
     leaprun_assert_command(
@@ -866,7 +1709,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-target-user-and-group",
         ],
@@ -878,7 +1721,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-missing-user",
         ],
@@ -887,7 +1730,7 @@ def run_leaprun_tests() -> None:
     )
     # ---
     leaprun_assert_command(
-        ["sudo", "-u", PlTestGlobal.test_username, "leaprun", "test-act-free"],
+        ["sudo", "-u", "privleaptestone", "leaprun", "test-act-free"],
         exit_code=0,
         stdout_data=b"test-act-free\n",
     )
@@ -896,7 +1739,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-userpermit",
         ],
@@ -908,7 +1751,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-multi-equals",
         ],
@@ -920,7 +1763,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-grouppermit",
         ],
@@ -932,7 +1775,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-grouppermit-userpermit",
         ],
@@ -944,7 +1787,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-sudopermit",
         ],
@@ -956,7 +1799,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-multiuser-permit",
         ],
@@ -983,7 +1826,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-multigroup-permit",
         ],
@@ -1010,7 +1853,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-multiuser-multigroup-permit",
         ],
@@ -1055,7 +1898,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-exit240",
         ],
@@ -1067,7 +1910,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-stderr",
         ],
@@ -1079,7 +1922,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-stdout-stderr-interleaved",
         ],
@@ -1092,7 +1935,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-rootdata",
         ],
@@ -1105,7 +1948,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-userdata",
         ],
@@ -1118,7 +1961,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "--check",
             "test-act-free",
@@ -1131,7 +1974,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "-c",
             "--",
@@ -1145,7 +1988,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "--check",
             "test-act-userrestrict",
@@ -1154,28 +1997,33 @@ def run_leaprun_tests() -> None:
         stderr_data=PlTestData.test_act_userrestrict_unauthorized,
     )
     # ---
-    stop_privleapd_subprocess()
-    leaprun_assert_function(
-        leaprun_server_invalid_response_test,
-        "",
-        "Leaprun invalid response test",
+    leaprun_assert_command(
+        [
+            "sudo",
+            "-u",
+            "privleaptestone",
+            "leaprun",
+            "--check",
+            "test-act-free",
+            "test-act-grouppermit-userrestrict",
+            "test-act-nonsenseabc",
+            "test-act-nonsensedef",
+        ],
+        exit_code=1,
+        stdout_data=PlTestData.test_act_multi_auth,
+        stderr_data=PlTestData.test_act_multi_unauth,
     )
     # ---
-    leaprun_assert_function(
-        leaprun_server_late_cutoff_test, "", "Leaprun server late cutoff test"
-    )
-    # ---
-    start_privleapd_subprocess([])
     leaprun_assert_function(
         write_new_config_file,
         "added_actions_config_file",
         "Write config file with added actions",
     )
-    leaprun_assert_command(
-        ["leapctl", "--create", PlTestGlobal.test_username],
-        exit_code=0,
-        stdout_data=PlTestData.test_username_socket_created,
-    )
+    # leaprun_assert_command(
+    #    ["leapctl", "--create", "privleaptestone"],
+    #    exit_code=0,
+    #    stdout_data=PlTestData.privleaptestone_socket_created,
+    # )
     leaprun_assert_command(
         ["leapctl", "--reload"],
         exit_code=0,
@@ -1186,7 +2034,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-added1",
         ],
@@ -1197,7 +2045,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-added2",
         ],
@@ -1220,7 +2068,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-added1",
         ],
@@ -1231,7 +2079,7 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-added2",
         ],
@@ -1259,13 +2107,118 @@ def run_leaprun_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "--",
             "test-act-grouppermit-userrestrict",
         ],
         exit_code=0,
         stdout_data=b"test-act-grouppermit-userrestrict\n",
+    )
+    # ---
+    leaprun_assert_command(
+        ["sudo", "-u", "privleaptestone", "leaprun", "qwe123!@#"],
+        exit_code=1,
+        stderr_data=b"ERROR: Signal name 'qwe123!@#' is invalid!\n",
+    )
+    # ---
+    stop_privleapd_subprocess()
+    leaprun_assert_function(
+        leaprun_server_invalid_msg_seq_test,
+        "",
+        "Leaprun invalid response test",
+    )
+    # ---
+    leaprun_assert_function(
+        leaprun_server_late_cutoff_test, "", "Leaprun server late cutoff test"
+    )
+    # ---
+    leaprun_assert_function(
+        leaprun_server_early_cutoff_exec_test,
+        "",
+        "Leaprun server early cutoff exec test",
+    )
+    # ---
+    leaprun_assert_function(
+        leaprun_server_early_cutoff_query_test,
+        "",
+        "Leaprun server early cutoff query test",
+    )
+    # ---
+    leaprun_assert_function(
+        leaprun_terminate_test, "", "Leaprun terminate test"
+    )
+    # ---
+    leaprun_assert_function(
+        leaprun_midaction_cutoff_test, "", "Leaprun midaction cutoff test"
+    )
+    # ---
+    leaprun_assert_function(
+        leaprun_multi_unauthorized_test, "", "leaprun multi unauthorized test"
+    )
+    # ---
+    leaprun_assert_function(
+        leaprun_unauth_after_trigger_test,
+        "",
+        "leaprun unauth after trigger test",
+    )
+    # ---
+    leaprun_assert_function(
+        leaprun_auth_during_exec_test,
+        "",
+        "leaprun auth during exec test",
+    )
+    # ---
+    leaprun_assert_function(
+        leaprun_multi_authorized_test, "", "leaprun multi authorized test"
+    )
+    # ---
+    leaprun_assert_function(
+        leaprun_access_check_end_during_exec_test,
+        "",
+        "Leaprun access check end during exec test",
+    )
+    # ---
+    leaprun_assert_function(
+        leaprun_access_check_end_before_results_test,
+        "",
+        "Leaprun access check end before results test",
+    )
+    # ---
+    leaprun_assert_function(
+        leaprun_trigger_error_during_check_test,
+        "",
+        "Leaprun trigger error during check test",
+    )
+    # ---
+    leaprun_assert_function(
+        leaprun_multi_trigger_test,
+        "",
+        "Leaprun multi trigger test",
+    )
+    # ---
+    leaprun_assert_function(
+        leaprun_trigger_during_check_test,
+        "",
+        "Leaprun trigger during check test",
+    )
+    # ---
+    leaprun_assert_function(
+        leaprun_result_stdout_before_trigger_test,
+        "",
+        "Leaprun result stdout before trigger test",
+    )
+    # ---
+    leaprun_assert_function(
+        leaprun_result_stderr_before_trigger_test,
+        "",
+        "Leaprun result stderr before trigger test",
+    )
+    # ---
+    leaprun_assert_function(
+        leaprun_result_exitcode_before_trigger_test,
+        "",
+        "Leaprun result exitcode before trigger test",
     )
     # ---
 
@@ -1298,7 +2251,7 @@ def write_config_file_with_bad_name(bogus: str) -> bool:
 def write_new_config_file(bad_config_file: str) -> bool:
     """
     Writes a config file other than the default unit-test.conf file. Used for
-      testing various things that involve changing configuration.
+    testing various things that involve changing configuration.
     """
 
     target_path: Path
@@ -1357,6 +2310,11 @@ def write_new_config_file(bad_config_file: str) -> bool:
                 "system_local.conf",
             )
             target_contents = PlTestData.system_local_config_file
+        case "new_persistent_users_config_file":
+            target_path = Path(
+                PlTestGlobal.privleap_conf_dir, "new_persistent_users.conf"
+            )
+            target_contents = PlTestData.new_persistent_users_config_file
         case _:
             return False
 
@@ -1414,7 +2372,7 @@ def privleapd_set_secure_owner(target_path: str) -> bool:
 def privleapd_set_secure_mode(target_path: str) -> bool:
     """
     Sets the mode of the specified file or directory to 644 for files, or 755
-      for directories.
+    for directories.
     """
 
     ## We don't actually use the 644 codepath here (we never have the need to
@@ -1433,7 +2391,7 @@ def privleapd_set_secure_mode(target_path: str) -> bool:
 def privleapd_check_persistent_users_test(bogus: str) -> bool:
     """
     Ensures all persistent users configured in privleapd's test configuration
-      have comm sockets created automatically.
+    have comm sockets created automatically.
     """
 
     if bogus != "":
@@ -1517,7 +2475,7 @@ def privleapd_bad_config_file_check_test(bogus: str) -> bool:
 def privleapd_control_disconnect_test(bogus: str) -> bool:
     """
     Tests how privleapd handles a control client that connects and then
-      instantly disconnects.
+    instantly disconnects.
     """
 
     if bogus != "":
@@ -1531,7 +2489,7 @@ def privleapd_control_disconnect_test(bogus: str) -> bool:
 def privleapd_create_invalid_user_socket_test(bogus: str) -> bool:
     """
     Tests how privleapd handles a control client that requests a socket to be
-      created for a user that does not exist.
+    created for a user that does not exist.
     """
 
     if bogus != "":
@@ -1558,8 +2516,8 @@ def privleapd_create_invalid_user_socket_test(bogus: str) -> bool:
 def privleapd_create_invalid_user_socket_and_bail_test(bogus: str) -> bool:
     """
     Tests how privleapd handles a control client that requests a socket to be
-      created for a user that does not exist, and then disconnects before
-      privleapd can send a reply.
+    created for a user that does not exist, and then disconnects before
+    privleapd can send a reply.
     """
 
     if bogus != "":
@@ -1583,7 +2541,7 @@ def privleapd_create_invalid_user_socket_and_bail_test(bogus: str) -> bool:
 def privleapd_destroy_invalid_user_socket_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      destroyed for a user that does not exist.
+    destroyed for a user that does not exist.
     """
 
     if bogus != "":
@@ -1610,16 +2568,14 @@ def privleapd_destroy_invalid_user_socket_test(bogus: str) -> bool:
 def privleapd_create_user_socket_twice_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      created for the same (existing) user twice in a row.
+    created for the same (existing) user twice in a row.
     """
     if bogus != "":
         return False
     discard_privleapd_stderr()
     assert_success: bool = True
     control_session: PrivleapSession = PrivleapSession(is_control_session=True)
-    control_session.send_msg(
-        PrivleapControlClientCreateMsg(PlTestGlobal.test_username)
-    )
+    control_session.send_msg(PrivleapControlClientCreateMsg("privleaptestone"))
     control_server_msg: PrivleapMsg = control_session.get_msg()
     control_session.close_session()
     if not isinstance(control_server_msg, PrivleapControlServerOkMsg):
@@ -1629,9 +2585,7 @@ def privleapd_create_user_socket_twice_test(bogus: str) -> bool:
         )
         assert_success = False
     control_session = PrivleapSession(is_control_session=True)
-    control_session.send_msg(
-        PrivleapControlClientCreateMsg(PlTestGlobal.test_username)
-    )
+    control_session.send_msg(PrivleapControlClientCreateMsg("privleaptestone"))
     control_server_msg = control_session.get_msg()
     control_session.close_session()
     if not isinstance(control_server_msg, PrivleapControlServerExistsMsg):
@@ -1648,8 +2602,8 @@ def privleapd_create_user_socket_twice_test(bogus: str) -> bool:
 def privleapd_create_existing_user_socket_and_bail_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      created for a user that already has a socket created, and then disconnects
-      before privleapd can send a reply.
+    created for a user that already has a socket created, and then disconnects
+    before privleapd can send a reply.
     """
 
     if bogus != "":
@@ -1662,7 +2616,7 @@ def privleapd_create_existing_user_socket_and_bail_test(bogus: str) -> bool:
             is_control_session=True
         )
         control_session.send_msg(
-            PrivleapControlClientCreateMsg(PlTestGlobal.test_username)
+            PrivleapControlClientCreateMsg("privleaptestone")
         )
         control_session.close_session()
         if compare_privleapd_stderr(
@@ -1675,7 +2629,7 @@ def privleapd_create_existing_user_socket_and_bail_test(bogus: str) -> bool:
 def privleapd_create_blocked_user_socket_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      created for a user that has a blocker socket in the way.
+    created for a user that has a blocker socket in the way.
     """
 
     if bogus != "":
@@ -1683,9 +2637,7 @@ def privleapd_create_blocked_user_socket_test(bogus: str) -> bool:
     discard_privleapd_stderr()
     assert_success: bool = True
     control_session: PrivleapSession = PrivleapSession(is_control_session=True)
-    control_session.send_msg(
-        PrivleapControlClientCreateMsg(PlTestGlobal.test_username)
-    )
+    control_session.send_msg(PrivleapControlClientCreateMsg("privleaptestone"))
     control_server_msg: PrivleapMsg = control_session.get_msg()
     control_session.close_session()
     if not isinstance(control_server_msg, PrivleapControlServerControlErrorMsg):
@@ -1704,8 +2656,8 @@ def privleapd_create_blocked_user_socket_test(bogus: str) -> bool:
 def privleapd_create_blocked_user_socket_and_bail_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      created for a user that has a blocker socket in the way, and then
-      disconnects before privleapd can send a reply.
+    created for a user that has a blocker socket in the way, and then
+    disconnects before privleapd can send a reply.
     """
 
     if bogus != "":
@@ -1718,7 +2670,7 @@ def privleapd_create_blocked_user_socket_and_bail_test(bogus: str) -> bool:
             is_control_session=True
         )
         control_session.send_msg(
-            PrivleapControlClientCreateMsg(PlTestGlobal.test_username)
+            PrivleapControlClientCreateMsg("privleaptestone")
         )
         control_session.close_session()
         if compare_privleapd_stderr(
@@ -1731,7 +2683,7 @@ def privleapd_create_blocked_user_socket_and_bail_test(bogus: str) -> bool:
 def privleapd_destroy_missing_user_socket_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      destroyed for a user whose socket on the filesystem has been deleted.
+    destroyed for a user whose socket on the filesystem has been deleted.
     """
 
     if bogus != "":
@@ -1743,15 +2695,13 @@ def privleapd_destroy_missing_user_socket_test(bogus: str) -> bool:
             Path(
                 PlTestGlobal.privleap_state_dir,
                 "comm",
-                PlTestGlobal.test_username,
+                "privleaptestone",
             )
         )
     except Exception:
         return False
     control_session: PrivleapSession = PrivleapSession(is_control_session=True)
-    control_session.send_msg(
-        PrivleapControlClientDestroyMsg(PlTestGlobal.test_username)
-    )
+    control_session.send_msg(PrivleapControlClientDestroyMsg("privleaptestone"))
     control_server_msg: PrivleapMsg = control_session.get_msg()
     control_session.close_session()
     if not isinstance(control_server_msg, PrivleapControlServerOkMsg):
@@ -1770,7 +2720,7 @@ def privleapd_destroy_missing_user_socket_test(bogus: str) -> bool:
 def privleapd_create_expected_disallowed_socket_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      created for a user that is marked as "expected disallowed".
+    created for a user that is marked as "expected disallowed".
     """
 
     if bogus != "":
@@ -1799,8 +2749,8 @@ def privleapd_create_expected_disallowed_socket_test(bogus: str) -> bool:
 def privleapd_destroy_user_socket_and_bail_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      destroyed for a user with a socket in existence, and then disconnects
-      before privleapd can send a reply.
+    destroyed for a user with a socket in existence, and then disconnects
+    before privleapd can send a reply.
     """
 
     if bogus != "":
@@ -1813,14 +2763,14 @@ def privleapd_destroy_user_socket_and_bail_test(bogus: str) -> bool:
             is_control_session=True
         )
         control_session.send_msg(
-            PrivleapControlClientCreateMsg(PlTestGlobal.test_username)
+            PrivleapControlClientCreateMsg("privleaptestone")
         )
         _ = control_session.get_msg()
         control_session.close_session()
         discard_privleapd_stderr()
         control_session = PrivleapSession(is_control_session=True)
         control_session.send_msg(
-            PrivleapControlClientDestroyMsg(PlTestGlobal.test_username)
+            PrivleapControlClientDestroyMsg("privleaptestone")
         )
         control_session.close_session()
         if compare_privleapd_stderr(
@@ -1833,8 +2783,8 @@ def privleapd_destroy_user_socket_and_bail_test(bogus: str) -> bool:
 def privleapd_destroy_bad_user_socket_and_bail_test(bogus: str) -> bool:
     """
     Test how privleapd handles a control client that requests a socket to be
-      destroyed for a user with a socket in existence, and then disconnects
-      before privleapd can send a reply.
+    destroyed for a user with a socket in existence, and then disconnects
+    before privleapd can send a reply.
     """
 
     if bogus != "":
@@ -1847,7 +2797,7 @@ def privleapd_destroy_bad_user_socket_and_bail_test(bogus: str) -> bool:
             is_control_session=True
         )
         control_session.send_msg(
-            PrivleapControlClientDestroyMsg(PlTestGlobal.test_username)
+            PrivleapControlClientDestroyMsg("privleaptestone")
         )
         control_session.close_session()
         if compare_privleapd_stderr(
@@ -1860,7 +2810,7 @@ def privleapd_destroy_bad_user_socket_and_bail_test(bogus: str) -> bool:
 def privleapd_send_invalid_control_message_test(bogus: str) -> bool:
     """
     Test how privleapd handles an entirely invalid message sent by a control
-      client.
+    client.
     """
 
     if bogus != "":
@@ -1896,7 +2846,7 @@ def privleapd_send_corrupted_control_message_test(bogus: str) -> bool:
     # data that isn't expected and should be rejected. The pun in "root exploit"
     # was not originally intended, but was too good to leave out :)
     socket_send_raw_bytes(
-        control_session.backend_socket, b"\x00\x00\x00\x13CREATE root exploit"
+        control_session.backend_socket, b"\x00\x00\x00\x15CREATE 1 root exploit"
     )
     control_session.close_session()
     if not compare_privleapd_stderr(
@@ -1909,13 +2859,13 @@ def privleapd_send_corrupted_control_message_test(bogus: str) -> bool:
 def privleapd_bail_comm_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that immediately disconnects after
-      connecting.
+    connecting.
     """
 
     if bogus != "":
         return False
     discard_privleapd_stderr()
-    comm_session: PrivleapSession = PrivleapSession(PlTestGlobal.test_username)
+    comm_session: PrivleapSession = PrivleapSession("privleaptestone")
     comm_session.close_session()
     if not compare_privleapd_stderr(PlTestData.bail_comm_lines):
         return False
@@ -1930,12 +2880,12 @@ def privleapd_send_invalid_comm_message_test(bogus: str) -> bool:
     if bogus != "":
         return False
     discard_privleapd_stderr()
-    comm_session: PrivleapSession = PrivleapSession(PlTestGlobal.test_username)
+    comm_session: PrivleapSession = PrivleapSession("privleaptestone")
     assert comm_session.backend_socket is not None
     # privleap message packets are simply length-prefixed binary blobs, with the
     # length specified as a 4-byte big-endian integer.
     socket_send_raw_bytes(
-        comm_session.backend_socket, b"\x00\x00\x00\x0dBOB asdfghjkl"
+        comm_session.backend_socket, b"\x00\x00\x00\x0fBOB 1 asdfghjkl"
     )
     comm_session.close_session()
     if not compare_privleapd_stderr(PlTestData.send_invalid_comm_message_lines):
@@ -1946,7 +2896,7 @@ def privleapd_send_invalid_comm_message_test(bogus: str) -> bool:
 def privleapd_send_nonexistent_signal_and_bail_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that requests a nonexistent action
-      to be run, and then disconnects before privleapd can send a reply.
+    to be run, and then disconnects before privleapd can send a reply.
     """
 
     if bogus != "":
@@ -1955,9 +2905,7 @@ def privleapd_send_nonexistent_signal_and_bail_test(bogus: str) -> bool:
     # This test is prone to race conditions, so we try 5 times and consider it
     # good if one of those times passes.
     for i in range(5):
-        comm_session: PrivleapSession = PrivleapSession(
-            PlTestGlobal.test_username
-        )
+        comm_session: PrivleapSession = PrivleapSession("privleaptestone")
         comm_session.send_msg(PrivleapCommClientSignalMsg("nonexistent"))
         comm_session.close_session()
         part1_passed: bool = False
@@ -1982,8 +2930,8 @@ def privleapd_send_nonexistent_signal_and_bail_test(bogus: str) -> bool:
 def privleapd_send_userrestrict_signal_and_bail_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that requests an action to be run
-      that the user is not permitted to run, and then disconnects before
-      privleapd can send a reply.
+    that the user is not permitted to run, and then disconnects before
+    privleapd can send a reply.
     """
 
     if bogus != "":
@@ -1992,9 +2940,7 @@ def privleapd_send_userrestrict_signal_and_bail_test(bogus: str) -> bool:
     # This test is prone to race conditions, so we try 5 times and consider it
     # good if one of those times passes.
     for i in range(5):
-        comm_session: PrivleapSession = PrivleapSession(
-            PlTestGlobal.test_username
-        )
+        comm_session: PrivleapSession = PrivleapSession("privleaptestone")
         comm_session.send_msg(
             PrivleapCommClientSignalMsg("test-act-userrestrict")
         )
@@ -2021,8 +2967,8 @@ def privleapd_send_userrestrict_signal_and_bail_test(bogus: str) -> bool:
 def privleapd_send_grouprestrict_signal_and_bail_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that requests an action to be run
-      that the user is not in a group that is permitted to run, and then
-      disconnects before privleapd can send a reply.
+    that the user is not in a group that is permitted to run, and then
+    disconnects before privleapd can send a reply.
     """
 
     if bogus != "":
@@ -2031,9 +2977,7 @@ def privleapd_send_grouprestrict_signal_and_bail_test(bogus: str) -> bool:
     # This test is prone to race conditions, so we try 5 times and consider it
     # good if one of those times passes.
     for i in range(5):
-        comm_session: PrivleapSession = PrivleapSession(
-            PlTestGlobal.test_username
-        )
+        comm_session: PrivleapSession = PrivleapSession("privleaptestone")
         comm_session.send_msg(
             PrivleapCommClientSignalMsg("test-act-grouprestrict")
         )
@@ -2063,8 +3007,8 @@ def privleapd_check_signal_response_helper(
 ) -> Tuple[bytes, bytes, int, bool, bool]:
     """
     Test how privleapd handles a comm client that requests a specific action to
-      be run. This function actually runs the action, and sends the result back
-      to privleapd_check_signal_response_test.
+    be run. This function actually runs the action, and sends the result back
+    to privleapd_check_signal_response_test.
     """
 
     comm_session: PrivleapSession = PrivleapSession(target_user)
@@ -2117,7 +3061,7 @@ def privleapd_check_signal_response_helper(
 def privleapd_check_signal_response_test(test_type: str) -> bool:
     """
     Test how privleapd handles a comm client that requests a specific action to
-      be run. General test function usable for basically any signal.
+    be run. General test function usable for basically any signal.
     """
 
     expect_stdout_data: bytes = b""
@@ -2127,7 +3071,7 @@ def privleapd_check_signal_response_test(test_type: str) -> bool:
     expect_error_result: bool = False
     expect_privleapd_stderr: list[str] = []
     test_action: str | None = None
-    target_user: str = PlTestGlobal.test_username
+    target_user: str = "privleaptestone"
     match test_type:
         case "test-act-invalid-bash":
             expect_stderr_data = (
@@ -2158,20 +3102,20 @@ def privleapd_check_signal_response_test(test_type: str) -> bool:
                 PlTestData.test_act_userpermit_success_lines
             )
             test_action = "test-act-userpermit"
-        case "test-act-privleap-grouppermit-alttest-success":
+        case "test-act-privleap-grouppermit-privleaptesttwo-success":
             expect_stdout_data = b"test-act-privleap-grouppermit\n"
             expect_privleapd_stderr = (
-                PlTestData.test_act_privleap_grouppermit_alttest_success_lines
+                PlTestData.test_act_privleap_grouppermit_privleaptesttwo_success_lines
             )
             test_action = "test-act-privleap-grouppermit"
-            target_user = "alttest"
-        case "test-act-privleap-grouppermit-alttest-kick":
+            target_user = "privleaptesttwo"
+        case "test-act-privleap-grouppermit-privleaptesttwo-kick":
             expect_error_result = True
             expect_privleapd_stderr = (
-                PlTestData.test_act_privleap_grouppermit_alttest_kick_lines
+                PlTestData.test_act_privleap_grouppermit_privleaptesttwo_kick_lines
             )
             test_action = "test-act-privleap-grouppermit"
-            target_user = "alttest"
+            target_user = "privleaptesttwo"
         case "test-act-nonexistent-restrict":
             expect_unauthorized = True
             expect_privleapd_stderr = (
@@ -2225,8 +3169,8 @@ def privleapd_check_signal_response_test(test_type: str) -> bool:
 def privleapd_send_valid_signal_and_bail_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that requests an action to be run
-      that is valid and that the user can run, and then disconnects before
-      privleapd can send a reply.
+    that is valid and that the user can run, and then disconnects before
+    privleapd can send a reply.
     """
 
     if bogus != "":
@@ -2235,9 +3179,7 @@ def privleapd_send_valid_signal_and_bail_test(bogus: str) -> bool:
     # This test is prone to race conditions, so we try 5 times and consider it
     # good if one of those times passes.
     for i in range(5):
-        comm_session: PrivleapSession = PrivleapSession(
-            PlTestGlobal.test_username
-        )
+        comm_session: PrivleapSession = PrivleapSession("privleaptestone")
         comm_session.send_msg(PrivleapCommClientSignalMsg("test-act-free"))
         comm_session.close_session()
         if compare_privleapd_stderr(
@@ -2250,19 +3192,29 @@ def privleapd_send_valid_signal_and_bail_test(bogus: str) -> bool:
 def privleapd_allowed_action_access_check_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that checks if they are allowed to
-      run an action that they are allowed to run.
+    run an action that they are allowed to run.
     """
 
     if bogus != "":
         return False
     discard_privleapd_stderr()
     assert_success: bool = True
-    comm_session: PrivleapSession = PrivleapSession(PlTestGlobal.test_username)
-    comm_session.send_msg(PrivleapCommClientAccessCheckMsg("test-act-free"))
+    comm_session: PrivleapSession = PrivleapSession("privleaptestone")
+    comm_session.send_msg(PrivleapCommClientAccessCheckMsg(["test-act-free"]))
     comm_session_msg: PrivleapMsg = comm_session.get_msg()
     if not isinstance(comm_session_msg, PrivleapCommServerAuthorizedMsg):
-        logging.error("Incorrect reply to access check!")
+        logging.error("Incorrect reply type to access check!")
         assert_success = False
+    else:
+        if len(comm_session_msg.signal_name_list) > 1:
+            logging.error("Too many signal names in reply to access check!")
+            assert_success = False
+        if comm_session_msg.signal_name_list[0] != "test-act-free":
+            logging.error(
+                "Reply to access check names signal '%s' rather than "
+                + "'test-act-free'!",
+                comm_session_msg.signal_name_list[0],
+            )
     if not compare_privleapd_stderr(
         PlTestData.allowed_action_access_check_lines
     ):
@@ -2273,21 +3225,31 @@ def privleapd_allowed_action_access_check_test(bogus: str) -> bool:
 def privleapd_disallowed_action_access_check_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that checks if they are allowed to
-      run an action that they are allowed to run.
+    run an action that they are allowed to run.
     """
 
     if bogus != "":
         return False
     discard_privleapd_stderr()
     assert_success: bool = True
-    comm_session: PrivleapSession = PrivleapSession(PlTestGlobal.test_username)
+    comm_session: PrivleapSession = PrivleapSession("privleaptestone")
     comm_session.send_msg(
-        PrivleapCommClientAccessCheckMsg("test-act-userrestrict")
+        PrivleapCommClientAccessCheckMsg(["test-act-userrestrict"])
     )
     comm_session_msg: PrivleapMsg = comm_session.get_msg()
     if not isinstance(comm_session_msg, PrivleapCommServerUnauthorizedMsg):
-        logging.error("Incorrect reply to access check!")
+        logging.error("Incorrect reply type to access check!")
         assert_success = False
+    else:
+        if len(comm_session_msg.signal_name_list) > 1:
+            logging.error("Too many signal names in reply to access check!")
+            assert_success = False
+        if comm_session_msg.signal_name_list[0] != "test-act-userrestrict":
+            logging.error(
+                "Reply to access check names signal '%s' rather than "
+                + "'test-act-userrestrict'!",
+                comm_session_msg.signal_name_list[0],
+            )
     if not compare_privleapd_stderr(
         PlTestData.disallowed_action_access_check_lines
     ):
@@ -2307,7 +3269,7 @@ def privleapd_leaprun_terminate_test(bogus: str) -> bool:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-noreturn",
         ],
@@ -2326,13 +3288,13 @@ def privleapd_leaprun_terminate_test(bogus: str) -> bool:
 def privleapd_terminate_sent_first_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that send a TERMINATE message
-      as the first message.
+    as the first message.
     """
 
     if bogus != "":
         return False
     discard_privleapd_stderr()
-    comm_session: PrivleapSession = PrivleapSession(PlTestGlobal.test_username)
+    comm_session: PrivleapSession = PrivleapSession("privleaptestone")
     comm_session.send_msg(PrivleapCommClientTerminateMsg())
     comm_session.close_session()
     if compare_privleapd_stderr(PlTestData.terminate_sent_first_lines):
@@ -2343,13 +3305,13 @@ def privleapd_terminate_sent_first_test(bogus: str) -> bool:
 def privleapd_invalid_ascii_test(idx_str: str) -> bool:
     """
     Test how privleapd handles a comm client that sends well-formed messages
-      with invalid ASCII contents.
+    with invalid ASCII contents.
     """
 
     idx: int = int(idx_str)
     if idx > len(PlTestData.invalid_ascii_list):
         return False
-    comm_session: PrivleapSession = PrivleapSession(PlTestGlobal.test_username)
+    comm_session: PrivleapSession = PrivleapSession("privleaptestone")
     assert comm_session.backend_socket is not None
     comm_session.backend_socket.send(PlTestData.invalid_ascii_list[idx])
     try:
@@ -2366,6 +3328,51 @@ def privleapd_invalid_ascii_test(idx_str: str) -> bool:
     return False
 
 
+def privleapd_control_msg_mismatch_test(bogus: str) -> bool:
+    """
+    Test how privleapd handles receiving a comm message on the control socket.
+    """
+
+    if bogus != "":
+        return False
+    discard_privleapd_stderr()
+    control_session: PrivleapSession = PrivleapSession(is_control_session=True)
+    assert control_session.backend_socket is not None
+    # pylint: disable=protected-access
+    # Same rationale as for leaprun_server_invalid_msg_seq_test
+    control_session._PrivleapSession__send_msg(  # type: ignore [attr-defined]
+        PrivleapCommClientSignalMsg("test-act-free")
+    )
+    control_session.close_session()
+    if not compare_privleapd_stderr(
+        PlTestData.privleapd_control_msg_mismatch_lines
+    ):
+        return False
+    return True
+
+
+def privleapd_comm_msg_mismatch_test(bogus: str) -> bool:
+    """
+    Test how privleapd handles receiving a control message on the comm socket.
+    """
+
+    if bogus != "":
+        return False
+    comm_session: PrivleapSession = PrivleapSession("privleaptestone")
+    assert comm_session.backend_socket is not None
+    # pylint: disable=protected-access
+    # Same rationale as for privleapd_control_msg_mismatch_test
+    comm_session._PrivleapSession__send_msg(  # type: ignore [attr-defined]
+        PrivleapControlClientCreateMsg("wha")
+    )
+    comm_session.close_session()
+    if not compare_privleapd_stderr(
+        PlTestData.privleapd_comm_msg_mismatch_lines
+    ):
+        return False
+    return True
+
+
 def privleapd_send_random_garbage_test(bogus: str) -> bool:
     """
     Test how privleapd handles a comm client that sends pseudorandom data.
@@ -2374,7 +3381,7 @@ def privleapd_send_random_garbage_test(bogus: str) -> bool:
     if bogus != "":
         return False
     discard_privleapd_stderr()
-    comm_session: PrivleapSession = PrivleapSession(PlTestGlobal.test_username)
+    comm_session: PrivleapSession = PrivleapSession("privleaptestone")
     assert comm_session.backend_socket is not None
     with open("/dev/urandom", "rb") as randfile:
         socket_send_raw_bytes(comm_session.backend_socket, randfile.read(256))
@@ -2433,7 +3440,7 @@ def privleapd_config_reload_fail_test(bogus: str) -> bool:
 def privleapd_config_reload_with_kick_test(bogus: str) -> bool:
     """
     Reloads privleapd's configuration, and checks if no-longer-allowed users
-      were kicked in the process.
+    were kicked in the process.
     """
 
     if bogus != "":
@@ -2456,6 +3463,196 @@ def privleapd_config_reload_with_kick_test(bogus: str) -> bool:
     return assert_success
 
 
+def privleapd_multithreading_test_monitor() -> None:
+    """
+    Monitors the stderr from privleapd for unexpected lines, printing errors
+    and setting a flag if an unexpected line is detected.
+    """
+
+    assert PlTestGlobal.privleapd_proc is not None
+    assert PlTestGlobal.privleapd_proc.stderr is not None
+    linebuf: str = ""
+    while True:
+        if PlTestGlobal.multithreading_test_monitor_stop:
+            break
+        while "\n" in linebuf:
+            linebuf_parts: list[str] = linebuf.split("\n", maxsplit=1)
+            linebuf = linebuf_parts[1]
+            line: str = linebuf_parts[0]
+            line = re.sub(
+                "privleaptest(one|two|three|four|five|six|seven|eight|"
+                + "nine|ten)",
+                "XXX_USERNAME_XXX",
+                line,
+            )
+            if line not in PlTestData.multithreading_test_set:
+                logging.error(
+                    "Unexpected stderr line from privleapd: '%s'", line
+                )
+                PlTestGlobal.multithreading_test_unexpected_stderr = True
+            else:
+                logging.info("Valid line '%s' received from privleapd", line)
+
+        try:
+            linebuf += PlTestGlobal.privleapd_proc.stderr.read()
+        except Exception:
+            pass
+        time.sleep(0.1)
+
+
+# pylint: disable=consider-using-with
+# Rationale:
+#   consider-using-with: Not suitable for the parallel process running
+#     mechanism being used here.
+def privleapd_multithreading_test_worker(
+    mode: str, user_name: str
+) -> subprocess.Popen[bytes]:
+    """
+    Calls leapctl or leaprun to do an action asynchronously.
+    """
+
+    return_proc: subprocess.Popen[bytes]
+    match mode:
+        case "create":
+            return_proc = subprocess.Popen(
+                ["leapctl", "--create", user_name],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+            )
+        case "run":
+            return_proc = subprocess.Popen(
+                ["sudo", "-u", user_name, "leaprun", "test-act-anyone"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+            )
+        case "destroy":
+            return_proc = subprocess.Popen(
+                ["leapctl", "--destroy", user_name],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+            )
+    return return_proc
+
+
+# pylint: disable=too-many-branches
+# Rationale:
+#   too-many-branches: Using less branches isn't practical, splitting this up
+#     would only make it harder to read.
+def privleapd_multithreading_test(bogus: str) -> bool:
+    """
+    Exercises privleapd's multithreading code.
+    """
+
+    if bogus != "":
+        return False
+    discard_privleapd_stderr()
+
+    proc_list: list[subprocess.Popen[bytes]] = []
+    first_user_name_block = [
+        "privleaptestone",
+        "privleaptesttwo",
+        "privleaptestthree",
+        "privleaptestfour",
+        "privleaptestfive",
+    ]
+    second_user_name_block = [
+        "privleaptestsix",
+        "privleaptestseven",
+        "privleaptesteight",
+        "privleaptestnine",
+        "privleaptestten",
+    ]
+    monitor_thread: Thread = Thread(
+        target=privleapd_multithreading_test_monitor,
+    )
+    monitor_thread.start()
+
+    for user_name in first_user_name_block:
+        proc_list.append(
+            privleapd_multithreading_test_worker("create", user_name)
+        )
+    for proc in proc_list:
+        proc.communicate()
+    proc_list.clear()
+
+    for loop_idx in range(0, 20):
+        for first_block_user_name, second_block_user_name in zip(
+            first_user_name_block, second_user_name_block
+        ):
+            proc_list.append(
+                privleapd_multithreading_test_worker(
+                    "run", first_block_user_name
+                )
+            )
+            proc_list.append(
+                privleapd_multithreading_test_worker(
+                    "create", second_block_user_name
+                )
+            )
+        for proc in proc_list:
+            proc.communicate()
+        proc_list.clear()
+        logging.info(
+            "Multithreading test, part 1 of iteration %s done", loop_idx + 1
+        )
+
+        for first_block_user_name, second_block_user_name in zip(
+            first_user_name_block, second_user_name_block
+        ):
+            proc_list.append(
+                privleapd_multithreading_test_worker(
+                    "destroy", first_block_user_name
+                )
+            )
+            proc_list.append(
+                privleapd_multithreading_test_worker(
+                    "run", second_block_user_name
+                )
+            )
+        for proc in proc_list:
+            proc.communicate()
+        proc_list.clear()
+        logging.info(
+            "Multithreading test, part 2 of iteration %s done", loop_idx + 1
+        )
+
+        for first_block_user_name, second_block_user_name in zip(
+            first_user_name_block, second_user_name_block
+        ):
+            proc_list.append(
+                privleapd_multithreading_test_worker(
+                    "create", first_block_user_name
+                )
+            )
+            proc_list.append(
+                privleapd_multithreading_test_worker(
+                    "destroy", second_block_user_name
+                )
+            )
+        for proc in proc_list:
+            proc.communicate()
+        proc_list.clear()
+        logging.info(
+            "Multithreading test, part 3 of iteration %s done", loop_idx + 1
+        )
+
+    for user_name in first_user_name_block:
+        proc_list.append(
+            privleapd_multithreading_test_worker("destroy", user_name)
+        )
+    for proc in proc_list:
+        proc.communicate()
+    proc_list.clear()
+
+    time.sleep(0.5)
+    PlTestGlobal.multithreading_test_monitor_stop = True
+    time.sleep(0.5)
+
+    if PlTestGlobal.multithreading_test_unexpected_stderr:
+        return False
+    return True
+
+
 def privleapd_assert_command(
     command_data: list[str],
     exit_code: int,
@@ -2464,7 +3661,7 @@ def privleapd_assert_command(
 ) -> None:
     """
     Runs a command for leaprun tests, testing the output against expected values
-      and recording the result as a passed or failed assertion.
+    and recording the result as a passed or failed assertion.
     """
 
     global privleapd_asserts_passed
@@ -2483,7 +3680,7 @@ def privleapd_assert_function(
 ) -> None:
     """
     Runs a function that returns a boolean, passing the given string argument.
-      Records the result as a passed or failed assertion.
+    Records the result as a passed or failed assertion.
     """
 
     global privleapd_asserts_passed
@@ -2504,6 +3701,7 @@ def run_privleapd_tests() -> None:
     """
 
     # ---
+    start_privleapd_subprocess([])
     privleapd_assert_function(
         privleapd_check_persistent_users_test,
         "",
@@ -2518,7 +3716,7 @@ def run_privleapd_tests() -> None:
     # ---
     stop_privleapd_subprocess()
     privleapd_assert_command(
-        ["sudo", "-u", PlTestGlobal.test_username, "/usr/bin/privleapd"],
+        ["sudo", "-u", "privleaptestone", "/usr/bin/privleapd"],
         exit_code=1,
         stderr_data=PlTestData.privleapd_ensure_running_as_root_fail,
     )
@@ -2534,15 +3732,15 @@ def run_privleapd_tests() -> None:
         expected_error_output=PlTestData.invalid_config_file_name_lines,
     )
     privleapd_assert_command(
-        ["leapctl", "--create", PlTestGlobal.test_username],
+        ["leapctl", "--create", "privleaptestone"],
         exit_code=0,
-        stdout_data=PlTestData.test_username_socket_created,
+        stdout_data=PlTestData.privleaptestone_socket_created,
     )
     privleapd_assert_command(
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-invalid",
         ],
@@ -2804,9 +4002,9 @@ def run_privleapd_tests() -> None:
     )
     # ---
     privleapd_assert_command(
-        ["leapctl", "--destroy", PlTestGlobal.test_username],
+        ["leapctl", "--destroy", "privleaptestone"],
         exit_code=0,
-        stdout_data=PlTestData.test_username_socket_destroyed,
+        stdout_data=PlTestData.privleaptestone_socket_destroyed,
     )
     privleapd_assert_function(
         make_blocker_socket,
@@ -2814,10 +4012,10 @@ def run_privleapd_tests() -> None:
             Path(
                 PlTestGlobal.privleap_state_dir,
                 "comm",
-                PlTestGlobal.test_username,
+                "privleaptestone",
             )
         ),
-        f"Make blocker socket for user {PlTestGlobal.test_username}",
+        "Make blocker socket for user privleaptestone",
     )
     privleapd_assert_function(
         privleapd_create_blocked_user_socket_test,
@@ -2837,16 +4035,16 @@ def run_privleapd_tests() -> None:
             Path(
                 PlTestGlobal.privleap_state_dir,
                 "comm",
-                PlTestGlobal.test_username,
+                "privleaptestone",
             )
         ),
-        f"Remove blocker socket for user {PlTestGlobal.test_username}",
+        "Remove blocker socket for user privleaptestone",
     )
     # ---
     privleapd_assert_command(
-        ["leapctl", "--create", PlTestGlobal.test_username],
+        ["leapctl", "--create", "privleaptestone"],
         exit_code=0,
-        stdout_data=PlTestData.test_username_socket_created,
+        stdout_data=PlTestData.privleaptestone_socket_created,
     )
     privleapd_assert_function(
         privleapd_destroy_missing_user_socket_test,
@@ -2887,9 +4085,9 @@ def run_privleapd_tests() -> None:
     )
     # ---
     privleapd_assert_command(
-        ["leapctl", "--create", PlTestGlobal.test_username],
+        ["leapctl", "--create", "privleaptestone"],
         exit_code=0,
-        stdout_data=PlTestData.test_username_socket_created,
+        stdout_data=PlTestData.privleaptestone_socket_created,
     )
     privleapd_assert_function(
         privleapd_bail_comm_test,
@@ -2969,6 +4167,18 @@ def run_privleapd_tests() -> None:
             str(i),
             f"Test privleapd invalid ASCII handling (iteration {i+1})",
         )
+    # ---
+    privleapd_assert_function(
+        privleapd_control_msg_mismatch_test,
+        "",
+        "Test privleapd control message mismatch handling",
+    )
+    # ---
+    privleapd_assert_function(
+        privleapd_comm_msg_mismatch_test,
+        "",
+        "Test privleapd comm message mismatch handling",
+    )
     # ---
     privleapd_assert_command(["/usr/bin/privleapd", "-C"], exit_code=0)
     # ---
@@ -3085,63 +4295,63 @@ def run_privleapd_tests() -> None:
     )
     # ---
     privleapd_assert_command(
-        ["leapctl", "--create", "alttest"],
+        ["leapctl", "--create", "privleaptesttwo"],
         exit_code=0,
-        stdout_data=PlTestData.alttest_socket_created,
+        stdout_data=PlTestData.privleaptesttwo_socket_created,
     )
     privleapd_assert_function(
         privleapd_check_signal_response_test,
-        "test-act-privleap-grouppermit-alttest-success",
-        "Test privleapd action run with allowed user alttest",
+        "test-act-privleap-grouppermit-privleaptesttwo-success",
+        "Test privleapd action run with allowed user privleaptesttwo",
     )
     privleapd_assert_command(
-        ["usermod", "-r", "-G", "privleap", "alttest"],
+        ["usermod", "-r", "-G", "privleap", "privleaptesttwo"],
         exit_code=0,
         stdout_data=b"",
     )
     privleapd_assert_function(
         privleapd_check_signal_response_test,
-        "test-act-privleap-grouppermit-alttest-kick",
-        "Test privleapd action run with no longer allowed user alttest",
+        "test-act-privleap-grouppermit-privleaptesttwo-kick",
+        "Test privleapd action run with no longer allowed user privleaptesttwo",
     )
     privleapd_assert_function(
-        check_socket_absent,
-        "/run/privleapd/comm/alttest",
-        "Test alttest socket no longer exists",
+        test_if_path_not_exists,
+        str(Path(PlTestGlobal.privleap_state_dir, "comm", "privleaptesttwo")),
+        "Test privleaptesttwo socket no longer exists",
     )
     privleapd_assert_command(
-        ["leapctl", "--create", "alttest"],
+        ["leapctl", "--create", "privleaptesttwo"],
         exit_code=2,
-        stderr_data=PlTestData.alttest_socket_not_permitted,
+        stderr_data=PlTestData.privleaptesttwo_socket_not_permitted,
     )
     privleapd_assert_command(
-        ["usermod", "-a", "-G", "privleap", "alttest"],
+        ["usermod", "-a", "-G", "privleap", "privleaptesttwo"],
         exit_code=0,
         stdout_data=b"",
     )
     privleapd_assert_command(
-        ["leapctl", "--create", "alttest"],
+        ["leapctl", "--create", "privleaptesttwo"],
         exit_code=0,
-        stdout_data=PlTestData.alttest_socket_created,
+        stdout_data=PlTestData.privleaptesttwo_socket_created,
     )
     privleapd_assert_function(
         privleapd_check_signal_response_test,
-        "test-act-privleap-grouppermit-alttest-success",
-        "Test privleapd action run with allowed user alttest",
+        "test-act-privleap-grouppermit-privleaptesttwo-success",
+        "Test privleapd action run with allowed user privleaptesttwo",
     )
     # ---
     privleapd_assert_command(
-        ["leapctl", "--create", "alttest2"],
+        ["leapctl", "--create", "privleaptestthree"],
         exit_code=0,
-        stdout_data=PlTestData.alttest2_socket_created,
+        stdout_data=PlTestData.privleaptestthree_socket_created,
     )
     privleapd_assert_command(
-        ["usermod", "-r", "-G", "privleap", "alttest"],
+        ["usermod", "-r", "-G", "privleap", "privleaptesttwo"],
         exit_code=0,
         stdout_data=b"",
     )
     privleapd_assert_command(
-        ["usermod", "-r", "-G", "privleap", "alttest2"],
+        ["usermod", "-r", "-G", "privleap", "privleaptestthree"],
         exit_code=0,
         stdout_data=b"",
     )
@@ -3151,22 +4361,65 @@ def run_privleapd_tests() -> None:
         "Test privleapd config reload with multiple no-longer-allowed users",
     )
     privleapd_assert_function(
-        check_socket_absent,
-        "/run/privleapd/comm/alttest",
-        "Test alttest socket no longer exists",
+        test_if_path_not_exists,
+        str(Path(PlTestGlobal.privleap_state_dir, "comm", "privleaptesttwo")),
+        "Test privleaptesttwo socket no longer exists",
     )
     privleapd_assert_function(
-        check_socket_absent,
-        "/run/privleapd/comm/alttest2",
-        "Test alttest2 socket no longer exists",
+        test_if_path_not_exists,
+        str(Path(PlTestGlobal.privleap_state_dir, "comm", "privleaptestthree")),
+        "Test privleaptestthree socket no longer exists",
+    )
+    # We don't add privleap group membership back to the #2 and #3 accounts
+    # yet since we need them to be missing that membership for the next test.
+    # ---
+    privleapd_assert_function(
+        write_new_config_file,
+        "new_persistent_users_config_file",
+        "Write config file with new persistent users",
+    )
+    privleapd_assert_function(
+        privleapd_config_reload_test,
+        "",
+        "Test privleapd restartless config reload with new persistent users",
+    )
+    privleapd_assert_function(
+        test_if_path_exists,
+        str(Path(PlTestGlobal.privleap_state_dir, "comm", "privleaptesttwo")),
+        "Ensure privleaptesttwo user socket exists",
+    )
+    privleapd_assert_function(
+        test_if_path_exists,
+        str(Path(PlTestGlobal.privleap_state_dir, "comm", "privleaptestthree")),
+        "Ensure privleaptestthree user socket exists",
+    )
+    privleapd_assert_function(
+        try_remove_file,
+        str(Path(PlTestGlobal.privleap_conf_dir, "new_persistent_users.conf")),
+        "Remove config file with new persistent users",
+    )
+    privleapd_assert_function(
+        privleapd_config_reload_with_kick_test,
+        "",
+        "Test privleapd config reload with removed persistent users",
+    )
+    privleapd_assert_function(
+        test_if_path_not_exists,
+        str(Path(PlTestGlobal.privleap_state_dir, "comm", "privleaptesttwo")),
+        "Test privleaptesttwo socket no longer exists",
+    )
+    privleapd_assert_function(
+        test_if_path_not_exists,
+        str(Path(PlTestGlobal.privleap_state_dir, "comm", "privleaptestthree")),
+        "Test privleaptestthree socket no longer exists",
     )
     privleapd_assert_command(
-        ["usermod", "-a", "-G", "privleap", "alttest"],
+        ["usermod", "-a", "-G", "privleap", "privleaptesttwo"],
         exit_code=0,
         stdout_data=b"",
     )
     privleapd_assert_command(
-        ["usermod", "-a", "-G", "privleap", "alttest2"],
+        ["usermod", "-a", "-G", "privleap", "privleaptestthree"],
         exit_code=0,
         stdout_data=b"",
     )
@@ -3210,15 +4463,15 @@ def run_privleapd_tests() -> None:
         expected_error_output=PlTestData.missing_local_config_dir_lines,
     )
     privleapd_assert_command(
-        ["leapctl", "--create", PlTestGlobal.test_username],
+        ["leapctl", "--create", "privleaptestone"],
         exit_code=0,
-        stdout_data=PlTestData.test_username_socket_created,
+        stdout_data=PlTestData.privleaptestone_socket_created,
     )
     privleapd_assert_command(
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-free",
         ],
@@ -3245,7 +4498,7 @@ def run_privleapd_tests() -> None:
         [
             "sudo",
             "-u",
-            PlTestGlobal.test_username,
+            "privleaptestone",
             "leaprun",
             "test-act-system-local",
         ],
@@ -3261,6 +4514,43 @@ def run_privleapd_tests() -> None:
         privleapd_config_reload_test,
         "",
         "Test privleapd restartless config reload, no system-local config",
+    )
+    # ---
+    privleapd_assert_command(
+        [
+            "bash",
+            "-c",
+            "sudo -u privleaptestone "
+            + "leaprun test-act-interrupt & sleep 1; disown; exit 0",
+        ],
+        exit_code=0,
+    )
+    privleapd_assert_command(
+        ["leapctl", "--destroy", "privleaptestone"],
+        exit_code=0,
+        stdout_data=PlTestData.privleaptestone_socket_destroyed,
+    )
+    time.sleep(0.1)
+    privleapd_assert_function(
+        test_if_path_exists,
+        "/test-act-interrupt",
+        "Test privleapd action termination upon comm socket destruction",
+    )
+    privleapd_assert_function(
+        try_remove_file,
+        "/test-act-interrupt",
+        "Remove flag file left by test-act-interrupt",
+    )
+    # ---
+    privleapd_assert_function(
+        privleapd_multithreading_test,
+        "",
+        "Test privleapd multithreading code",
+    )
+    privleapd_assert_command(
+        ["leapctl", "--create", "privleaptestone"],
+        exit_code=0,
+        stdout_data=PlTestData.privleaptestone_socket_created,
     )
     # ---
 
@@ -3334,9 +4624,21 @@ def main() -> NoReturn:
     print_test_header()
     ensure_running_as_root()
     stop_privleapd_service()
-    setup_test_account(PlTestGlobal.test_username, PlTestGlobal.test_home_dir)
-    setup_test_account("alttest", Path("/home/alttest"))
-    setup_test_account("alttest2", Path("/home/alttest2"))
+    for setup_account_name in [
+        "privleaptestone",
+        "privleaptesttwo",
+        "privleaptestthree",
+        "privleaptestfour",
+        "privleaptestfive",
+        "privleaptestsix",
+        "privleaptestseven",
+        "privleaptesteight",
+        "privleaptestnine",
+        "privleaptestten",
+    ]:
+        setup_test_account(
+            setup_account_name, Path(f"/home/{setup_account_name}")
+        )
     displace_old_privleap_config()
     write_privleap_test_config()
 

@@ -14,7 +14,8 @@
 import sys
 import shutil
 import select
-from threading import Thread
+from threading import Thread, Lock
+from queue import SimpleQueue
 import os
 import pwd
 import grp
@@ -24,7 +25,8 @@ import logging
 import time
 from enum import Enum
 from pathlib import Path
-from typing import Tuple, cast, SupportsIndex, NoReturn, Any
+from typing import cast, SupportsIndex, NoReturn, Any, IO
+from dataclasses import dataclass
 
 import sdnotify  # type: ignore
 
@@ -35,6 +37,7 @@ from .privleap import (
     PrivleapCommClientSignalMsg,
     PrivleapCommClientTerminateMsg,
     PrivleapCommon,
+    PrivleapCommServerAccessCheckResultsEndMsg,
     PrivleapCommServerAuthorizedMsg,
     PrivleapCommServerResultExitcodeMsg,
     PrivleapCommServerResultStderrMsg,
@@ -60,6 +63,27 @@ from .privleap import (
 )
 
 
+# pylint: disable=too-many-instance-attributes
+# Rationale:
+#   too-many-instance-attributes: It's not reasonably feasible to reduce the
+#     number of attributes here.
+@dataclass
+class PrivleapdSocketInfo:
+    """
+    A PrivleapSocket and associated data for checking when it should be
+    terminated.
+    """
+
+    listen_socket: PrivleapSocket
+    term_notify_read_fd: int
+    term_notify_write_fd: int
+    term_notify_read_pipe: IO[bytes] | None
+    term_notify_write_pipe: IO[bytes] | None
+    term_notify_lock: Lock = Lock()
+    term_notify_pipes_closed: bool = False
+    should_terminate: bool = False
+
+
 # pylint: disable=too-few-public-methods
 # Rationale:
 #   too-few-public-methods: This class just stores global variables, it needs no
@@ -70,22 +94,45 @@ class PrivleapdGlobal:
     Global variables for privleapd.
     """
 
+    # Readable by all threads, writable by none
     config_dir_list: list[Path] = [
         Path("/etc/privleap/conf.d"),
         Path("/usr/local/etc/privleap/conf.d"),
     ]
+    pid_file_path: Path = Path(PrivleapCommon.state_dir, "pid")
+
+    # Readable by all threads, writable by main thread
+    test_mode = False
+    check_config_mode = False
+    debug_mode = False
+    old_umask: int = 0
+
+    # Readable by all threads, writable by main thread until the control
+    # thread starts, then writable by control thread
+    socket_list: list[PrivleapdSocketInfo] = []
     action_list: list[PrivleapAction] = []
     persistent_user_list: list[str] = []
     allowed_user_list: list[str] = []
     allowed_group_list: list[str] = []
     expected_disallowed_user_list: list[str] = []
-    socket_list: list[PrivleapSocket] = []
-    pid_file_path: Path = Path(PrivleapCommon.state_dir, "pid")
-    test_mode = False
-    check_config_mode = False
-    debug_mode = False
+
+    # Readable and writable by main thread only
     sdnotify_object: sdnotify.SystemdNotifier = sdnotify.SystemdNotifier()
-    old_umask: int = 0
+
+    # Thread IPC mechanisms
+    # control-to-main pipe read end, for main thread
+    ctm_read_fd: int = 0
+    # control-to-main write pipe, for control thread
+    ctm_write_fd: int = 0
+    # IO for ctm_read_fd
+    ctm_read_pipe: IO[bytes] | None = None
+    # IO for ctm_write_fd
+    ctm_write_pipe: IO[bytes] | None = None
+    # all-to-control queue
+    control_request_queue: SimpleQueue[dict[str, PrivleapSession | str]] = (
+        SimpleQueue()
+    )
+    socket_list_lock: Lock = Lock()
 
 
 class PrivleapdAuthStatus(Enum):
@@ -111,7 +158,9 @@ class PrivleapdCommDestroyResult(Enum):
 def send_msg_safe(session: PrivleapSession, msg: PrivleapMsg) -> bool:
     """
     Sends a message to the client, gracefully handling the situation where the
-      client has already closed the session.
+    client has already closed the session.
+
+    May be called by either comm or control threads.
     """
 
     if PrivleapdGlobal.test_mode:
@@ -129,8 +178,10 @@ def send_msg_safe(session: PrivleapSession, msg: PrivleapMsg) -> bool:
 def user_in_allowed_group(user_name: str) -> bool:
     """
     Returns True if user_name currently belongs to an allowed group. Looks up
-      user and group data from scratch on each call, so that if user group
-      membership changes between calls, privleapd notices.
+    user and group data from scratch on each call, so that if user group
+    membership changes between calls, privleapd notices.
+
+    May be called by any thread.
     """
 
     try:
@@ -172,7 +223,9 @@ def user_in_allowed_group(user_name: str) -> bool:
 def is_user_allowed(user_name: str) -> bool:
     """
     Returns True if user_name is present in the allowed user list or is a
-      member of a group present in the allowed group list.
+    member of a group present in the allowed group list.
+
+    May be called by any thread.
     """
 
     if user_name in PrivleapdGlobal.allowed_user_list:
@@ -184,11 +237,14 @@ def prune_disallowed_comm_sockets() -> None:
     """
     Remove comm sockets for users who are no longer allowed to connect to
     privleap.
+
+    May only be called by the control thread.
     """
 
     user_names_to_kick: list[str] = []
 
-    for sock in PrivleapdGlobal.socket_list:
+    for sock_info in PrivleapdGlobal.socket_list:
+        sock: PrivleapSocket = sock_info.listen_socket
         if sock.socket_type != PrivleapSocketType.COMMUNICATION:
             continue
         assert sock.user_name is not None
@@ -204,12 +260,58 @@ def prune_disallowed_comm_sockets() -> None:
         _, _ = destroy_comm_socket(user_name)
 
 
+def socket_list_add(new_sock: PrivleapSocket) -> None:
+    """
+    Sets up and appends a socket to PrivleapdGlobal.socket_list. Does not
+    synchronize access.
+
+    If called directly, may only be called by the main thread. May also be
+    called by the control thread if called via socket_list_add_sync().
+    """
+
+    term_notify_read_fd: int
+    term_notify_write_fd: int
+    term_notify_read_fd, term_notify_write_fd = os.pipe()
+    term_notify_read_pipe: IO[bytes] = os.fdopen(
+        term_notify_read_fd, "rb", buffering=0
+    )
+    term_notify_write_pipe: IO[bytes] = os.fdopen(
+        term_notify_write_fd, "wb", buffering=0
+    )
+    PrivleapdGlobal.socket_list.append(
+        PrivleapdSocketInfo(
+            new_sock,
+            term_notify_read_fd,
+            term_notify_write_fd,
+            term_notify_read_pipe,
+            term_notify_write_pipe,
+        )
+    )
+
+
+def socket_list_add_sync(new_sock: PrivleapSocket) -> None:
+    """
+    Sets up and appends a socket to PrivleapdGlobal.socket_list, synchronizing
+    access with the main thread.
+
+    May only be called by the control thread.
+    """
+
+    assert PrivleapdGlobal.ctm_write_pipe is not None
+    with PrivleapdGlobal.socket_list_lock:
+        while PrivleapdGlobal.ctm_write_pipe.write(b"\x00") == 0:
+            pass
+        socket_list_add(new_sock)
+
+
 def handle_control_create_msg(
     control_session: PrivleapSession,
     control_msg: PrivleapControlClientCreateMsg,
 ) -> None:
     """
     Handles a CREATE control message from the client.
+
+    May only be called by the control thread.
     """
 
     assert control_msg.user_name is not None
@@ -239,7 +341,8 @@ def handle_control_create_msg(
         send_msg_safe(control_session, PrivleapControlServerDisallowedUserMsg())
         return
 
-    for sock in PrivleapdGlobal.socket_list:
+    for sock_info in PrivleapdGlobal.socket_list:
+        sock: PrivleapSocket = sock_info.listen_socket
         if sock.user_name == user_name:
             # User already has an open socket
             logging.info(
@@ -254,7 +357,7 @@ def handle_control_create_msg(
         comm_socket: PrivleapSocket = PrivleapSocket(
             PrivleapSocketType.COMMUNICATION, user_name
         )
-        PrivleapdGlobal.socket_list.append(comm_socket)
+        socket_list_add_sync(comm_socket)
         logging.info(
             "Handled CREATE message for account '%s', socket created", user_name
         )
@@ -268,13 +371,39 @@ def handle_control_create_msg(
         return
 
 
+def socket_list_stop_sync(sock_idx: int) -> None:
+    """
+    Removes a comm socket from the socket list, synchronizing access with the
+    main thread.
+
+    May only be called by the control thread.
+    """
+
+    assert PrivleapdGlobal.ctm_write_pipe is not None
+    with PrivleapdGlobal.socket_list_lock:
+        while PrivleapdGlobal.ctm_write_pipe.write(b"\x00") == 0:
+            pass
+        target_socket_info: PrivleapdSocketInfo = PrivleapdGlobal.socket_list[
+            sock_idx
+        ]
+        assert target_socket_info.term_notify_write_pipe is not None
+        assert target_socket_info.term_notify_read_pipe is not None
+        target_socket_info.should_terminate = True
+        target_socket_info.listen_socket.close()
+        while target_socket_info.term_notify_write_pipe.write(b"\x00") == 0:
+            pass
+        PrivleapdGlobal.socket_list.pop(cast(SupportsIndex, sock_idx))
+
+
 def destroy_comm_socket(
     user_name: str,
 ) -> tuple[str, PrivleapdCommDestroyResult]:
     """
     Destroys the comm socket for the specified username. Returns the real user
-      name that the function attempted to destroy a socket for, and the result
-      of the destroy operation.
+    name that the function attempted to destroy a socket for, and the result
+    of the destroy operation.
+
+    May only be called by the control thread.
     """
 
     remove_sock_idx: int | None = None
@@ -293,7 +422,8 @@ def destroy_comm_socket(
         )
         return real_user_name, PrivleapdCommDestroyResult.PERSISTENT_USER
 
-    for sock_idx, sock in enumerate(PrivleapdGlobal.socket_list):
+    for sock_idx, sock_info in enumerate(PrivleapdGlobal.socket_list):
+        sock: PrivleapSocket = sock_info.listen_socket
         if sock.user_name == real_user_name:
             socket_path: Path = Path(PrivleapCommon.comm_dir, real_user_name)
             if socket_path.exists():
@@ -321,7 +451,7 @@ def destroy_comm_socket(
             break
 
     if remove_sock_idx is not None:
-        PrivleapdGlobal.socket_list.pop(cast(SupportsIndex, remove_sock_idx))
+        socket_list_stop_sync(remove_sock_idx)
         logging.info(
             "Successfully destroyed comm socket for account '%s'",
             real_user_name,
@@ -342,6 +472,8 @@ def handle_control_destroy_msg(
 ) -> None:
     """
     Handles a DESTROY control message from the client.
+
+    May only be called by the control thread.
     """
 
     assert control_msg.user_name is not None
@@ -380,20 +512,26 @@ def handle_control_destroy_msg(
 def handle_control_reload_msg(control_session: PrivleapSession) -> None:
     """
     Handles a RELOAD message from the client.
+
+    May only be called by the control thread.
     """
 
     if parse_config_files():
         logging.info("Handled RELOAD message, configuration reloaded")
         prune_disallowed_comm_sockets()
+        open_persistent_comm_sockets(in_control_thread=True)
         send_msg_safe(control_session, PrivleapControlServerOkMsg())
     else:
         logging.warning("Handled RELOAD message, configuration was invalid!")
         send_msg_safe(control_session, PrivleapControlServerControlErrorMsg())
 
 
-def handle_control_session(control_socket: PrivleapSocket) -> None:
+def handle_control_socket_conn(control_socket: PrivleapSocket) -> None:
     """
     Handles control socket connections, for creating or destroying comm sockets.
+    See control_handler_loop for most of the real logic this triggers.
+
+    May only be called by the main thread.
     """
 
     try:
@@ -404,15 +542,21 @@ def handle_control_session(control_socket: PrivleapSocket) -> None:
         )
         return
 
-    try:
-        control_msg: (
-            PrivleapMsg
-            | PrivleapControlClientCreateMsg
-            | PrivleapControlClientDestroyMsg
-        )
+    PrivleapdGlobal.control_request_queue.put(
+        {"type": "control_session", "control_session": control_session}
+    )
 
+
+def handle_control_session(control_session: PrivleapSession) -> None:
+    """
+    Reads a control message from a control session and handles it accordingly.
+
+    May only be called by the control thread.
+    """
+
+    try:
         try:
-            control_msg = control_session.get_msg()
+            control_msg: PrivleapMsg = control_session.get_msg()
         except Exception as e:
             logging.error(
                 "Could not get message from control client!", exc_info=e
@@ -430,7 +574,6 @@ def handle_control_session(control_socket: PrivleapSocket) -> None:
                 "privleapd mis-parsed a control command from the client!"
             )
             sys.exit(2)
-
     finally:
         control_session.close_session()
 
@@ -444,6 +587,8 @@ def run_action(
 
     """
     Runs the command defined in an action.
+
+    May only be called by comm threads.
     """
 
     # There is a slight possibility that calling_user might not exist when this
@@ -456,10 +601,6 @@ def run_action(
     # any TOCTOU condition internal to subprocess.Popen by deleting the calling
     # user account at a precise time, so even if this was exploitable somehow,
     # it would only be exploitable by root, so this is not a security issue.
-
-    # User privilege de-escalation technique inspired by
-    # https://stackoverflow.com/a/6037494/19474638, using this technique since
-    # it ensures the environment is also changed.
 
     # It's safe to assume that desired_action.{target_user,target_group}
     # represent a user and group that actually exists on the system if their
@@ -520,8 +661,10 @@ def get_client_initial_msg(
 ) -> PrivleapCommClientSignalMsg | PrivleapCommClientAccessCheckMsg | None:
     """
     Gets a SIGNAL or ACCESS_CHECK comm message from the client. Returns
-      None if the client tries to send something other than a SIGNAL or
-      ACCESS_CHECK message.
+    None if the client tries to send something other than a SIGNAL or
+    ACCESS_CHECK message.
+
+    May only be called by comm threads.
     """
 
     try:
@@ -558,7 +701,9 @@ def get_client_initial_msg(
 def lookup_desired_action(action_name: str) -> PrivleapAction | None:
     """
     Finds the privleap action corresponding to the provided action name. Returns
-      None if the action cannot be found.
+    None if the action cannot be found.
+
+    May be called by either comm or control threads.
     """
 
     for action in PrivleapdGlobal.action_list:
@@ -572,8 +717,10 @@ def authorize_user(
 ) -> PrivleapdAuthStatus:
     """
     Ensures the user that requested an action to be run is authorized to run
-      the requested action. Returns an enum value indicating if the user is
-      authorized, and if not, why.
+    the requested action. Returns an enum value indicating if the user is
+    authorized, and if not, why.
+
+    May be called only by comm threads.
     """
 
     assert action.action_name is not None
@@ -614,39 +761,68 @@ def authorize_user(
     return PrivleapdAuthStatus.UNAUTHORIZED
 
 
-def check_action_terminate(
+def assert_action_terminate(
     comm_session: PrivleapSession, action_name: str
-) -> bool:
+) -> None:
     """
-    Checks for a TERMINATE message from the client.
+    Checks if the message from the client is a TERMINATE message, and logs an
+    error if not.
+
+    May be called only by comm threads.
     """
 
-    assert comm_session.backend_socket is not None
-    ready_streams: Tuple[list[int], list[int], list[int]] = select.select(
-        [comm_session.backend_socket.fileno()], [], [], 0
-    )
-    if comm_session.backend_socket.fileno() in ready_streams[0]:
-        try:
-            comm_msg: PrivleapMsg = comm_session.get_msg()
-        except Exception as e:
-            logging.error(
-                "Could not get message from client run by account '%s'!",
-                comm_session.user_name,
-                exc_info=e,
-            )
-            return True
-        if isinstance(comm_msg, PrivleapCommClientTerminateMsg):
-            logging.info(
-                "Action '%s' prematurely terminated by account '%s'",
-                action_name,
-                comm_session.user_name,
-            )
-            return True
+    try:
+        comm_msg: PrivleapMsg = comm_session.get_msg()
+    except Exception as e:
         logging.error(
-            "Received invalid message type '%s' from client run by account '%s'!",
-            type(comm_msg).__name__,
+            "Could not get message from client run by account '%s'!",
+            comm_session.user_name,
+            exc_info=e,
+        )
+        return
+    if isinstance(comm_msg, PrivleapCommClientTerminateMsg):
+        logging.info(
+            "Action '%s' prematurely terminated by account '%s'",
+            action_name,
             comm_session.user_name,
         )
+        return
+    logging.error(
+        "Received invalid message type '%s' from client run by account '%s'!",
+        type(comm_msg).__name__,
+        comm_session.user_name,
+    )
+
+
+def check_early_action_terminate(
+    listen_socket_info: PrivleapdSocketInfo,
+    ready_fds: list[int],
+    comm_session: PrivleapSession,
+    action_name: str,
+) -> bool:
+    """
+    Checks if we should terminate the running action early. This can be
+    triggered by a client request or the destruction of a comm socket.
+    """
+
+    assert listen_socket_info.term_notify_read_pipe is not None
+    assert listen_socket_info.term_notify_write_pipe is not None
+    assert comm_session.backend_socket is not None
+
+    if listen_socket_info.should_terminate:
+        with listen_socket_info.term_notify_lock:
+            if not listen_socket_info.term_notify_pipes_closed:
+                listen_socket_info.term_notify_read_pipe.close()
+                listen_socket_info.term_notify_write_pipe.close()
+                listen_socket_info.term_notify_pipes_closed = True
+        return True
+
+    if comm_session.backend_socket.fileno() in ready_fds:
+        # The only message we expect the client may send at this point is
+        # TERMINATE. If in the future other messages are supported (for
+        # instance if stdin streaming is added), we will want to check for
+        # those messages here.
+        assert_action_terminate(comm_session, action_name)
         return True
 
     return False
@@ -656,33 +832,46 @@ def send_action_results(
     comm_session: PrivleapSession,
     action_name: str,
     action_process: subprocess.Popen[bytes],
+    listen_socket_info: PrivleapdSocketInfo,
 ) -> None:
     """
     Streams the stdout and stderr of the running action to the client, and sends
-      the exitcode once the action is finished running.
+    the exitcode once the action is finished running.
+
+    May be called only by comm threads.
     """
 
     assert action_process.stdout is not None
     assert action_process.stderr is not None
     assert comm_session.backend_socket is not None
 
+    epoll_obj: select.epoll = select.epoll()
+    epoll_obj.register(comm_session.backend_socket.fileno(), select.EPOLLIN)
+    epoll_obj.register(action_process.stdout.fileno(), select.EPOLLIN)
+    epoll_obj.register(action_process.stderr.fileno(), select.EPOLLIN)
+
+    # Comm threads that are currently streaming stdio from a process to a
+    # client may be stuck waiting for the process to write something to stdout
+    # or stderr. They will not notice when should_terminate is set to True. To
+    # force them to notice, the term_notify_* variables have an OS pipe set up
+    # on them, and the same epoll call that checks for process stdio also
+    # checks for a write to this pipe. We do not need to check the value
+    # written to this variable (it is always a single NULL byte), we just need
+    # to break the epoll_obj.poll() call.
+    assert listen_socket_info.term_notify_read_fd != 0
+    epoll_obj.register(listen_socket_info.term_notify_read_fd, select.EPOLLIN)
+
     try:
         stdout_done: bool = False
         stderr_done: bool = False
 
         while not stdout_done or not stderr_done:
-            select.select(
-                [
-                    action_process.stdout.fileno(),
-                    action_process.stderr.fileno(),
-                    comm_session.backend_socket.fileno(),
-                ],
-                [],
-                [],
-            )
+            ready_fds: list[int] = [x[0] for x in epoll_obj.poll()]
 
             while True:
-                if check_action_terminate(comm_session, action_name):
+                if check_early_action_terminate(
+                    listen_socket_info, ready_fds, comm_session, action_name
+                ):
                     return
 
                 stdout_buf: bytes | None = action_process.stdout.read(1024)
@@ -714,6 +903,7 @@ def send_action_results(
         action_process.wait()
 
     finally:
+        epoll_obj.close()
         action_process.stdout.close()
         action_process.stderr.close()
         action_process.terminate()
@@ -732,29 +922,77 @@ def send_action_results(
 
 
 def auth_signal_request(
-    comm_msg: PrivleapMsg, comm_session: PrivleapSession
+    auth_type: str, signal_name: str, user_name: str
 ) -> PrivleapAction | None:
     """
     Finds the requested action, and ensures that the calling user has the
-      permissions to run it. Returns the desired action if auth succeeds.
-      Returns None, sends an UNAUTHORIZED message to the user, and logs the
-      reason for authentication failure if auth fails or the action does not
-      exist.
+    permissions to run it. Returns the desired action if auth succeeds.
+    Returns None, sends an UNAUTHORIZED message to the user, and logs the
+    reason for authentication failure if auth fails or the action does not
+    exist.
+
+    May only be called by comm threads.
     """
 
-    auth_type: str
-    if isinstance(comm_msg, PrivleapCommClientSignalMsg):
-        auth_type = "Action run request"
-    elif isinstance(comm_msg, PrivleapCommClientAccessCheckMsg):
-        auth_type = "Access check"
-    else:
-        logging.critical("Invalid message type provided!")
-        sys.exit(1)
+    desired_action: PrivleapAction | None = lookup_desired_action(signal_name)
+    auth_result: PrivleapdAuthStatus | None = None
+    if desired_action is not None:
+        auth_result = authorize_user(desired_action, user_name)
 
-    assert isinstance(
-        comm_msg,
-        (PrivleapCommClientSignalMsg, PrivleapCommClientAccessCheckMsg),
+    if auth_result != PrivleapdAuthStatus.AUTHORIZED:
+        if auth_result is None:
+            logging.warning(
+                "%s: Could not find action '%s' requested by account '%s'",
+                auth_type,
+                signal_name,
+                user_name,
+            )
+        else:
+            assert desired_action is not None
+            assert desired_action.action_name is not None
+            if auth_result == PrivleapdAuthStatus.USER_MISSING:
+                logging.warning(
+                    "%s: Account '%s' does not exist, cannot run action '%s'",
+                    auth_type,
+                    user_name,
+                    desired_action.action_name,
+                )
+            elif auth_result == PrivleapdAuthStatus.UNAUTHORIZED:
+                logging.warning(
+                    "%s: Account '%s' is not authorized to run action '%s'",
+                    auth_type,
+                    user_name,
+                    desired_action.action_name,
+                )
+        return None
+
+    assert desired_action is not None
+    logging.info(
+        "%s: Account '%s' is authorized to run action '%s'",
+        auth_type,
+        user_name,
+        desired_action.action_name,
     )
+    return desired_action
+
+
+def handle_signal_message(
+    comm_msg: PrivleapCommClientSignalMsg,
+    comm_session: PrivleapSession,
+    listen_socket_info: PrivleapdSocketInfo,
+) -> None:
+    """
+    Handles a SIGNAL message from the client.
+
+    The control thread may signal to this comm thread to terminate the
+    session. The termination flag is checked both in this function and in
+    send_action_results() so this request can be obeyed.
+
+    May only be called by comm threads.
+    """
+
+    assert comm_session.user_name is not None
+
     # The auth code attempts to NOT allow a client to tell the difference
     # between an action that doesn't exist, and one that does exist but that
     # they aren't allowed to execute. If authentication fails or the action
@@ -764,67 +1002,34 @@ def auth_signal_request(
     # as a side-channel, but that would potentially allow DoS attacks which
     # are probably a bigger threat.
     auth_start_time: float = time.monotonic()
-    desired_action: PrivleapAction | None = lookup_desired_action(
-        comm_msg.signal_name
+    desired_action: PrivleapAction | None = auth_signal_request(
+        "Action run request", comm_msg.signal_name, comm_session.user_name
     )
-    auth_result: PrivleapdAuthStatus | None = None
-    if desired_action is not None:
-        assert comm_session.user_name is not None
-        auth_result = authorize_user(desired_action, comm_session.user_name)
-
-    if auth_result != PrivleapdAuthStatus.AUTHORIZED:
-        if auth_result is None:
-            logging.warning(
-                "%s: Could not find action '%s' requested by account '%s'",
-                auth_type,
-                comm_msg.signal_name,
-                comm_session.user_name,
-            )
-        else:
-            assert desired_action is not None
-            assert desired_action.action_name is not None
-            if auth_result == PrivleapdAuthStatus.USER_MISSING:
-                logging.warning(
-                    "%s: Account '%s' does not exist, cannot run action '%s'",
-                    auth_type,
-                    comm_session.user_name,
-                    desired_action.action_name,
-                )
-            elif auth_result == PrivleapdAuthStatus.UNAUTHORIZED:
-                logging.warning(
-                    "%s: Account '%s' is not authorized to run action '%s'",
-                    auth_type,
-                    comm_session.user_name,
-                    desired_action.action_name,
-                )
+    if desired_action is None:
         auth_end_time: float = auth_start_time + 3
         auth_fail_sleep_time: float = auth_end_time - auth_start_time
         if auth_fail_sleep_time > 0:
             time.sleep(auth_fail_sleep_time)
-        send_msg_safe(comm_session, PrivleapCommServerUnauthorizedMsg())
-        return None
+        send_msg_safe(
+            comm_session,
+            PrivleapCommServerUnauthorizedMsg([comm_msg.signal_name]),
+        )
+        return
 
-    assert desired_action is not None
-    logging.info(
-        "%s: Account '%s' is authorized to run action '%s'",
-        auth_type,
-        comm_session.user_name,
-        desired_action.action_name,
-    )
-    return desired_action
-
-
-def handle_signal_message(
-    desired_action: PrivleapAction, comm_session: PrivleapSession
-) -> None:
-    """
-    Handles a SIGNAL message from the client.
-    """
+    if listen_socket_info.should_terminate:
+        return
 
     assert comm_session.user_name is not None
     try:
-        action_process: subprocess.Popen[bytes]
-        action_process = run_action(desired_action, comm_session.user_name)
+        action_process: subprocess.Popen[bytes] = run_action(
+            desired_action, comm_session.user_name
+        )
+        if listen_socket_info.should_terminate:
+            action_process.stdout.close()
+            action_process.stderr.close()
+            action_process.terminate()
+            action_process.wait()
+            return
     except Exception as e:
         logging.error(
             "Action '%s' authorized for account '%s', but trigger failed!",
@@ -847,24 +1052,69 @@ def handle_signal_message(
     send_msg_safe(comm_session, PrivleapCommServerTriggerMsg())
     assert desired_action.action_name is not None
     send_action_results(
-        comm_session, desired_action.action_name, action_process
+        comm_session,
+        desired_action.action_name,
+        action_process,
+        listen_socket_info,
     )
 
 
-def handle_comm_session(comm_socket: PrivleapSocket) -> None:
+def handle_access_check_message(
+    comm_msg: PrivleapCommClientAccessCheckMsg,
+    comm_session: PrivleapSession,
+) -> None:
     """
-    Handles comm socket connections, for running actions.
+    Handles an ACCESS_CHECK message from the client.
+
+    May only be called by comm threads.
     """
 
-    try:
-        comm_session: PrivleapSession = comm_socket.get_session()
-    except Exception as e:
-        logging.error(
-            "Could not start comm session with client run by account '%s'!",
-            comm_socket.user_name,
-            exc_info=e,
+    assert comm_session.user_name is not None
+
+    auth_signal_name_list: list[str] = []
+    unauth_signal_name_list: list[str] = []
+
+    # The same timing concerns in handle_signal_message's authentication
+    # mechanism apply here.
+    auth_start_time: float = time.monotonic()
+    for signal_name in comm_msg.signal_name_list:
+        desired_action: PrivleapAction | None = auth_signal_request(
+            "Access check", signal_name, comm_session.user_name
         )
-        return
+        if desired_action is None:
+            unauth_signal_name_list.append(signal_name)
+        else:
+            auth_signal_name_list.append(signal_name)
+
+    auth_signal_name_list_len: int = len(auth_signal_name_list)
+    unauth_signal_name_list_len: int = len(unauth_signal_name_list)
+
+    if unauth_signal_name_list_len > 0:
+        auth_end_time: float = auth_start_time + 3
+        auth_fail_sleep_time: float = auth_end_time - auth_start_time
+        if auth_fail_sleep_time > 0:
+            time.sleep(auth_fail_sleep_time)
+        send_msg_safe(
+            comm_session,
+            PrivleapCommServerUnauthorizedMsg(unauth_signal_name_list),
+        )
+
+    if auth_signal_name_list_len > 0:
+        send_msg_safe(
+            comm_session, PrivleapCommServerAuthorizedMsg(auth_signal_name_list)
+        )
+
+    send_msg_safe(comm_session, PrivleapCommServerAccessCheckResultsEndMsg())
+
+
+def handle_comm_session(
+    comm_session: PrivleapSession, listen_socket_info: PrivleapdSocketInfo
+) -> None:
+    """
+    Handle comm sessions.
+
+    Must be spawned as a comm thread by the main thread.
+    """
 
     assert comm_session.user_name is not None
     if not is_user_allowed(comm_session.user_name):
@@ -874,7 +1124,9 @@ def handle_comm_session(comm_socket: PrivleapSocket) -> None:
             comm_session.user_name,
         )
         comm_session.close_session()
-        _, _ = destroy_comm_socket(comm_session.user_name)
+        PrivleapdGlobal.control_request_queue.put(
+            {"type": "destroy_comm_sock", "user_name": comm_session.user_name}
+        )
         return
 
     try:
@@ -886,28 +1138,51 @@ def handle_comm_session(comm_socket: PrivleapSocket) -> None:
         if comm_msg is None:
             return
 
-        desired_action: PrivleapAction | None = auth_signal_request(
-            comm_msg, comm_session
-        )
-
-        if desired_action is None:
-            return
-
         if isinstance(comm_msg, PrivleapCommClientSignalMsg):
-            handle_signal_message(desired_action, comm_session)
+            handle_signal_message(comm_msg, comm_session, listen_socket_info)
         elif isinstance(comm_msg, PrivleapCommClientAccessCheckMsg):
-            # We already authorized the request above, so we can simply tell the
-            # client about that now.
-            send_msg_safe(comm_session, PrivleapCommServerAuthorizedMsg())
+            handle_access_check_message(comm_msg, comm_session)
 
     finally:
         comm_session.close_session()
 
 
+def handle_comm_socket_conn(comm_socket_info: PrivleapdSocketInfo) -> None:
+    """
+    Handles comm socket connections, for running actions.
+
+    May only be called by the main thread.
+    """
+
+    try:
+        comm_session: PrivleapSession = (
+            comm_socket_info.listen_socket.get_session()
+        )
+    except Exception as e:
+        logging.error(
+            "Could not start comm session with client run by account '%s'!",
+            comm_socket_info.listen_socket.user_name,
+            exc_info=e,
+        )
+        return
+
+    # Threads hold references to themselves, thus there is no need to keep our
+    # own reference to the thread. See:
+    # https://stackoverflow.com/a/42428333/19474638
+    comm_thread: Thread = Thread(
+        target=handle_comm_session,
+        args=[comm_session, comm_socket_info],
+        daemon=True,
+    )
+    comm_thread.start()
+
+
 def ensure_running_as_root() -> None:
     """
     Ensures the server is running as root. privleapd cannot function when
-      running as a user as it may have to execute commands as root.
+    running as a user as it may have to execute commands as root.
+
+    May only be called by the main thread.
     """
 
     if os.geteuid() != 0:
@@ -918,7 +1193,9 @@ def ensure_running_as_root() -> None:
 def verify_not_running_twice() -> None:
     """
     Ensures that two simultaneous instances of privleapd are not running at the
-      same time.
+    same time.
+
+    May only be called by the main thread.
     """
 
     if not PrivleapdGlobal.pid_file_path.exists():
@@ -954,7 +1231,9 @@ def verify_not_running_twice() -> None:
 def cleanup_old_state_dir() -> None:
     """
     Cleans up the old state directory left behind by a previous privleapd
-      instance.
+    instance.
+
+    May only be called by the main thread.
     """
 
     # This probably won't run anywhere but Linux, but just in case, make sure
@@ -981,19 +1260,23 @@ def cleanup_old_state_dir() -> None:
 def append_if_not_in(item: Any, item_list: list[Any]) -> None:
     """
     Append an item to a list if the item is not already in the list.
+
+    May be called by any thread.
     """
 
     if item not in item_list:
         item_list.append(item)
 
 
-def extend_action_list(
+def extend_target_arr(
     action_arr: list[PrivleapAction], target_arr: list[PrivleapAction]
 ) -> str | None:
     """
-    Extend PrivleapdGlobal.action_list with the contents of action_arr. If a
-      duplicate action is found, stop early and return the name of the
-      duplicate, otherwise return None.
+    Extend target_arr with the contents of action_arr. If a duplicate action
+    is found, stop early and return the name of the duplicate, otherwise
+    return None.
+
+    May be called by any thread.
     """
     for action_item in action_arr:
         for existing_action_item in target_arr:
@@ -1003,9 +1286,9 @@ def extend_action_list(
     return None
 
 
-# pylint: disable=too-many-arguments, too-many-locals
+# pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-locals
 # Rationale:
-#   too-many-arguments, too-many-locals:
+#   too-many-arguments, too-many-positional-arguments, too-many-locals:
 #     This function needs to load multiple kinds of data from configuration
 #     files simultaneously. It is therefore hard to reduce the number of
 #     arguments and variables it needs without harming readability.
@@ -1019,6 +1302,8 @@ def parse_config_file(
 ) -> bool:
     """
     Parses a single config file.
+
+    May be called by any thread.
     """
 
     config_result: ConfigData | str
@@ -1040,7 +1325,7 @@ def parse_config_file(
     allowed_user_arr = config_result[2]
     allowed_group_arr = config_result[3]
     expected_disallowed_user_arr = config_result[4]
-    duplicate_action_name: str | None = extend_action_list(
+    duplicate_action_name: str | None = extend_target_arr(
         action_arr, temp_action_list
     )
     if duplicate_action_name is not None:
@@ -1074,6 +1359,8 @@ def str_list_quote_and_comma_delimit(str_list: list[str]) -> str:
     """
     Turns a string list like ["abc", "def", "ghi"] into a string like
     "'abc', 'def', 'ghi'".
+
+    May be called by any thread.
     """
 
     out_str: str = ""
@@ -1088,6 +1375,9 @@ def str_list_quote_and_comma_delimit(str_list: list[str]) -> str:
 def parse_config_files() -> bool:
     """
     Parses all config files under /etc/privleap/conf.d.
+
+    May be called by the main thread until the control thread starts, then may
+    only be called by the control thread.
     """
 
     config_file_list: list[Path] = []
@@ -1189,6 +1479,8 @@ def parse_config_files() -> bool:
 def populate_state_dir() -> None:
     """
     Creates the state dir and PID file.
+
+    May only be called by the main thread.
     """
 
     if not PrivleapCommon.state_dir.exists():
@@ -1245,8 +1537,10 @@ def populate_state_dir() -> None:
 def open_control_socket() -> None:
     """
     Opens the control socket. Privileged clients can connect to this socket to
-      request that privleapd create or destroy comm sockets used for
-      communicating with unprivileged users.
+    request that privleapd create or destroy comm sockets used for
+    communicating with unprivileged users.
+
+    May only be called by the main thread.
     """
 
     try:
@@ -1257,84 +1551,200 @@ def open_control_socket() -> None:
         logging.critical("Failed to open control socket!", exc_info=e)
         sys.exit(1)
 
-    PrivleapdGlobal.socket_list.append(control_socket)
+    PrivleapdGlobal.socket_list.append(
+        PrivleapdSocketInfo(control_socket, 0, 0, None, None)
+    )
 
 
-def open_persistent_comm_sockets() -> None:
+def open_persistent_comm_sockets(in_control_thread: bool) -> None:
     """
     Opens comm sockets for persistent users. privleapd will treat these sockets
-      like normal sockets, but opens them without needing a privileged client to
-      request their creation, and does NOT allow a privileged client to destroy
-      them.
+    like normal sockets, but opens them without needing a privileged client to
+    request their creation, and does NOT allow a privileged client to destroy
+    them.
+
+    May be called by the main thread until the control thread starts, then may
+    only be called by the control thread. in_control_thread must be set to
+    True if called by the control thread.
     """
+
+    new_comm_socket: PrivleapSocket
 
     for user_name in PrivleapdGlobal.persistent_user_list:
         try:
-            comm_socket: PrivleapSocket = PrivleapSocket(
-                PrivleapSocketType.COMMUNICATION, user_name
-            )
-            PrivleapdGlobal.socket_list.append(comm_socket)
-            # We intentionally don't log the creation of persistent user sockets
-            # since for one, doing so would needlessly clutter the system logs
-            # (the list of persistent users can be determined by just looking
-            # at privleap's config), and for two, privleap doesn't output log
-            # information during early startup unless something is wrong. The
-            # test suite depends on this behavior, so it's not something we want
-            # to break unless necessary.
+            if in_control_thread:
+                socket_already_exists: bool = False
+                for existing_socket_info in PrivleapdGlobal.socket_list:
+                    existing_socket: PrivleapSocket = (
+                        existing_socket_info.listen_socket
+                    )
+                    if existing_socket.socket_type != (
+                        PrivleapSocketType.COMMUNICATION
+                    ):
+                        continue
+                    assert existing_socket.user_name is not None
+                    if existing_socket.user_name == user_name:
+                        socket_already_exists = True
+                        break
+
+                if socket_already_exists:
+                    continue
+                new_comm_socket = PrivleapSocket(
+                    PrivleapSocketType.COMMUNICATION, user_name
+                )
+                socket_list_add_sync(new_comm_socket)
+            else:
+                new_comm_socket = PrivleapSocket(
+                    PrivleapSocketType.COMMUNICATION, user_name
+                )
+                socket_list_add(new_comm_socket)
+            # We intentionally don't log the creation of persistent user
+            # sockets since privleap currently doesn't output log information
+            # during early startup unless something is wrong. The test suite
+            # depends on this behavior, so it's not something we want to break
+            # unless necessary.
+            #
+            # TODO: Persistent users may change over time, so logging them may
+            # be useful for debugging. Try to make the test suite able to deal
+            # with these particular log messages during early startup.
         except Exception as e:
-            logging.error(
+            logging.warning(
                 "Failed to create persistent socket for account '%s'!",
                 user_name,
                 exc_info=e,
             )
-            return
+            # The user account probably was removed before we created the
+            # socket for it. This isn't a fatal error.
+            continue
+
+
+def prep_sock_notify_pipe() -> None:
+    """
+    Prepares a pipe fd pair used to inform the main thread when a new socket
+    is about to be added and when it is done being added.
+
+    May only be called by the mai nthread.
+    """
+
+    PrivleapdGlobal.ctm_read_fd, PrivleapdGlobal.ctm_write_fd = os.pipe()
+    PrivleapdGlobal.ctm_read_pipe = os.fdopen(
+        PrivleapdGlobal.ctm_read_fd, "rb", buffering=0
+    )
+    PrivleapdGlobal.ctm_write_pipe = os.fdopen(
+        PrivleapdGlobal.ctm_write_fd, "wb", buffering=0
+    )
+
+
+def control_handler_loop() -> NoReturn:
+    """
+    Control connection handler thread. This waits for new control requests
+    to be passed to it over a queue, and handles them as they show up. This
+    prevents control connections from hanging up normal operation of
+    privleapd.
+
+    Must be spawned as the control thread by the main thread.
+    """
+
+    while True:
+        control_request: dict[str, PrivleapSession | str] = (
+            PrivleapdGlobal.control_request_queue.get()
+        )
+        assert "type" in control_request
+
+        match control_request["type"]:
+            case "control_session":
+                assert "control_session" in control_request
+                assert isinstance(
+                    control_request["control_session"], PrivleapSession
+                )
+                handle_control_session(control_request["control_session"])
+            case "destroy_comm_sock":
+                assert "user_name" in control_request
+                assert isinstance(control_request["user_name"], str)
+                _, _ = destroy_comm_socket(control_request["user_name"])
 
 
 def main_loop() -> NoReturn:
     """
     Main processing loop of privleapd. This loop will watch for and accept
-      connections as needed, spawning threads to handle each individual comm
-      connection. Control connections are handled in the main thread since they
-      aren't a DoS risk, and running two control sessions at once could be
-      dangerous.
+    connections as needed, spawning threads to handle each individual comm
+    connection. Control connections are handled in the main thread since they
+    aren't a DoS risk, and running two control sessions at once could be
+    dangerous.
+
+    May only be called by the main thread.
     """
 
+    assert PrivleapdGlobal.ctm_read_pipe is not None
+    epoll_fd_set: set[int] = set()
+    epoll_obj: select.epoll = select.epoll()
+    epoll_obj.register(PrivleapdGlobal.ctm_read_fd, select.EPOLLIN)
+    socket_list_changed: bool = True
+
     while True:
-        ready_socket_list: Tuple[list[int], list[int], list[int]] = (
-            select.select(
-                [
-                    sock_obj.backend_socket.fileno()
-                    for sock_obj in PrivleapdGlobal.socket_list
-                    if sock_obj.backend_socket is not None
-                ],
-                [],
-                [],
-                5,
-            )
-        )
+        if socket_list_changed:
+            read_sock_fileno_list: list[int] = [
+                sock_obj.backend_socket.fileno()
+                for sock_obj in [
+                    x.listen_socket for x in PrivleapdGlobal.socket_list
+                ]
+                if sock_obj.backend_socket is not None
+            ]
+            read_sock_fileno_set: set[int] = set(read_sock_fileno_list)
+            for register_fileno in read_sock_fileno_set - epoll_fd_set:
+                epoll_obj.register(register_fileno, select.EPOLLIN)
+            epoll_fd_set.update(read_sock_fileno_set)
+            for remove_fileno in epoll_fd_set - read_sock_fileno_set:
+                epoll_fd_set.remove(remove_fileno)
+            socket_list_changed = False
+
+        epoll_event_fd_list: list[int] = [x[0] for x in epoll_obj.poll(5)]
         PrivleapdGlobal.sdnotify_object.notify("WATCHDOG=1")
-        for ready_socket_fileno in ready_socket_list[0]:
-            ready_sock_obj: PrivleapSocket | None = None
-            for sock_obj in PrivleapdGlobal.socket_list:
-                assert sock_obj.backend_socket is not None
-                if sock_obj.backend_socket.fileno() == ready_socket_fileno:
-                    ready_sock_obj = sock_obj
-                    break
-            if ready_sock_obj is None:
-                logging.critical("privleapd lost track of a socket!")
-                sys.exit(1)
-            if ready_sock_obj.socket_type == PrivleapSocketType.CONTROL:
-                handle_control_session(ready_sock_obj)
-            else:
-                comm_thread: Thread = Thread(
-                    target=handle_comm_session, args=[ready_sock_obj]
-                )
-                comm_thread.start()
+
+        if PrivleapdGlobal.ctm_read_fd in epoll_event_fd_list:
+            # Connection change, i.e. adding or removing a socket. The
+            # main thread needs to synchronize with the control thread
+            # when this is done to prevent losing track of or not
+            # noticing a new socket.
+            PrivleapdGlobal.ctm_read_pipe.read(1)
+            with PrivleapdGlobal.socket_list_lock:
+                pass
+            socket_list_changed = True
+            continue
+
+        # Note that if we get this far, PrivleapdGlobal.ctm_read_fd is NOT in
+        # epoll_event_fd_list, so we don't need to check for its presence and
+        # can assume all fds correspond to active sockets.
+        with PrivleapdGlobal.socket_list_lock:
+            for ready_socket_fileno in epoll_event_fd_list:
+                ready_sock_info_obj: PrivleapdSocketInfo | None = None
+                for sock_info_obj in PrivleapdGlobal.socket_list:
+                    sock_obj = sock_info_obj.listen_socket
+                    assert sock_obj.backend_socket is not None
+                    if sock_obj.backend_socket.fileno() == (
+                        ready_socket_fileno
+                    ):
+                        ready_sock_info_obj = sock_info_obj
+                        break
+                if ready_sock_info_obj is None:
+                    logging.critical("privleapd lost track of a socket!")
+                    sys.exit(1)
+                if ready_sock_info_obj.listen_socket.socket_type == (
+                    PrivleapSocketType.CONTROL
+                ):
+                    handle_control_socket_conn(
+                        ready_sock_info_obj.listen_socket
+                    )
+                else:
+                    handle_comm_socket_conn(ready_sock_info_obj)
 
 
 def print_usage() -> None:
     """
     Print usage information.
+
+    May be called by any thread.
+
     """
     print(
         """privleapd: privleap backend server
@@ -1350,7 +1760,7 @@ If run without any options specified, the server will start normally.""",
 
 def main() -> NoReturn:
     """
-    Main function.
+    Main thread entry point.
     """
 
     ## Set restrictive umask to prevent any file permission vulnerability
@@ -1392,11 +1802,16 @@ def main() -> NoReturn:
         sys.exit(1)
     populate_state_dir()
     open_control_socket()
-    open_persistent_comm_sockets()
+    open_persistent_comm_sockets(in_control_thread=False)
     PrivleapdGlobal.sdnotify_object.notify("READY=1")
     PrivleapdGlobal.sdnotify_object.notify("STATUS=Fully started")
     if PrivleapdGlobal.test_mode:
         Path("/tmp/privleapd-ready-for-test").touch()
+    control_handler_thread: Thread = Thread(
+        target=control_handler_loop, daemon=True
+    )
+    prep_sock_notify_pipe()
+    control_handler_thread.start()
     main_loop()
 
 

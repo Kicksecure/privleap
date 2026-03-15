@@ -133,7 +133,7 @@ def start_control_session() -> None:
 def handle_create_request(user_name: str) -> NoReturn:
     """
     Requests that privleapd create a socket for the specified user, and handles
-      the response to the request.
+    the response to the request.
     """
 
     assert LeapctlGlobal.control_session is not None
@@ -182,7 +182,7 @@ def handle_create_request(user_name: str) -> NoReturn:
 def handle_destroy_request(user_name: str) -> NoReturn:
     """
     Requests that privleapd destroy a socket for the specified user, and handles
-      the response to the request.
+    the response to the request.
     """
 
     assert LeapctlGlobal.control_session is not None
