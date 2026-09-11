@@ -1,15 +1,12 @@
 #!/usr/bin/python3 -su
 
-# Copyright (C) 2025 - 2026 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
-# See the file COPYING for copying conditions.
+## Copyright (C) 2025 - 2026 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
+## See the file COPYING for copying conditions.
 
+## duplicate-code is triggered by generic_error and unexpected_error_msg.
+## These access incompatible variants of cleanup_and_exit and therefore
+## can't be easily shared.
 # pylint: disable=broad-exception-caught,duplicate-code
-# Rationale:
-#   broad-exception-caught: except blocks are general error handlers.
-#   duplicate-code: This is being triggered because of generic_error and
-#     unexpected_error_msg, which are very similar in leapctl and leaprun but
-#     can't be reasonably broken out of either due to the fact that they access
-#     incompatible variants of the cleanup_and_exit function.
 
 """leapctl.py - privleapd client for controlling available comm sockets."""
 
@@ -36,10 +33,6 @@ from .privleap import (
 
 
 # pylint: disable=too-few-public-methods
-# Rationale:
-#   too-few-public-methods: This class just stores global variables, it needs no
-#     public methods. Namespacing global variables in a class makes things
-#     safer.
 class LeapctlGlobal:
     """
     Global variables for leapctl.
@@ -212,9 +205,9 @@ def handle_destroy_request(user_id: str) -> NoReturn:
         cleanup_and_exit(0)
     elif isinstance(control_msg, PrivleapControlServerPersistentUserMsg):
         print(f"Cannot destroy socket for persistent account {repr(user_id)}.")
-        # It is not an error to try to destroy a socket for a persistent user,
-        # since this may legitimately happen if someone logs in as a user that
-        # happens to be persistent in privleap's config, and then logs out.
+        ## It is not an error to try to destroy a socket for a persistent user,
+        ## since this may legitimately happen if someone logs in as a user that
+        ## happens to be persistent in privleap's config, and then logs out.
         cleanup_and_exit(0)
     else:
         unexpected_msg_error(control_msg)
@@ -268,11 +261,11 @@ def main() -> NoReturn:
         control_user_struct: pwd.struct_passwd | None = (
             PrivleapCommon.normalize_user_id(control_user_id)
         )
-        # Allow a username that doesn't exist to be passed when using --destroy,
-        # so if a user is deleted before their comm socket is destroyed, the
-        # socket can be destroyed anyway. Note that this will only work if the
-        # deleted user's UID is passed, since there is no way to recover a
-        # deleted user's UID to correlate it to a UID.
+        ## Allow a username that doesn't exist to be passed when using --destroy,
+        ## so if a user is deleted before their comm socket is destroyed, the
+        ## socket can be destroyed anyway. Note that this will only work if the
+        ## deleted user's UID is passed, since there is no way to recover a
+        ## deleted user's UID to correlate it to a UID.
         if control_user_struct is None:
             if control_action != "--destroy":
                 generic_error(

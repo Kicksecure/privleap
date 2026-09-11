@@ -1,9 +1,9 @@
 #!/usr/bin/python3 -su
 
-# Copyright (C) 2025 - 2026 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
-# See the file COPYING for copying conditions.
+## Copyright (C) 2025 - 2026 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
+## See the file COPYING for copying conditions.
 
-# pylint: disable=too-few-public-methods, too-many-lines, unknown-option-value, broad-exception-caught
+# pylint: disable=too-few-public-methods, too-many-lines, broad-exception-caught
 
 """
 privleap.py - Backend library for privleap clients and servers.
@@ -82,12 +82,12 @@ class PrivleapMsg:
         Outputs raw bytes for message.
         """
 
-        # Technically, a 0 could be used instead of a function call to get the
-        # argument count lower bound. However, by using the function call, if
-        # a message supports mandatory arguments, but fails to implement a
-        # serialize handler, this handler will generate an invalid message
-        # which will cause the recipient to throw an error. Thus this aids
-        # debugging.
+        ## Technically, a 0 could be used instead of a function call to get the
+        ## argument count lower bound. However, by using the function call, if
+        ## a message supports mandatory arguments, but fails to implement a
+        ## serialize handler, this handler will generate an invalid message
+        ## which will cause the recipient to throw an error. Thus this aids
+        ## debugging.
         return (f"{self.name} {self.get_arg_count_lower_bound_chr()}").encode(
             "utf-8"
         )
@@ -714,13 +714,13 @@ class PrivleapSession:
         which message type it is.
         """
 
-        # Default to the length of the recv_buf if no space is found
+        ## Default to the length of the recv_buf if no space is found
         type_field_len: int = len(recv_buf)
 
-        # Find first ASCII space, if it exists
+        ## Find first ASCII space, if it exists
         for idx, byte_val in enumerate(recv_buf):
-            # Don't allow anything other than printable 7-bit-ASCII in the type
-            # field
+            ## Don't allow anything other than printable 7-bit-ASCII in the type
+            ## field
             if byte_val <= 0x1F or byte_val >= 0x7F:
                 raise ValueError("Invalid byte found in ASCII string data")
             if byte_val == 0x20:
@@ -730,10 +730,8 @@ class PrivleapSession:
         return recv_buf[:type_field_len].decode("utf-8")
 
     @staticmethod
+    ## Splitting this up would make it less readable.
     # pylint: disable=too-many-branches
-    # Rationale:
-    #   too-many-branches: This function does a single job that can't be
-    #     reasonably made less complex or split into additional functions.
     def __parse_msg_parameters(
         recv_buf: bytes, arg_bounds: tuple[int, int], blob_at_end: bool
     ) -> Tuple[list[str], bytes | None]:
@@ -749,9 +747,9 @@ class PrivleapSession:
         processed_args: int = -1
         i: int = -1
 
-        # __parse_msg_parameters has to ignore the first string in the
-        # message, since the first string is the message type, not a parameter.
-        # Thus we have to parse one more string than specified by str_count.
+        ## __parse_msg_parameters has to ignore the first string in the
+        ## message, since the first string is the message type, not a parameter.
+        ## Thus we have to parse one more string than specified by str_count.
         while True:
             if processed_args == arg_count:
                 break
@@ -762,8 +760,8 @@ class PrivleapSession:
 
             space_idx: int = len(recv_buf)
             for j in range(recv_buf_pos, len(recv_buf)):
-                # Don't allow anything other than printable 7-bit-ASCII in the
-                # type field
+                ## Don't allow anything other than printable 7-bit-ASCII in the
+                ## type field
                 byte_val: int = recv_buf[j]
                 if byte_val <= 0x1F or byte_val >= 0x7F:
                     raise ValueError("Invalid byte found in ASCII string data")
@@ -771,25 +769,25 @@ class PrivleapSession:
                     space_idx = j
                     break
 
-            # Ignore the message type field, we parsed that out already in
-            # __get_msg_type_field
+            ## Ignore the message type field, we parsed that out already in
+            ## __get_msg_type_field
             if i == 0:
-                # If space_idx isn't equal to len(recv_buf), we hit an actual
-                # space, so we want to pick up scanning immediately *after*
-                # that space. If space_idx is equal to len(recv_buf) though,
-                # it's already at an index equal to one past the end of the
-                # data buffer, so there's no need to increment it.
+                ## If space_idx isn't equal to len(recv_buf), we hit an actual
+                ## space, so we want to pick up scanning immediately *after*
+                ## that space. If space_idx is equal to len(recv_buf) though,
+                ## it's already at an index equal to one past the end of the
+                ## data buffer, so there's no need to increment it.
                 if space_idx != len(recv_buf):
                     recv_buf_pos = space_idx + 1
                 else:
                     recv_buf_pos = space_idx
                 continue
 
-            # Grab the detected string
+            ## Grab the detected string
             found_string: str = recv_buf[recv_buf_pos:space_idx].decode("utf-8")
 
             if i == 1:
-                # This is the argument count, parse it
+                ## This is the argument count, parse it
                 arg_count = PrivleapCommon.msg_arg_count_to_int(found_string)
                 if arg_count < arg_bounds[0]:
                     raise ValueError(
@@ -801,8 +799,8 @@ class PrivleapSession:
                         f"Argument count '{arg_count}' is greater than upper "
                         + f"bound '{arg_bounds[1]}'."
                     )
-                # Increment processed_args from -1 to 0; note that this will
-                # terminate the loop for 0-argument messages
+                ## Increment processed_args from -1 to 0; note that this will
+                ## terminate the loop for 0-argument messages
                 processed_args += 1
                 if space_idx != len(recv_buf):
                     recv_buf_pos = space_idx + 1
@@ -814,19 +812,19 @@ class PrivleapSession:
             processed_args += 1
 
             if space_idx != len(recv_buf):
-                # At this point output_list contains all of the strings we
-                # want. If blob_at_end is false, we *must* be at the end of
-                # recv_buf, or someone's trying to pass buggy or malicious
-                # data. If blob_at_end is true, we want to take all remaining
-                # data in the recv_buf and return it as the blob later.
+                ## At this point output_list contains all of the strings we
+                ## want. If blob_at_end is false, we *must* be at the end of
+                ## recv_buf, or someone's trying to pass buggy or malicious
+                ## data. If blob_at_end is true, we want to take all remaining
+                ## data in the recv_buf and return it as the blob later.
                 if processed_args == arg_count and not blob_at_end:
                     raise ValueError(
                         "recv_buf contains data past the last string"
                     )
                 recv_buf_pos = space_idx + 1
             else:
-                # Now the opposite is true; if blob_at_end is true, we *must*
-                # not be at the end of recv_buf, or the blob is missing.
+                ## Now the opposite is true; if blob_at_end is true, we *must*
+                ## not be at the end of recv_buf, or the blob is missing.
                 if processed_args == arg_count and blob_at_end:
                     raise ValueError("recv_buf is missing a binary blob!")
                 recv_buf_pos = space_idx
@@ -837,12 +835,8 @@ class PrivleapSession:
 
         return (output_list, blob)
 
+    ## This is a dispatch function and should not be split up.
     # pylint: disable=too-many-return-statements, too-many-branches, too-many-statements
-    # Rationale:
-    #   too-many-return-statements, too-many-branches, too-many-statements: This
-    #     is essentially a dispatch function, it shouldn't be split for
-    #     readability's sake and it can't use less return statements or
-    #     branches.
     def get_msg(self) -> PrivleapMsg:
         """
         Gets a message from the backend socket and returns it as a PrivleapMsg
@@ -862,10 +856,10 @@ class PrivleapSession:
         if msg_type_str not in PrivleapCommon.msg_arg_blob_data:
             raise ValueError(f"Unrecognized message type '{msg_type_str}'")
 
-        # Note, we parse the arguments of every single message type, even if the
-        # message should have no arguments. This is because the parser ensures
-        # that the message is well-formed, and we do not want to accept a
-        # technically usable but ill-formed message for security reasons.
+        ## Note, we parse the arguments of every single message type, even if the
+        ## message should have no arguments. This is because the parser ensures
+        ## that the message is well-formed, and we do not want to accept a
+        ## technically usable but ill-formed message for security reasons.
         param_list: list[str]
         blob: bytes | None
         (param_list, blob) = self.__parse_msg_parameters(
@@ -874,8 +868,8 @@ class PrivleapSession:
             blob_at_end=PrivleapCommon.msg_arg_blob_data[msg_type_str][2],
         )
 
-        # Server-side control socket, we're receiving, so expect client control
-        # messages
+        ## Server-side control socket, we're receiving, so expect client control
+        ## messages
         if self.is_control_session and self.is_server_side:
             if msg_type_str == "CREATE":
                 return PrivleapControlClientCreateMsg(param_list[0])
@@ -887,8 +881,8 @@ class PrivleapSession:
                 f"Invalid message type '{msg_type_str}' for socket"
             )
 
-        # Client-side control socket, we're receiving, so expect server control
-        # messages
+        ## Client-side control socket, we're receiving, so expect server control
+        ## messages
         if self.is_control_session and not self.is_server_side:
             if msg_type_str == "OK":
                 return PrivleapControlServerOkMsg()
@@ -908,8 +902,8 @@ class PrivleapSession:
                 f"Invalid message type '{msg_type_str}' for socket"
             )
 
-        # Server-side comm socket, we're receiving, so expect client comm
-        # messages
+        ## Server-side comm socket, we're receiving, so expect client comm
+        ## messages
         if not self.is_control_session and self.is_server_side:
             if msg_type_str == "SIGNAL":
                 return PrivleapCommClientSignalMsg(param_list[0])
@@ -921,9 +915,9 @@ class PrivleapSession:
                 f"Invalid message type '{msg_type_str}' for socket"
             )
 
-        # self.is_server_side = False, self.is_control_socket = False
-        # Client-side comm socket, we're receiving, so expect server comm
-        # messages
+        ## self.is_server_side = False, self.is_control_socket = False
+        ## Client-side comm socket, we're receiving, so expect server comm
+        ## messages
         if msg_type_str == "TRIGGER":
             return PrivleapCommServerTriggerMsg()
         if msg_type_str == "TRIGGER_ERROR":
@@ -1091,8 +1085,8 @@ class PrivleapSocket:
 
         assert self.backend_socket is not None
 
-        # socket.accept returns a (socket, address) tuple, we only need the
-        # socket from this
+        ## socket.accept returns a (socket, address) tuple, we only need the
+        ## socket from this
         session_socket: socket.socket = self.backend_socket.accept()[0]
         if self.socket_type == PrivleapSocketType.CONTROL:
             return PrivleapSession(session_socket, is_control_session=True)
@@ -1123,12 +1117,8 @@ class PrivleapAction:
     A single action defined by privleap's configuration.
     """
 
+    ## Splitting this up would make it less readable and more bug-prone.
     # pylint: disable=too-many-arguments, too-many-branches, too-many-positional-arguments
-    # Rationale:
-    #   too-many-arguments, too-many-branches, too-many-positional-arguments:
-    #     This constructor loads configuration data, it's far easier to do all
-    #     data assignment and validation at once (and arguably more readable
-    #     too).
     def __init__(
         self,
         action_name: str | None = None,
@@ -1168,10 +1158,10 @@ class PrivleapAction:
                     PrivleapCommon.normalize_user_id(raw_auth_user_id)
                 )
                 if auth_user_struct is None:
-                    # We don't bail out on a nonexistent user since there are
-                    # legitimate situations for an action to specify an
-                    # authorized user that doesn't exist. We just skip over
-                    # nonexistent users.
+                    ## We don't bail out on a nonexistent user since there are
+                    ## legitimate situations for an action to specify an
+                    ## authorized user that doesn't exist. We just skip over
+                    ## nonexistent users.
                     continue
                 self.auth_uids.append(auth_user_struct.pw_uid)
 
@@ -1182,10 +1172,10 @@ class PrivleapAction:
                     PrivleapCommon.normalize_group_id(raw_auth_group_id)
                 )
                 if auth_group_struct is None:
-                    # We don't bail out on a nonexistent group since there are
-                    # legitimate situations for an action to specify an
-                    # authorized group that doesn't exist. We just skip over
-                    # nonexistent groups.
+                    ## We don't bail out on a nonexistent group since there are
+                    ## legitimate situations for an action to specify an
+                    ## authorized group that doesn't exist. We just skip over
+                    ## nonexistent groups.
                     continue
                 self.auth_gids.append(auth_group_struct.gr_gid)
 
@@ -1242,11 +1232,11 @@ class PrivleapCommon:
     state_dir: Path = Path("/run/privleapd")
     control_path: Path = Path(state_dir, "control")
     comm_dir: Path = Path(state_dir, "comm")
-    # Only an extremely poorly designed client or server will ever fail to
-    # work quickly enough for a 0.1-second timeout to be too short. On the
-    # other hand, a malicious client may attempt to lock up privleapd by
-    # sending incomplete data and then hanging forever, so we timeout very
-    # quickly to avoid this attack.
+    ## Only an extremely poorly designed client or server will ever fail to
+    ## work quickly enough for a 0.1-second timeout to be too short. On the
+    ## other hand, a malicious client may attempt to lock up privleapd by
+    ## sending incomplete data and then hanging forever, so we timeout very
+    ## quickly to avoid this attack.
     socket_timeout: float = 0.1
     config_file_regex: re.Pattern[str] = re.compile(r"[-A-Za-z0-9_]+\.conf\Z")
     user_name_regex: re.Pattern[str] = re.compile(r"[a-z_][-a-z0-9_]*\$?\Z")
@@ -1323,8 +1313,8 @@ class PrivleapCommon:
         return True
 
     @staticmethod
+    ## TODO: Split this up somehow.
     # pylint: disable=too-many-locals, too-many-branches, too-many-statements, too-many-return-statements
-    # TODO: Split this up somehow.
     def parse_config_file(config_file: Path) -> ConfigData | str:
         """
         Parses the data from a privleap configuration file and returns all
@@ -1412,8 +1402,8 @@ class PrivleapCommon:
                                 )
                             except PrivleapTargetIdentMissingError:
                                 pass
-                            # We don't need to nullify current_action_name since
-                            # we set its value below.
+                            ## We don't need to nullify current_action_name since
+                            ## we set its value below.
                             # current_action_name = None
                             current_action_command = None
                             current_auth_user_ids = []
@@ -1446,8 +1436,8 @@ class PrivleapCommon:
                         )
                     continue
 
-                # Config lines are only valid if under a header, if we hit a
-                # config line before a header something is wrong
+                ## Config lines are only valid if under a header, if we hit a
+                ## config line before a header something is wrong
                 if not first_header_parsed:
                     return (
                         f"{config_file}:{line_idx}:error:Config line "
@@ -1606,8 +1596,8 @@ class PrivleapCommon:
                             f"'{current_header_name}'"
                         )
 
-        # The last action in the file may not be in the list yet, add it now
-        # if needed
+        ## The last action in the file may not be in the list yet, add it now
+        ## if needed
         if current_section_type == PrivleapConfigSection.ACTION:
             assert current_action_name is not None
             if current_action_command is None:
@@ -1698,7 +1688,7 @@ class PrivleapCommon:
                     user_info = pwd.getpwuid(int(user_id))
                 except Exception:
                     return None
-        else:  # isinstance(user_id, int)
+        else:  ## isinstance(user_id, int)
             try:
                 user_info = pwd.getpwuid(user_id)
             except Exception:
@@ -1731,7 +1721,7 @@ class PrivleapCommon:
                     group_info = grp.getgrgid(int(group_id))
                 except Exception:
                     return None
-        else:  # isinstance(group_id, int)
+        else:  ## isinstance(group_id, int)
             try:
                 group_info = grp.getgrgid(group_id)
             except Exception:
@@ -1758,7 +1748,7 @@ class PrivleapCommon:
             return chr(ord("a") + (arg_count - 36))
         if arg_count == 62:
             return "+"
-        # arg_count == 63
+        ## arg_count == 63
         return "/"
 
     @staticmethod

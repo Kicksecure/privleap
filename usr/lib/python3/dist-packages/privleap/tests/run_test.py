@@ -4,11 +4,6 @@
 ## See the file COPYING for copying conditions.
 
 # pylint: disable=broad-exception-caught,global-statement,too-many-lines
-# Rationale:
-#   broad-exception-caught: We use broad exception catching for general-purpose
-#     error handlers.
-#   global-statement: Only used for the assert count variables, not a problem.
-#   too-many-lines: Breaking up this file is not a priority at the moment.
 
 """
 run_test.py - Tests for privleap. This is implemented as an entire program as
@@ -297,8 +292,8 @@ def leapctl_server_cutoff_test(bogus: str) -> bool:
         return False
     init_fake_server_dirs()
     control_socket: PrivleapSocket = PrivleapSocket(PrivleapSocketType.CONTROL)
-    # This test is prone to race conditions, so we try 5 times and consider it
-    # good if one of those times passes.
+    ## This test is prone to race conditions, so we try 5 times and consider it
+    ## good if one of those times passes.
     for _ in range(5):
         with subprocess.Popen(
             ["leapctl", "--create", "privleaptestone"],
@@ -324,26 +319,26 @@ def run_leapctl_tests() -> None:
     apt_uid_str: str = str(pwd.getpwnam("_apt").pw_uid)
     privleaptestone_uid_str: str = str(pwd.getpwnam("privleaptestone").pw_uid)
 
-    # ---
+    ## ---
     start_privleapd_subprocess([])
     leapctl_assert_command(
         ["leapctl", "--create", "nonexistent"],
         exit_code=1,
         stderr_data=PlTestData.specified_user_missing,
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--destroy", "nonexistent"],
         exit_code=0,
         stdout_data=PlTestData.nonexistent_socket_missing,
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--destroy", "12345"],
         exit_code=0,
         stdout_data=PlTestData.onetwothreefourfive_socket_missing,
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--create", "_apt"],
         exit_code=0,
@@ -360,7 +355,7 @@ def run_leapctl_tests() -> None:
         ),
         "Ensure _apt socket exists",
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--destroy", "_apt"],
         exit_code=0,
@@ -377,7 +372,7 @@ def run_leapctl_tests() -> None:
         ),
         "Ensure _apt socket does not exist",
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--create", apt_uid_str],
         exit_code=0,
@@ -394,7 +389,7 @@ def run_leapctl_tests() -> None:
         ),
         "Ensure _apt socket exists",
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--destroy", apt_uid_str],
         exit_code=0,
@@ -411,7 +406,7 @@ def run_leapctl_tests() -> None:
         ),
         "Ensure _apt socket does not exist",
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--create", "privleaptestone"],
         exit_code=0,
@@ -428,7 +423,7 @@ def run_leapctl_tests() -> None:
         ),
         "Ensure test user socket exists",
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--destroy", "privleaptestone"],
         exit_code=0,
@@ -445,19 +440,19 @@ def run_leapctl_tests() -> None:
         ),
         "Ensure test user socket does not exist",
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--destroy", "privleaptestone"],
         exit_code=0,
         stdout_data=PlTestData.privleaptestone_socket_missing,
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--destroy", privleaptestone_uid_str],
         exit_code=0,
         stdout_data=PlTestData.privleaptestone_socket_missing,
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         [
             "sudo",
@@ -470,7 +465,7 @@ def run_leapctl_tests() -> None:
         exit_code=1,
         stderr_data=PlTestData.privleapd_connection_failed,
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--create", "privleaptestone"],
         exit_code=0,
@@ -486,7 +481,7 @@ def run_leapctl_tests() -> None:
         exit_code=0,
         stdout_data=PlTestData.privleaptestone_socket_exists,
     )
-    # ---
+    ## ---
     leapctl_assert_function(
         make_blocker_socket,
         str(Path(PlTestGlobal.privleap_state_dir, "comm", "0")),
@@ -507,7 +502,7 @@ def run_leapctl_tests() -> None:
         str(Path(PlTestGlobal.privleap_state_dir, "comm", "0")),
         "Remove blocker socket for account 'root'",
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--create", "root"],
         exit_code=0,
@@ -518,7 +513,7 @@ def run_leapctl_tests() -> None:
         exit_code=0,
         stdout_data=PlTestData.root_socket_destroyed,
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--create", "1"],
         exit_code=0,
@@ -529,7 +524,7 @@ def run_leapctl_tests() -> None:
         exit_code=0,
         stdout_data=PlTestData.daemon_socket_destroyed,
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--create", "root"],
         exit_code=0,
@@ -545,13 +540,13 @@ def run_leapctl_tests() -> None:
         exit_code=0,
         stdout_data=PlTestData.root_socket_destroyed,
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--destroy", "sys"],
         exit_code=0,
         stdout_data=PlTestData.cannot_destroy_persistent_sys_socket,
     )
-    # ---
+    ## ---
     leapctl_assert_function(
         leapctl_create_deleteme_user,
         "",
@@ -588,25 +583,25 @@ def run_leapctl_tests() -> None:
         exit_code=0,
         stdout_data=deleteme_destroy_stdout,
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--create", "man"],
         exit_code=2,
         stderr_data=PlTestData.man_socket_not_permitted,
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--create", "irc"],
         exit_code=0,
         stdout_data=PlTestData.irc_expected_socket_not_permitted,
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--create", "news"],
         exit_code=0,
         stdout_data=PlTestData.news_expected_socket_not_permitted,
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl", "--create", "privleaptesttwo"],
         exit_code=0,
@@ -617,32 +612,32 @@ def run_leapctl_tests() -> None:
         exit_code=0,
         stdout_data=PlTestData.privleaptesttwo_socket_destroyed,
     )
-    # ---
-    # TODO: This test looks rather useless, can we remove it without losing
-    # test coverage?
+    ## ---
+    ## TODO: This test looks rather useless, can we remove it without losing
+    ## test coverage?
     leapctl_assert_command(
         ["leapctl", "--create", "root"],
         exit_code=0,
         stdout_data=PlTestData.root_socket_created,
     )
-    # ---
+    ## ---
     stop_privleapd_subprocess()
     leapctl_assert_function(
         leapctl_server_error_test,
         "",
         "Test leapctl against fake server that always errors out",
     )
-    # ---
+    ## ---
     leapctl_assert_function(
         leapctl_server_cutoff_test,
         "",
         "Test leapctl against fake server that always abruptly disconnects",
     )
-    # ---
+    ## ---
     leapctl_assert_command(
         ["leapctl"], exit_code=1, stdout_data=PlTestData.leapctl_help
     )
-    # ---
+    ## ---
 
     logging.info(
         "leapctl passed asserts: %s, failed asserts: %s",
@@ -748,11 +743,6 @@ def leaprun_server_invalid_msg_seq_test(bogus: str) -> bool:
         comm_session: PrivleapSession = wait_and_get_session(comm_socket)
         comm_session.get_msg()
         # pylint: disable=protected-access
-        # Rationale:
-        #   protected-access: privleap prevents us from sending incorrect
-        #     message types. However, this code tests what happens when an
-        #     incorrect message type is sent anyway, so we have to bypass the
-        #     protections.
         comm_session._PrivleapSession__send_msg(  # type: ignore [attr-defined]
             PrivleapControlServerNouserMsg()
         )
@@ -853,9 +843,8 @@ def leaprun_server_early_cutoff_query_test(bogus: str) -> bool:
     return False
 
 
+## Probably can't be broken up any further.
 # pylint: disable=too-many-return-statements
-# Rationale:
-#   too-many-return-statements: This can't be reasonably broken up any further.
 def leaprun_terminate_test(bogus: str) -> bool:
     """
     Tests that leaprun sends a "TERMINATE" message when it receives SIGTERM.
@@ -1598,15 +1587,12 @@ def leaprun_filter_env_var_test_stdout(
 
 
 # pylint: disable=too-many-statements
-# Rationale:
-#   too-many-statements: This is a dispatch function for tests, cannot be split
-#     up.
 def run_leaprun_tests() -> None:
     """
     Runs all tests on the leaprun executable.
     """
 
-    # ---
+    ## ---
     leaprun_assert_command(
         ["sudo", "-u", "privleaptestone", "leaprun"],
         exit_code=1,
@@ -1704,14 +1690,14 @@ def run_leaprun_tests() -> None:
         exit_code=1,
         stdout_data=PlTestData.leaprun_help,
     )
-    # ---
+    ## ---
     start_privleapd_subprocess([])
     leaprun_assert_command(
         ["sudo", "-u", "privleaptestone", "leaprun", "test"],
         exit_code=1,
         stderr_data=PlTestData.privleapd_connection_failed,
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         ["leapctl", "--create", "privleaptestone"],
         exit_code=0,
@@ -1723,7 +1709,7 @@ def run_leaprun_tests() -> None:
         exit_code=1,
         stderr_data=PlTestData.privleapd_connection_failed,
     )
-    # ---
+    ## ---
     start_privleapd_subprocess([])
     leaprun_assert_command(
         ["leapctl", "--create", "privleaptestone"],
@@ -1741,7 +1727,7 @@ def run_leaprun_tests() -> None:
         exit_code=1,
         stderr_data=PlTestData.test_act_nonexistent_unauthorized,
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -1753,7 +1739,7 @@ def run_leaprun_tests() -> None:
         exit_code=1,
         stderr_data=PlTestData.test_act_userrestrict_unauthorized,
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -1765,7 +1751,7 @@ def run_leaprun_tests() -> None:
         exit_code=1,
         stderr_data=PlTestData.test_act_grouprestrict_unauthorized,
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -1777,7 +1763,7 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=b"test-act-grouppermit-userrestrict\n",
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -1789,7 +1775,7 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=b"test-act-grouprestrict-userpermit\n",
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -1801,7 +1787,7 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=PlTestData.test_act_target_user,
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         ["leapctl", "--create", "privleaptesttwo"],
         exit_code=0,
@@ -1823,7 +1809,7 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=PlTestData.privleaptesttwo_socket_destroyed,
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         ["leapctl", "--create", "root"],
         exit_code=0,
@@ -1834,7 +1820,7 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=PlTestData.test_act_target_group,
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         ["leaprun", "test-act-userrestrict"],
         exit_code=0,
@@ -1845,7 +1831,7 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=PlTestData.root_socket_destroyed,
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -1857,7 +1843,7 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=PlTestData.test_act_target_user_and_group,
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -1869,13 +1855,13 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=b"test-act-missing-user\n",
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         ["sudo", "-u", "privleaptestone", "leaprun", "test-act-free"],
         exit_code=0,
         stdout_data=b"test-act-free\n",
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -1887,7 +1873,7 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=b"test-act-userpermit\n",
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -1899,7 +1885,7 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=b"abc=def\n",
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -1911,7 +1897,7 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=b"test-act-grouppermit\n",
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -1923,7 +1909,7 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=b"test-act-grouppermit-userpermit\n",
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -1935,7 +1921,7 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=b"test-act-sudopermit\n",
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -1962,7 +1948,7 @@ def run_leaprun_tests() -> None:
         exit_code=1,
         stderr_data=PlTestData.test_act_multiuser_permit_unauthorized,
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -1989,7 +1975,7 @@ def run_leaprun_tests() -> None:
         exit_code=1,
         stderr_data=PlTestData.test_act_multigroup_permit_unauthorized,
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -2034,7 +2020,7 @@ def run_leaprun_tests() -> None:
         exit_code=1,
         stderr_data=PlTestData.test_act_multiuser_multigroup_permit_unauthorized,
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -2046,7 +2032,7 @@ def run_leaprun_tests() -> None:
         exit_code=240,
         stdout_data=b"test-act-exit240\n",
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -2058,7 +2044,7 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stderr_data=b"test-act-stderr\n",
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -2071,7 +2057,7 @@ def run_leaprun_tests() -> None:
         stdout_data=b"stdout00\nstdout01\n",
         stderr_data=b"stderr00\nstderr01\n",
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -2084,7 +2070,7 @@ def run_leaprun_tests() -> None:
         stdout_data=PlTestData.test_act_rootdata,
         filter_func=leaprun_filter_env_var_test_stdout,
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -2097,7 +2083,7 @@ def run_leaprun_tests() -> None:
         stdout_data=PlTestData.test_act_userdata,
         filter_func=leaprun_filter_env_var_test_stdout,
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -2110,7 +2096,7 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=PlTestData.test_act_free_authorized,
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -2124,7 +2110,7 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=PlTestData.test_act_free_authorized,
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -2137,7 +2123,7 @@ def run_leaprun_tests() -> None:
         exit_code=1,
         stderr_data=PlTestData.test_act_userrestrict_unauthorized,
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -2154,7 +2140,7 @@ def run_leaprun_tests() -> None:
         stdout_data=PlTestData.test_act_multi_auth,
         stderr_data=PlTestData.test_act_multi_unauth,
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         write_new_config_file,
         "added_actions_config_file",
@@ -2165,7 +2151,7 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=b"privleapd configuration reload successful.\n",
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -2188,7 +2174,7 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=b"test-act-added2\n",
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         try_remove_config_file,
         "added_actions_config_file",
@@ -2199,7 +2185,7 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=b"privleapd configuration reload successful.\n",
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -2222,7 +2208,7 @@ def run_leaprun_tests() -> None:
         exit_code=1,
         stderr_data=PlTestData.test_act_added2_unauthorized,
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         write_new_config_file,
         "added_actions_bad_config_file",
@@ -2238,7 +2224,7 @@ def run_leaprun_tests() -> None:
         "added_actions_bad_config_file",
         "Remove bad added actions config file",
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         [
             "sudo",
@@ -2251,118 +2237,118 @@ def run_leaprun_tests() -> None:
         exit_code=0,
         stdout_data=b"test-act-grouppermit-userrestrict\n",
     )
-    # ---
+    ## ---
     leaprun_assert_command(
         ["sudo", "-u", "privleaptestone", "leaprun", "qwe123!@#"],
         exit_code=1,
         stderr_data=b"ERROR: Signal name 'qwe123!@#' is invalid!\n",
     )
-    # ---
+    ## ---
     stop_privleapd_subprocess()
     leaprun_assert_function(
         leaprun_server_invalid_msg_seq_test,
         "",
         "Leaprun invalid response test",
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         leaprun_server_late_cutoff_test, "", "Leaprun server late cutoff test"
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         leaprun_server_early_cutoff_exec_test,
         "",
         "Leaprun server early cutoff exec test",
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         leaprun_server_early_cutoff_query_test,
         "",
         "Leaprun server early cutoff query test",
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         leaprun_terminate_test, "", "Leaprun terminate test"
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         leaprun_midaction_cutoff_test, "", "Leaprun midaction cutoff test"
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         leaprun_multi_unauthorized_test, "", "leaprun multi unauthorized test"
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         leaprun_unauth_after_trigger_test,
         "",
         "leaprun unauth after trigger test",
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         leaprun_auth_during_exec_test,
         "",
         "leaprun auth during exec test",
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         leaprun_multi_authorized_test, "", "leaprun multi authorized test"
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         leaprun_access_check_end_during_exec_test,
         "",
         "Leaprun access check end during exec test",
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         leaprun_access_check_end_before_results_test,
         "",
         "Leaprun access check end before results test",
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         leaprun_trigger_error_during_check_test,
         "",
         "Leaprun trigger error during check test",
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         leaprun_trigger_error_test,
         "",
         "Leaprun trigger error test",
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         leaprun_multi_trigger_test,
         "",
         "Leaprun multi trigger test",
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         leaprun_trigger_during_check_test,
         "",
         "Leaprun trigger during check test",
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         leaprun_result_stdout_before_trigger_test,
         "",
         "Leaprun result stdout before trigger test",
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         leaprun_result_stderr_before_trigger_test,
         "",
         "Leaprun result stderr before trigger test",
     )
-    # ---
+    ## ---
     leaprun_assert_function(
         leaprun_result_exitcode_before_trigger_test,
         "",
         "Leaprun result exitcode before trigger test",
     )
-    # ---
+    ## ---
 
     logging.info(
         "leaprun passed asserts: %s, failed asserts: %s",
@@ -2552,11 +2538,11 @@ def privleapd_check_persistent_users_test(bogus: str) -> bool:
 
     if bogus != "":
         return False
-    # This is duplicated from data in primary_test_config_file in
-    # run_test_util.py, since part of the test in that config file is to ensure
-    # the config parser can handle multiple [persistent-users] sections, making
-    # it difficult to store the list of persistent users in a central location
-    # that everything else uses.
+    ## This is duplicated from data in primary_test_config_file in
+    ## run_test_util.py, since part of the test in that config file is to ensure
+    ## the config parser can handle multiple [persistent-users] sections, making
+    ## it difficult to store the list of persistent users in a central location
+    ## that everything else uses.
     persistent_user_list: list[str] = ["sys", "bin", "uucp", "messagebus"]
     persistent_uid_list: list[int] = [
         pwd.getpwnam(x).pw_uid for x in persistent_user_list
@@ -2706,8 +2692,8 @@ def privleapd_create_invalid_user_socket_and_bail_test(by_uid: str) -> bool:
         user_id = "nonexistent"
         expect_lines = PlTestData.create_invalid_user_socket_and_bail_lines
     discard_privleapd_stderr()
-    # This test is prone to race conditions, so we try 5 times and consider it
-    # good if one of those times passes.
+    ## This test is prone to race conditions, so we try 5 times and consider it
+    ## good if one of those times passes.
     for i in range(5):
         control_session: PrivleapSession = PrivleapSession(
             is_control_session=True
@@ -2821,8 +2807,8 @@ def privleapd_create_existing_user_socket_and_bail_test(by_uid: str) -> bool:
 
     user_id: str = username_uid_resolve(by_uid, "privleaptestone")
     discard_privleapd_stderr()
-    # This test is prone to race conditions, so we try 5 times and consider it
-    # good if one of those times passes.
+    ## This test is prone to race conditions, so we try 5 times and consider it
+    ## good if one of those times passes.
     for i in range(5):
         control_session: PrivleapSession = PrivleapSession(
             is_control_session=True
@@ -2871,8 +2857,8 @@ def privleapd_create_blocked_user_socket_and_bail_test(by_uid: str) -> bool:
 
     user_id: str = username_uid_resolve(by_uid, "privleaptestone")
     discard_privleapd_stderr()
-    # This test is prone to race conditions, so we try 5 times and consider it
-    # good if one of those times passes.
+    ## This test is prone to race conditions, so we try 5 times and consider it
+    ## good if one of those times passes.
     for i in range(5):
         control_session: PrivleapSession = PrivleapSession(
             is_control_session=True
@@ -2994,8 +2980,8 @@ def privleapd_destroy_user_socket_and_bail_test(by_uid: str) -> bool:
 
     user_id: str = username_uid_resolve(by_uid, "privleaptestone")
     discard_privleapd_stderr()
-    # This test is prone to race conditions, so we try 5 times and consider it
-    # good if one of those times passes.
+    ## This test is prone to race conditions, so we try 5 times and consider it
+    ## good if one of those times passes.
     for i in range(5):
         control_session: PrivleapSession = PrivleapSession(
             is_control_session=True
@@ -3023,8 +3009,8 @@ def privleapd_destroy_bad_user_socket_and_bail_test(by_uid: str) -> bool:
 
     user_id: str = username_uid_resolve(by_uid, "privleaptestone")
     discard_privleapd_stderr()
-    # This test is prone to race conditions, so we try 5 times and consider it
-    # good if one of those times passes.
+    ## This test is prone to race conditions, so we try 5 times and consider it
+    ## good if one of those times passes.
     for i in range(5):
         control_session: PrivleapSession = PrivleapSession(
             is_control_session=True
@@ -3049,8 +3035,8 @@ def privleapd_send_invalid_control_message_test(bogus: str) -> bool:
     discard_privleapd_stderr()
     control_session: PrivleapSession = PrivleapSession(is_control_session=True)
     assert control_session.backend_socket is not None
-    # privleap message packets are simply length-prefixed binary blobs, with the
-    # length specified as a 4-byte big-endian integer.
+    ## privleap message packets are simply length-prefixed binary blobs, with the
+    ## length specified as a 4-byte big-endian integer.
     socket_send_raw_bytes(
         control_session.backend_socket, b"\x00\x00\x00\x0dBOB asdfghjkl"
     )
@@ -3108,8 +3094,8 @@ def privleapd_send_invalid_comm_message_test(by_uid: str) -> bool:
     discard_privleapd_stderr()
     comm_session: PrivleapSession = PrivleapSession(user_id)
     assert comm_session.backend_socket is not None
-    # privleap message packets are simply length-prefixed binary blobs, with the
-    # length specified as a 4-byte big-endian integer.
+    ## privleap message packets are simply length-prefixed binary blobs, with the
+    ## length specified as a 4-byte big-endian integer.
     socket_send_raw_bytes(
         comm_session.backend_socket, b"\x00\x00\x00\x0fBOB 1 asdfghjkl"
     )
@@ -3127,8 +3113,8 @@ def privleapd_send_nonexistent_signal_and_bail_test(by_uid: str) -> bool:
 
     user_id: str = username_uid_resolve(by_uid, "privleaptestone")
     discard_privleapd_stderr()
-    # This test is prone to race conditions, so we try 5 times and consider it
-    # good if one of those times passes.
+    ## This test is prone to race conditions, so we try 5 times and consider it
+    ## good if one of those times passes.
     for i in range(5):
         comm_session: PrivleapSession = PrivleapSession(user_id)
         comm_session.send_msg(PrivleapCommClientSignalMsg("nonexistent"))
@@ -3140,8 +3126,8 @@ def privleapd_send_nonexistent_signal_and_bail_test(by_uid: str) -> bool:
             quiet=i != 4,
         ):
             part1_passed = True
-        # privleapd waits about 3 seconds before sending the UNAUTHORIZED
-        # message for security reasons
+        ## privleapd waits about 3 seconds before sending the UNAUTHORIZED
+        ## message for security reasons
         time.sleep(3)
         if compare_privleapd_stderr(
             PlTestData.unauthorized_broken_pipe_lines, quiet=i != 4
@@ -3161,8 +3147,8 @@ def privleapd_send_userrestrict_signal_and_bail_test(by_uid: str) -> bool:
 
     user_id: str = username_uid_resolve(by_uid, "privleaptestone")
     discard_privleapd_stderr()
-    # This test is prone to race conditions, so we try 5 times and consider it
-    # good if one of those times passes.
+    ## This test is prone to race conditions, so we try 5 times and consider it
+    ## good if one of those times passes.
     for i in range(5):
         comm_session: PrivleapSession = PrivleapSession(user_id)
         comm_session.send_msg(
@@ -3176,8 +3162,8 @@ def privleapd_send_userrestrict_signal_and_bail_test(by_uid: str) -> bool:
             quiet=i != 4,
         ):
             part1_passed = True
-        # privleapd waits about 3 seconds before sending the UNAUTHORIZED
-        # message for security reasons
+        ## privleapd waits about 3 seconds before sending the UNAUTHORIZED
+        ## message for security reasons
         time.sleep(3)
         if compare_privleapd_stderr(
             PlTestData.unauthorized_broken_pipe_lines, quiet=i != 4
@@ -3197,8 +3183,8 @@ def privleapd_send_grouprestrict_signal_and_bail_test(by_uid: str) -> bool:
 
     user_id: str = username_uid_resolve(by_uid, "privleaptestone")
     discard_privleapd_stderr()
-    # This test is prone to race conditions, so we try 5 times and consider it
-    # good if one of those times passes.
+    ## This test is prone to race conditions, so we try 5 times and consider it
+    ## good if one of those times passes.
     for i in range(5):
         comm_session: PrivleapSession = PrivleapSession(user_id)
         comm_session.send_msg(
@@ -3212,8 +3198,8 @@ def privleapd_send_grouprestrict_signal_and_bail_test(by_uid: str) -> bool:
             quiet=i != 4,
         ):
             part1_passed = True
-        # privleapd waits about 3 seconds before sending the UNAUTHORIZED
-        # message for security reasons
+        ## privleapd waits about 3 seconds before sending the UNAUTHORIZED
+        ## message for security reasons
         time.sleep(3)
         if compare_privleapd_stderr(
             PlTestData.unauthorized_broken_pipe_lines, quiet=i != 4
@@ -3420,8 +3406,8 @@ def privleapd_send_valid_signal_and_bail_test(by_uid: str) -> bool:
 
     user_id: str = username_uid_resolve(by_uid, "privleaptestone")
     discard_privleapd_stderr()
-    # This test is prone to race conditions, so we try 5 times and consider it
-    # good if one of those times passes.
+    ## This test is prone to race conditions, so we try 5 times and consider it
+    ## good if one of those times passes.
     for i in range(5):
         comm_session: PrivleapSession = PrivleapSession(user_id)
         comm_session.send_msg(PrivleapCommClientSignalMsg("test-act-free"))
@@ -3561,8 +3547,8 @@ def privleapd_invalid_ascii_test(test_data: str) -> bool:
     assert comm_session.backend_socket is not None
     comm_session.backend_socket.send(PlTestData.invalid_ascii_list[idx])
     try:
-        # This line will usually error out, we include it only so that we can
-        # wait for the server to fully process the invalid data we've sent it.
+        ## This line will usually error out, we include it only so that we can
+        ## wait for the server to fully process the invalid data we've sent it.
         _ = comm_session.get_msg()
     except Exception:
         pass
@@ -3585,7 +3571,6 @@ def privleapd_control_msg_mismatch_test(bogus: str) -> bool:
     control_session: PrivleapSession = PrivleapSession(is_control_session=True)
     assert control_session.backend_socket is not None
     # pylint: disable=protected-access
-    # Same rationale as for leaprun_server_invalid_msg_seq_test
     control_session._PrivleapSession__send_msg(  # type: ignore [attr-defined]
         PrivleapCommClientSignalMsg("test-act-free")
     )
@@ -3606,7 +3591,6 @@ def privleapd_comm_msg_mismatch_test(by_uid: str) -> bool:
     comm_session: PrivleapSession = PrivleapSession(user_id)
     assert comm_session.backend_socket is not None
     # pylint: disable=protected-access
-    # Same rationale as for privleapd_control_msg_mismatch_test
     comm_session._PrivleapSession__send_msg(  # type: ignore [attr-defined]
         PrivleapControlClientCreateMsg("wha")
     )
@@ -3753,9 +3737,6 @@ def privleapd_multithreading_test_monitor() -> None:
 
 
 # pylint: disable=consider-using-with
-# Rationale:
-#   consider-using-with: Not suitable for the parallel process running
-#     mechanism being used here.
 def privleapd_multithreading_test_worker(
     mode: str, user_id: str, by_uid: str
 ) -> subprocess.Popen[bytes]:
@@ -3792,10 +3773,8 @@ def privleapd_multithreading_test_worker(
     return return_proc
 
 
+## Splitting this up would reduce readability.
 # pylint: disable=too-many-branches
-# Rationale:
-#   too-many-branches: Using less branches isn't practical, splitting this up
-#     would only make it harder to read.
 def privleapd_multithreading_test(by_uid: str) -> bool:
     """
     Exercises privleapd's multithreading code.
@@ -3966,27 +3945,27 @@ def run_privleapd_tests() -> None:
         pwd.getpwnam("privleaptestthree").pw_uid
     )
 
-    # ---
+    ## ---
     start_privleapd_subprocess([])
     privleapd_assert_function(
         privleapd_check_persistent_users_test,
         "",
         "Ensure all configured persistent users have comm sockets",
     )
-    # ---
+    ## ---
     privleapd_assert_command(
         ["/usr/bin/privleapd"],
         exit_code=1,
         stderr_data=PlTestData.privleapd_verify_not_running_twice_fail,
     )
-    # ---
+    ## ---
     stop_privleapd_subprocess()
     privleapd_assert_command(
         ["sudo", "-u", "privleaptestone", "/usr/bin/privleapd"],
         exit_code=1,
         stderr_data=PlTestData.privleapd_ensure_running_as_root_fail,
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         write_new_config_file,
         "bad_name_file",
@@ -4018,7 +3997,7 @@ def run_privleapd_tests() -> None:
         "bad_name_file",
         "Remove privleapd-ignored config file",
     )
-    # ---
+    ## ---
     stop_privleapd_subprocess()
     privleapd_assert_function(
         write_new_config_file,
@@ -4030,7 +4009,7 @@ def run_privleapd_tests() -> None:
         "bad_config_file",
         "Test privleapd behavior with bad config file",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_bad_config_file_check_test,
         "",
@@ -4041,7 +4020,7 @@ def run_privleapd_tests() -> None:
         "crash_config_file",
         "Remove config file with invalid contents",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         write_new_config_file,
         "duplicate_action_config_file",
@@ -4057,7 +4036,7 @@ def run_privleapd_tests() -> None:
         "duplicate_action_config_file",
         "Remove config file with duplicate action name",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         write_new_config_file,
         "wrongorder_config_file",
@@ -4073,7 +4052,7 @@ def run_privleapd_tests() -> None:
         "wrongorder_config_file",
         "Remove config file with badly ordered contents",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         write_new_config_file,
         "duplicate_keys_config_file",
@@ -4089,7 +4068,7 @@ def run_privleapd_tests() -> None:
         "duplicate_keys_config_file",
         "Remove config file with duplicate keys",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         write_new_config_file,
         "absent_command_directive_config_file",
@@ -4105,7 +4084,7 @@ def run_privleapd_tests() -> None:
         "absent_command_directive_config_file",
         "Remove config file with absent command directive",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         write_new_config_file,
         "invalid_action_config_file",
@@ -4121,7 +4100,7 @@ def run_privleapd_tests() -> None:
         "invalid_action_config_file",
         "Remove config file with invalid action name",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         write_new_config_file,
         "unrecognized_header_config_file",
@@ -4137,7 +4116,7 @@ def run_privleapd_tests() -> None:
         "unrecognized_header_config_file",
         "Remove config file with unrecognized header",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         write_new_config_file,
         "missing_auth_config_file",
@@ -4153,7 +4132,7 @@ def run_privleapd_tests() -> None:
         "missing_auth_config_file",
         "Remove config file with missing auth data",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         write_new_config_file,
         "added_actions_config_file",
@@ -4174,7 +4153,7 @@ def run_privleapd_tests() -> None:
         "added_actions_config_file",
         "Remove config file with insecure ownership",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         write_new_config_file,
         "added_actions_config_file",
@@ -4195,7 +4174,7 @@ def run_privleapd_tests() -> None:
         "added_actions_config_file",
         "Remove config file with insecure ownership",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_set_insecure_owner,
         str(PlTestGlobal.privleap_conf_dir),
@@ -4211,7 +4190,7 @@ def run_privleapd_tests() -> None:
         str(PlTestGlobal.privleap_conf_dir),
         "Make config directory ownership secure again",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_set_insecure_mode,
         str(PlTestGlobal.privleap_conf_dir),
@@ -4227,52 +4206,52 @@ def run_privleapd_tests() -> None:
         str(PlTestGlobal.privleap_conf_dir),
         "Make config directory mode secure again",
     )
-    # ---
+    ## ---
     start_privleapd_subprocess([])
     privleapd_assert_function(
         privleapd_control_disconnect_test,
         "",
         "Test privleapd client instant disconnect on control socket",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_create_invalid_user_socket_test,
         "",
         "Test privleapd socket create request for nonexistent user",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_create_invalid_user_socket_test,
         "by_uid",
         "Test privleapd socket create request for nonexistent UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_create_invalid_user_socket_and_bail_test,
         "",
         "Test privleapd socket create request for nonexistent user with "
         "abrupt disconnect",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_create_invalid_user_socket_and_bail_test,
         "by_uid",
         "Test privleapd socket create request for nonexistent UID with "
         "abrupt disconnect",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_destroy_invalid_user_socket_test,
         "",
         "Test privleapd socket destroy request for nonexistent username",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_destroy_invalid_user_socket_test,
         "by_uid",
         "Test privleapd socket destroy request for nonexistent username",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_create_user_socket_by_uid_test,
         "",
@@ -4283,7 +4262,7 @@ def run_privleapd_tests() -> None:
         exit_code=0,
         stdout_data=PlTestData.privleaptestone_socket_destroyed,
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_create_user_socket_twice_test,
         "",
@@ -4294,27 +4273,27 @@ def run_privleapd_tests() -> None:
         exit_code=0,
         stdout_data=PlTestData.privleaptestone_socket_destroyed,
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_create_user_socket_twice_test,
         "by_uid",
         "Test privleapd socket create request for existing UID twice",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_create_existing_user_socket_and_bail_test,
         "",
         "Test privleapd socket create request for user that already has a "
         "socket, with abrupt disconnect",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_create_existing_user_socket_and_bail_test,
         "by_uid",
         "Test privleapd socket create request for UID that already has a "
         "socket, with abrupt disconnect",
     )
-    # ---
+    ## ---
     privleapd_assert_command(
         ["leapctl", "--destroy", "privleaptestone"],
         exit_code=0,
@@ -4336,20 +4315,20 @@ def run_privleapd_tests() -> None:
         "",
         "Test privleapd socket create request for user with blocked socket",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_create_blocked_user_socket_test,
         "by_uid",
         "Test privleapd socket create request for UID with blocked socket",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_create_blocked_user_socket_and_bail_test,
         "",
         "Test privleapd socket create request for user with blocked socket and "
         "abrupt disconnect",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_create_blocked_user_socket_and_bail_test,
         "by_uid",
@@ -4367,19 +4346,19 @@ def run_privleapd_tests() -> None:
         ),
         "Remove blocker socket for user privleaptestone",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_destroy_persistent_user_test,
         "",
         "Test privleapd socket destroy request for persistent user",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_destroy_persistent_user_test,
         "by_uid",
         "Test privleapd socket destroy request for persistent UID",
     )
-    # ---
+    ## ---
     privleapd_assert_command(
         ["leapctl", "--create", "privleaptestone"],
         exit_code=0,
@@ -4390,7 +4369,7 @@ def run_privleapd_tests() -> None:
         "",
         "Test privleapd socket destroy request for user with deleted socket",
     )
-    # ---
+    ## ---
     privleapd_assert_command(
         ["leapctl", "--create", "privleaptestone"],
         exit_code=0,
@@ -4401,59 +4380,59 @@ def run_privleapd_tests() -> None:
         "by_uid",
         "Test privleapd socket destroy request for UID with deleted socket",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_create_expected_disallowed_socket_test,
         "",
         "Test privleapd socket create request for expected disallowed user",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_create_expected_disallowed_socket_test,
         "by_uid",
         "Test privleapd socket create request for expected disallowed UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_destroy_user_socket_and_bail_test,
         "",
         "Test privleapd socket destroy request for existing user, with "
         "abrupt disconnect",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_destroy_user_socket_and_bail_test,
         "by_uid",
         "Test privleapd socket destroy request for existing UID, with "
         "abrupt disconnect",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_destroy_bad_user_socket_and_bail_test,
         "",
         "Test privleapd socket destroy request for existing user with no "
         "socket, with abrupt disconnect",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_destroy_bad_user_socket_and_bail_test,
         "by_uid",
         "Test privleapd socket destroy request for existing UID with no "
         "socket, with abrupt disconnect",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_send_invalid_control_message_test,
         "",
         "Test privleapd against an invalid control message",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_send_corrupted_control_message_test,
         "",
         "Test privleapd against a corrupted control message",
     )
-    # ---
+    ## ---
     privleapd_assert_command(
         ["leapctl", "--create", "privleaptestone"],
         exit_code=0,
@@ -4464,140 +4443,140 @@ def run_privleapd_tests() -> None:
         "",
         "Test privleapd comm session with abrupt disconnect",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_bail_comm_test,
         "by_uid",
         "Test privleapd comm session with abrupt disconnect, by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_send_invalid_comm_message_test,
         "",
         "Test privleapd against an invalid comm message",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_send_invalid_comm_message_test,
         "by_uid",
         "Test privleapd against an invalid comm message, by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_send_nonexistent_signal_and_bail_test,
         "",
         "Test privleapd nonexistent action signal with abrupt disconnect",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_send_nonexistent_signal_and_bail_test,
         "by_uid",
         "Test privleapd nonexistent action signal with abrupt disconnect, by "
         + "UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_send_userrestrict_signal_and_bail_test,
         "",
         "Test privleapd userrestrict signal with abrupt disconnect",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_send_userrestrict_signal_and_bail_test,
         "by_uid",
         "Test privleapd userrestrict signal with abrupt disconnect, by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_send_grouprestrict_signal_and_bail_test,
         "",
         "Test privleapd grouprestrict signal with abrupt disconnect",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_send_grouprestrict_signal_and_bail_test,
         "by_uid",
         "Test privleapd grouprestrict signal with abrupt disconnect, by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "|test-act-invalid-bash",
         "Test privleapd's handling of invalid Bash in an action",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "by_uid|test-act-invalid-bash",
         "Test privleapd's handling of invalid Bash in an action, by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_send_valid_signal_and_bail_test,
         "",
         "Test privleapd valid signal with abrupt disconnect",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_send_valid_signal_and_bail_test,
         "by_uid",
         "Test privleapd valid signal with abrupt disconnect, by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_allowed_action_access_check_test,
         "",
         "Test privleapd access check with allowed action",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_allowed_action_access_check_test,
         "by_uid",
         "Test privleapd access check with allowed action, by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_disallowed_action_access_check_test,
         "",
         "Test privleapd access check with disallowed action",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_disallowed_action_access_check_test,
         "by_uid",
         "Test privleapd access check with disallowed action, by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_leaprun_terminate_test,
         "",
         "Test privleapd response to leaprun terminate command",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_terminate_sent_first_test,
         "",
         "Test privleapd response to terminate command being sent first",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_terminate_sent_first_test,
         "by_uid",
         "Test privleapd response to terminate command being sent first, by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_send_random_garbage_test,
         "",
         "Test privleapd random garbage handling",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_send_random_garbage_test,
         "by_uid",
         "Test privleapd random garbage handling, by UID",
     )
-    # ---
+    ## ---
     for i in range(0, len(PlTestData.invalid_ascii_list)):
         privleapd_assert_function(
             privleapd_invalid_ascii_test,
@@ -4609,45 +4588,45 @@ def run_privleapd_tests() -> None:
             f"by_uid|{i}",
             f"Test privleapd invalid ASCII handling (iteration {i+1}), by UID",
         )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_control_msg_mismatch_test,
         "",
         "Test privleapd control message mismatch handling",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_comm_msg_mismatch_test,
         "",
         "Test privleapd comm message mismatch handling",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_comm_msg_mismatch_test,
         "by_uid",
         "Test privleapd comm message mismatch handling, by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_command(["/usr/bin/privleapd", "-C"], exit_code=0)
-    # ---
+    ## ---
     privleapd_assert_command(
         ["/usr/bin/privleapd", "--help"],
         exit_code=0,
         stderr_data=PlTestData.privleapd_help,
     )
-    # ---
+    ## ---
     privleapd_assert_command(
         ["/usr/bin/privleapd", "-z"],
         exit_code=1,
         stderr_data=PlTestData.privleapd_unrecognized_argument,
     )
-    # ---
+    ## ---
     privleapd_assert_command(
         ["/usr/bin/privleapd", "\x1b[31mHi\x1b[m"],
         exit_code=1,
         stderr_data=PlTestData.privleapd_unrecognized_argument_escape,
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         write_new_config_file,
         "added_actions_config_file",
@@ -4658,44 +4637,44 @@ def run_privleapd_tests() -> None:
         "",
         "Test privleapd restartless config reload, adding actions",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "|test-act-added1-success",
         "Test privleapd when running a new signal after config reload",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "by_uid|test-act-added1-success",
         "Test privleapd when running a new signal after config reload, by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "|test-act-added2-success",
         "Test privleapd when running another new signal after config reload",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "by_uid|test-act-added2-success",
         "Test privleapd when running another new signal after config reload, "
         + "by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "|test-act-userpermit",
         "Test privleapd when running old signal after config reload",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "by_uid|test-act-userpermit",
         "Test privleapd when running old signal after config reload, by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         try_remove_config_file,
         "added_actions_config_file",
@@ -4706,46 +4685,46 @@ def run_privleapd_tests() -> None:
         "",
         "Test privleapd restartless config reload, removing actions",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "|test-act-added1-failure",
         "Test privleapd when failing to run a new signal after config reload",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "by_uid|test-act-added1-failure",
         "Test privleapd when failing to run a new signal after config reload, "
         + "by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "|test-act-added2-failure",
         "Test privleapd when failing to run another new signal after config "
         + "reload",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "by_uid|test-act-added2-failure",
         "Test privleapd when failing to run another new signal after config "
         + "reload, by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "|test-act-userpermit",
         "Test privleapd when running old signal after config reload",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "by_uid|test-act-userpermit",
         "Test privleapd when running old signal after config reload, by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         write_new_config_file,
         "added_actions_bad_config_file",
@@ -4756,34 +4735,34 @@ def run_privleapd_tests() -> None:
         "",
         "Test privleapd restartless config reload, invalid config",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "|test-act-added1-failure",
         "Test privleapd when failing to run a new signal after config reload",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "by_uid|test-act-added1-failure",
         "Test privleapd when failing to run a new signal after config reload, "
         + "by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "|test-act-added2-failure",
         "Test privleapd when failing to run another new signal after config "
         + "reload",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "by_uid|test-act-added2-failure",
         "Test privleapd when failing to run another new signal after config "
         + "reload, by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "|test-act-userpermit",
@@ -4799,7 +4778,7 @@ def run_privleapd_tests() -> None:
         "added_actions_bad_config_file",
         "Remove bad added actions config file",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         write_new_config_file,
         "bad_target_ident_config_file",
@@ -4844,7 +4823,7 @@ def run_privleapd_tests() -> None:
         "",
         "Reload config without bad target identities",
     )
-    # ---
+    ## ---
     privleapd_assert_command(
         ["leapctl", "--create", "privleaptesttwo"],
         exit_code=0,
@@ -4881,7 +4860,7 @@ def run_privleapd_tests() -> None:
         ),
         "Test privleaptesttwo socket no longer exists",
     )
-    # ---
+    ## ---
     privleapd_assert_command(
         ["usermod", "-a", "-G", "privleap", "privleaptesttwo"],
         exit_code=0,
@@ -4914,7 +4893,7 @@ def run_privleapd_tests() -> None:
         ),
         "Test privleaptesttwo socket no longer exists",
     )
-    # ---
+    ## ---
     privleapd_assert_command(
         ["leapctl", "--create", "privleaptesttwo"],
         exit_code=2,
@@ -4940,7 +4919,7 @@ def run_privleapd_tests() -> None:
         "by_uid|test-act-privleap-grouppermit-privleaptesttwo-success",
         "Test privleapd action run with allowed user privleaptesttwo, by UID",
     )
-    # ---
+    ## ---
     privleapd_assert_command(
         ["leapctl", "--create", "privleaptestthree"],
         exit_code=0,
@@ -4983,9 +4962,9 @@ def run_privleapd_tests() -> None:
         ),
         "Test privleaptestthree socket no longer exists",
     )
-    # We don't add privleap group membership back to the #2 and #3 accounts
-    # yet since we need them to be missing that membership for the next test.
-    # ---
+    ## We don't add privleap group membership back to the #2 and #3 accounts
+    ## yet since we need them to be missing that membership for the next test.
+    ## ---
     privleapd_assert_function(
         write_new_config_file,
         "new_persistent_users_config_file",
@@ -5060,7 +5039,7 @@ def run_privleapd_tests() -> None:
         exit_code=0,
         stdout_data=b"",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         write_new_config_file,
         "nonexistent_restrict_config_file",
@@ -5092,7 +5071,7 @@ def run_privleapd_tests() -> None:
         "Test privleapd config reload with nonexistent restrict config "
         "removed",
     )
-    # ---
+    ## ---
     stop_privleapd_subprocess()
     privleapd_assert_function(
         try_remove_dir,
@@ -5125,7 +5104,7 @@ def run_privleapd_tests() -> None:
         "/usr/local/etc/privleap/conf.d",
         "Re-create system-local configuration directory",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         write_new_config_file,
         "system_local_config_file",
@@ -5156,7 +5135,7 @@ def run_privleapd_tests() -> None:
         "",
         "Test privleapd restartless config reload, no system-local config",
     )
-    # ---
+    ## ---
     privleapd_assert_command(
         [
             "bash",
@@ -5182,13 +5161,13 @@ def run_privleapd_tests() -> None:
         "/test-act-interrupt",
         "Remove flag file left by test-act-interrupt",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_multithreading_test,
         "",
         "Test privleapd multithreading code",
     )
-    # ---
+    ## ---
     privleapd_assert_function(
         privleapd_multithreading_test,
         "by_uid",
@@ -5199,7 +5178,7 @@ def run_privleapd_tests() -> None:
         exit_code=0,
         stdout_data=PlTestData.privleaptestone_socket_created,
     )
-    # ---
+    ## ---
 
     logging.info(
         "privleapd passed asserts: %s, failed asserts: %s",

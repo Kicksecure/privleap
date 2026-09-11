@@ -4,11 +4,6 @@
 ## See the file COPYING for copying conditions.
 
 # pylint: disable=broad-exception-caught,too-few-public-methods,too-many-lines
-# Rationale:
-#   broad-exception-caught: We use broad exception catching for general-purpose
-#     error handlers.
-#   too-few-public-methods: Global variable class uses no methods intentionally.
-#   too-many-lines: Splitting this up is not a priority at the moment.
 
 """
 run_test_util.py - Utility functions for run_test.py.
@@ -63,20 +58,20 @@ def proc_try_readline(
     assert proc.stdout is not None
     assert proc.stderr is not None
 
-    # If there's a line already in the buffer, find and return it.
+    ## If there's a line already in the buffer, find and return it.
     if "\n" in PlTestGlobal.linebuf:
         linebuf_parts: list[str] = PlTestGlobal.linebuf.split("\n", maxsplit=1)
         PlTestGlobal.linebuf = linebuf_parts[1]
         return linebuf_parts[0] + "\n"
 
-    # Select the correct stream to read from.
+    ## Select the correct stream to read from.
     if read_stderr:
         target_stream: IO[str] = proc.stderr
     else:
         target_stream = proc.stdout
 
-    # Attempt to read from the stream, adding whatever is available from the
-    # stream into a buffer.
+    ## Attempt to read from the stream, adding whatever is available from the
+    ## stream into a buffer.
     current_time: datetime = datetime.now()
     end_time = current_time + timedelta(seconds=timeout)
     while True:
@@ -91,13 +86,13 @@ def proc_try_readline(
             break
         time.sleep(0.0001)
 
-    # Retrieve a line from the buffer and return it.
+    ## Retrieve a line from the buffer and return it.
     linebuf_parts = PlTestGlobal.linebuf.split("\n", maxsplit=1)
     if len(linebuf_parts) == 2:
         PlTestGlobal.linebuf = linebuf_parts[1]
         return linebuf_parts[0] + "\n"
 
-    # If there was no line to retrieve, return None.
+    ## If there was no line to retrieve, return None.
     return None
 
 
@@ -237,9 +232,6 @@ def start_privleapd_subprocess(
 
     try:
         # pylint: disable=consider-using-with
-        # Rationale:
-        #   consider-using-with: "with" is not suitable for the architecture of
-        #   this script in this scenario.
         full_args: list[str] = ["/usr/bin/privleapd", "--test"]
         for arg in extra_args:
             full_args.append(arg)
@@ -424,7 +416,7 @@ def compare_privleapd_stderr(
             read_lines.append(proc_line)
             if proc_line != line:
                 continue
-            # If we get this far, line == proc_line
+            ## If we get this far, line == proc_line
             break
     while True:
         proc_line = proc_try_readline(
@@ -485,7 +477,7 @@ Command=echo 'test-act-free'
 AuthorizedUsers=privleaptestone
 
 [persistent-users]
-# UID 3 = sys
+## UID 3 = sys
 User=3
 
 [action:test-act-userrestrict]
@@ -536,7 +528,7 @@ Command=echo 'test-act-grouppermit-userpermit'
 AuthorizedUsers=privleaptestone
 AuthorizedGroups=privleaptestone
 
-# Not all groups have a corresponding username, this tests that edge case
+## Not all groups have a corresponding username, this tests that edge case
 [action:test-act-sudopermit]
 Command=echo 'test-act-sudopermit'
 AuthorizedGroups=sudo
@@ -623,7 +615,7 @@ User=news
 User=messagebus
 """
     comment_only_config_file: str = """# this is a comment
-# and so is this
+## and so is this
 """
     invalid_filename_test_config_file: str = """[action:test-act-invalid]
 Command=echo 'test-act-invalid'
@@ -651,7 +643,7 @@ Command=echo 'test-act-notabsent'
 AuthorizedUsers=root
 
 [action:test-act-absent]
-# Command=echo 'test-act-absent'
+## Command=echo 'test-act-absent'
 """
     invalid_action_config_file: str = """[action:test-@ct-invalidaction]
 Command=echo 'test-@ct-invalidaction'
