@@ -188,7 +188,6 @@ def handle_destroy_request(user_id: str) -> NoReturn:
     assert LeapctlGlobal.control_session is not None
 
     try:
-        # noinspection PyUnboundLocalVariable
         LeapctlGlobal.control_session.send_msg(
             PrivleapControlClientDestroyMsg(user_id)
         )

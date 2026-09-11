@@ -46,7 +46,6 @@ class PlTestGlobal:
     privleap_state_comm_dir: Path = Path(privleap_state_dir, "comm")
     base_delay: float = 0.1
     privleapd_running: bool = False
-    no_service_handling = False
     all_asserts_passed = True
     multithreading_test_unexpected_stderr = False
     multithreading_test_monitor_stop = False
@@ -193,20 +192,6 @@ def erase_old_privleap_config() -> None:
     PlTestGlobal.privleap_system_local_conf_dir.mkdir(
         parents=True, exist_ok=False
     )
-
-
-def stop_privleapd_service() -> None:
-    """
-    Stops the privleapd service. This must be called before testing starts.
-    """
-
-    if PlTestGlobal.no_service_handling:
-        return
-    try:
-        subprocess.run(["systemctl", "stop", "privleapd"], check=True)
-    except Exception as e:
-        logging.critical("Could not stop privleapd service!", exc_info=e)
-        sys.exit(1)
 
 
 def check_privleapd_error_output(expected_error_output: list[str]) -> None:
@@ -391,9 +376,7 @@ def assert_command_result(
 def write_privleap_test_config() -> None:
     """
     Writes test privleap config data. Includes one legitimate config file, one
-    empty file, and one file that contains only comments. Also creates the
-    secondary configuration directory so that notices about it not existing
-    don't appear in most instances.
+    empty file, and one file that contains only comments.
     """
 
     with open(
@@ -414,7 +397,6 @@ def write_privleap_test_config() -> None:
         encoding="utf-8",
     ) as config_file:
         config_file.write("\n")
-    Path("/usr/local/etc/privleap/conf.d").mkdir(parents=True, exist_ok=True)
 
 
 def compare_privleapd_stderr(
@@ -483,6 +465,7 @@ def socket_send_raw_bytes(sock: socket.socket, buf: bytes) -> bool:
     Sends a buffer of bytes through a socket, coping with partial sends
     properly.
     """
+
     buf_sent: int = 0
     while buf_sent < len(buf):
         last_sent: int = sock.send(buf[buf_sent:])
@@ -646,7 +629,6 @@ User=messagebus
 Command=echo 'test-act-invalid'
 AuthorizedUsers=root
 """
-    # noinspection SpellCheckingInspection
     crash_config_file: str = """[action:test-act-crash]
 Commandecho 'test-act-crash'
 AuthorizedUsers=root
@@ -747,6 +729,9 @@ User=privleaptestthree
     nonexistent_socket_missing: bytes = (
         b"Comm socket does not exist for account 'nonexistent'.\n"
     )
+    onetwothreefourfive_socket_missing: bytes = (
+        b"Comm socket does not exist for account '12345'.\n"
+    )
     apt_socket_created: bytes = b"Comm socket created for account '_apt'.\n"
     apt_socket_destroyed: bytes = b"Comm socket destroyed for account '_apt'.\n"
     privleaptestone_socket_created: bytes = (
@@ -783,6 +768,9 @@ User=privleaptestthree
     )
     deleteme_socket_created: bytes = (
         b"Comm socket created for account 'deleteme'.\n"
+    )
+    deleteme_socket_invisible: bytes = (
+        b"Comm socket does not exist for account 'deleteme'.\n"
     )
     deleteme_socket_destroyed: bytes = (
         b"Comm socket destroyed for account 'XXX_DELETEME_UID_XXX'.\n"
@@ -877,6 +865,9 @@ User=privleaptestthree
         b"ERROR: privleapd returned a 'TRIGGER_ERROR' message when leaprun "
         + b"was in check mode!\n"
     )
+    privleapd_trigger_error = (
+        b"ERROR: An error was encountered launching action 'test-act-free'.\n"
+    )
     privleapd_multi_trigger = (
         b"ERROR: privleapd returned two 'TRIGGER' messages in the same "
         + b"session!\n"
@@ -936,14 +927,6 @@ User=privleaptestthree
     test_act_nonexistent_unauthorized: bytes = (
         b"ERROR: Account 'privleaptestone' (1002) is unauthorized to run "
         + b"action 'test-act-nonexistent'.\n"
-    )
-    test_act_bad_target_user_unauthorized: bytes = (
-        b"ERROR: Account 'privleaptestone' (1002) is unauthorized to run "
-        + b"action 'test-act-bad-target-user'.\n"
-    )
-    test_act_bad_target_group_unauthorized: bytes = (
-        b"ERROR: Account 'privleaptestone' (1002) is unauthorized to run "
-        + b"action 'test-act-bad-target-group'.\n"
     )
     test_act_added1_unauthorized: bytes = (
         b"ERROR: Account 'privleaptestone' (1002) is unauthorized to run "
@@ -1048,20 +1031,34 @@ User=privleaptestthree
         "Traceback (most recent call last):\n",
         "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
-    destroy_invalid_user_socket_lines: list[str] = [
+    control_create_invalid_uid_socket_lines: list[str] = [
+        "handle_control_create_msg: WARNING: Account '12345' does not exist\n"
+    ]
+    create_invalid_uid_socket_and_bail_lines: list[str] = [
+        "handle_control_create_msg: WARNING: Account '12345' does not "
+        + "exist\n",
+        "send_msg_safe: ERROR: Could not send 'CONTROL_ERROR'\n",
+        "Traceback (most recent call last):\n",
+        "BrokenPipeError: [Errno 32] Broken pipe\n",
+    ]
+    destroy_invalid_uid_socket_lines: list[str] = [
         "destroy_comm_socket: INFO: Could not destroy comm socket for account "
         + "'12345', account has no comm socket open\n",
         "handle_control_destroy_msg: INFO: Handled DESTROY message for account "
         + "'12345', socket did not exist\n",
     ]
-    destroy_nonexistent_user_lines: list[str] = [
+    destroy_invalid_user_socket_lines: list[str] = [
         "destroy_comm_socket: WARNING: Could not destroy comm socket for "
         + "account 'nonexistent', account does not exist and its original UID "
         + "was not given\n",
         "handle_control_destroy_msg: INFO: Handled DESTROY message for account "
         + "'nonexistent', socket did not exist\n",
     ]
-    create_user_socket_lines: list[str] = [
+    create_user_socket_once_lines: list[str] = [
+        "handle_control_create_msg: INFO: Handled CREATE message for account "
+        + "'privleaptestone', socket created\n",
+    ]
+    create_user_socket_twice_lines: list[str] = [
         "handle_control_create_msg: INFO: Handled CREATE message for account "
         + "'privleaptestone', socket created\n",
         "handle_control_create_msg: INFO: Handled CREATE message for account "
@@ -1212,7 +1209,6 @@ User=privleaptestthree
         b"\x00\x00\x00\x0fSIGNAL 1 PARAM1",
         b"\x00\x00\x00\x10SIGNAL 1  PARAM1",
     ]
-    # TODO: Any good way to avoid all the repetition?
     invalid_ascii_lines_list: list[list[str]] = [
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
@@ -1390,6 +1386,16 @@ User=privleaptestthree
         + "by field 'TargetGroup' of action 'test-act-bad-target-group' does "
         + "not exist.\n",
     ]
+    test_act_bad_target_user_lines: list[str] = [
+        "auth_signal_request: WARNING: Action run request: Could not find "
+        + "action 'test-act-bad-target-user' requested by account "
+        + "'privleaptestone'\n"
+    ]
+    test_act_bad_target_group_lines: list[str] = [
+        "auth_signal_request: WARNING: Action run request: Could not find "
+        + "action 'test-act-bad-target-group' requested by account "
+        + "'privleaptestone'\n"
+    ]
     test_act_added1_success_lines: list[str] = [
         "handle_signal_message: INFO: Triggered action 'test-act-added1' "
         + "for account 'privleaptestone'\n",
@@ -1530,4 +1536,10 @@ User=privleaptestthree
         + "'privleaptestone'!\n",
         "Traceback (most recent call last):\n",
         "ValueError: Invalid message type 'CREATE' for socket\n",
+    ]
+    test_act_system_local_success_lines: list[str] = [
+        "handle_signal_message: INFO: Triggered action "
+        + "'test-act-system-local' for account 'privleaptestone'\n",
+        "send_action_results: INFO: Action 'test-act-system-local' "
+        + "requested by account 'privleaptestone' completed\n",
     ]
