@@ -37,10 +37,9 @@ processes on the system, though it can be useful for debugging.
 See the `leaprun(8)`, `leapctl(8)`, and `privleapd(1)` manpages for usage
 instructions.
 
-## Configuration format
+## Configuration
 
-privleap stores its configuration under `/etc/privleap/conf.d`. See
-the `privleap-conf.d(5)` manpage for all the details of privleap
+See the `privleap-conf.d(5)` manpage for all the details of privleap
 configuration.
 
 ## Protocol

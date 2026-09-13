@@ -1,1 +1,3 @@
+interest-noawait /usr/lib/privleap/conf.d
 interest-noawait /etc/privleap/conf.d
+interest-noawait /usr/local/etc/privleap/conf.d

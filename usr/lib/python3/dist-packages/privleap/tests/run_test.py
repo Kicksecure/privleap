@@ -2423,6 +2423,12 @@ def id_to_config_info(file_id: str) -> tuple[str, str]:
                 PlTestGlobal.privleap_conf_dir, "nonexistent_restrict.conf"
             )
             target_contents = PlTestData.nonexistent_restrict_config_file
+        case "deploy_local_config_file":
+            target_path = Path(
+                PlTestGlobal.privleap_deploy_local_conf_dir,
+                "deploy_local.conf",
+            )
+            target_contents = PlTestData.deploy_local_config_file
         case "system_local_config_file":
             target_path = Path(
                 PlTestGlobal.privleap_system_local_conf_dir,
@@ -3344,6 +3350,12 @@ def privleapd_check_signal_response_test(test_data: str) -> bool:
             expect_unauthorized = True
             expect_privleapd_stderr = PlTestData.test_act_bad_target_group_lines
             test_action = "test-act-bad-target-group"
+        case "test-act-deploy-local":
+            expect_stdout_data = b"test-act-deploy-local\n"
+            expect_privleapd_stderr = (
+                PlTestData.test_act_deploy_local_success_lines
+            )
+            test_action = "test-act-deploy-local"
         case "test-act-system-local":
             expect_stdout_data = b"test-act-system-local\n"
             expect_privleapd_stderr = (
@@ -3821,7 +3833,9 @@ def privleapd_multithreading_test(by_uid: str) -> bool:
             first_user_id_block, second_user_id_block
         ):
             proc_list.append(
-                privleapd_multithreading_test_worker("run", first_block_user_id, by_uid)
+                privleapd_multithreading_test_worker(
+                    "run", first_block_user_id, by_uid
+                )
             )
             proc_list.append(
                 privleapd_multithreading_test_worker(
@@ -5107,6 +5121,37 @@ def run_privleapd_tests() -> None:
     ## ---
     privleapd_assert_function(
         write_new_config_file,
+        "deploy_local_config_file",
+        "Write config file in deployment-local config dir",
+    )
+    privleapd_assert_function(
+        privleapd_config_reload_test,
+        "",
+        "Test privleapd restartless config reload with deploy-local config",
+    )
+    privleapd_assert_function(
+        privleapd_check_signal_response_test,
+        "|test-act-deploy-local",
+        "Test deploy local action",
+    )
+    privleapd_assert_function(
+        privleapd_check_signal_response_test,
+        "by_uid|test-act-deploy-local",
+        "Test deploy local action, by UID",
+    )
+    privleapd_assert_function(
+        try_remove_config_file,
+        "deploy_local_config_file",
+        "Remove config-file in deploy-local config dir",
+    )
+    privleapd_assert_function(
+        privleapd_config_reload_test,
+        "",
+        "Test privleapd restartless config reload, no deploy-local config",
+    )
+    ## ---
+    privleapd_assert_function(
+        write_new_config_file,
         "system_local_config_file",
         "Write config file in system-local config dir",
     )
@@ -5123,7 +5168,7 @@ def run_privleapd_tests() -> None:
     privleapd_assert_function(
         privleapd_check_signal_response_test,
         "by_uid|test-act-system-local",
-        "Test system local action",
+        "Test system local action, by UID",
     )
     privleapd_assert_function(
         try_remove_config_file,

@@ -87,6 +87,7 @@ class PrivleapdGlobal:
 
     ## Readable by all threads, writable by none
     config_dir_list: list[Path] = [
+        Path("/usr/lib/privleap/conf.d"),
         Path("/etc/privleap/conf.d"),
         Path("/usr/local/etc/privleap/conf.d"),
     ]
@@ -1419,7 +1420,8 @@ def str_list_quote_and_comma_delimit(str_list: list[str]) -> str:
 
 def parse_config_files() -> bool:
     """
-    Parses all config files under /etc/privleap/conf.d.
+    Parses all config files under directories listed by
+    PrivleapdGlobal.config_dir_list.
 
     May be called by the main thread until the control thread starts, then may
     only be called by the control thread.
