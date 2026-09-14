@@ -1,6 +1,79 @@
 #!/bin/bash
 
-## Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
+## Copyright (C) 2025 - 2026 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
 ## See the file COPYING for copying conditions.
 
-python3 test/run-test --no-service-handling
+## Runs the privleap regression suite under coverage.py and reports how much of
+## the privleap Python code it reaches.
+
+set -o errexit
+set -o nounset
+set -o pipefail
+set -o errtrace
+shopt -s inherit_errexit
+shopt -s shift_verbose
+export LC_ALL=C
+
+repo_dir="$(pwd)"
+rcfile="${repo_dir}/debian/tests/coverage/coveragerc"
+
+## AUTOPKGTEST_ARTIFACTS might be a relative path.
+artifacts_dir="$(realpath -- "${AUTOPKGTEST_ARTIFACTS:-${repo_dir}/autopkgtest-artifacts}")"
+
+## cov_dir must be world-writable, as unprivileged clients run by the test
+## suite must have their coverage measured also.
+cov_dir="${artifacts_dir}/privleap-coverage"
+mkdir --mode=777 --parents -- "${cov_dir}"
+
+## Debugging.
+printf '%s\n' "DEBUGGING: Stat report on '${cov_dir}':"
+iter_str="${cov_dir}"
+while [ -n "${iter_str}" ] && [ "${iter_str}" != '/' ]; do
+  stat "${iter_str}" || true
+  iter_str="$(dirname "${iter_str}")";
+done
+printf '%s\n' "END DEBUGGING: Stat report on '${cov_dir}':"
+
+export COVERAGE_PROCESS_START="${rcfile}"
+export COVERAGE_FILE="${cov_dir}/.coverage"
+export PYTHONPATH="${repo_dir}/debian/tests/coverage${PYTHONPATH:+:${PYTHONPATH}}"
+
+## FIXME: Coverage reports from unprivileged clients are not being captured.
+## These must be captured for the coverage report to be useful. Issues rules
+## out so far:
+##
+## * Environment passthrough settings aren't being written to /etc/sudoers.d?
+##   Verified false - a developer was able to unpack the tarball written by
+##   mmdebstrap during environment setup and see the config file, with the
+##   expected contents.
+## * Malformed configuration? Verified false - a developer was able to chroot
+##   into an unpacked tarball, export whitelisted environment variables as
+##   root, then run `sudo -u user bash` and see those environment variables
+##   present in the shell.
+## * Parent directory permissions forbid unprivileged users from writing into
+##   the coverage data repository? Verified false - the stat report debugging
+##   above shows that every parent directory is at least r-x for unprivileged
+##   users, and that $cov_dir itself is rwx for unprivileged users.
+## * AUTOPKGTEST_ARTIFACTS is a relative path? Impossible, the path is made
+##   into an absolute path above. Verified false - these environment variables
+##   are printed into the test log by the `test-act-rootdata` and
+##   `test-act-userdata` action tests, and are shown as absolute paths there.
+## * Environment variables silently fail to have an effect in a non-root
+##   session? Verified false - a developer was able to run Python scripts
+##   commands in a properly set up unpacked tarball and see coverage report
+##   files generated automatically.
+##
+## Most likely the environment variables are not reaching the unprivileged
+## scripts for some unknown reason. It is also possible that coverage files
+## are being generated but coverage.py is ignoring them due to file ownership
+## or other concerns. Further investigation remains to be done.
+
+test_rc=0
+./test/run-test || test_rc="$?"
+
+python3 -m coverage combine --rcfile="${rcfile}" "${cov_dir}"
+python3 -m coverage report --rcfile="${rcfile}" 1>&2
+python3 -m coverage xml --rcfile="${rcfile}" -o "${cov_dir}/coverage.xml"
+python3 -m coverage html --rcfile="${rcfile}" --directory="${cov_dir}/coverage_html"
+
+exit "${test_rc}"

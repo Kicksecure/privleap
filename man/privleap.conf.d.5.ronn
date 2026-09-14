@@ -7,7 +7,19 @@ privleap-conf.d(5) -- privleap configuration files
 -->
 
 ## SYNOPSIS
-`/etc/privleap/conf.d/*.conf`
+`/usr/lib/privleap/conf.d/*.conf`, `/etc/privleap/conf.d/*.conf`,
+`/usr/local/etc/privleap/conf.d/*.conf`
+
+## CONFIGURATION DIRECTORIES
+privleapd searches the following directories for config files on startup:
+
+* `/usr/lib/privleap/conf.d/`
+* `/etc/privleap/conf.d/`
+* `/usr/local/etc/privleap/conf.d/`
+
+privleap's configuration options do not include any overridable settings, so no
+particular preference is given to any one directory. However, it is recommended
+to reserve `/usr/lib/privleap/conf.d/` for software-owned configuration files.
 
 ## DESCRIPTION
 These configuration files define the actions that can be run via privleapd, and
@@ -59,7 +71,7 @@ The following headers are recognized:
   times. If the specified user does not exist, the user is skipped over.
 
   `Group`: Specifies a user group to mark as "allowed". All users who are a
-  member of the specified group will be marked as "allowed". This key may
+  member of the specified group will be considered "allowed". This key may
   appear multiple times in the section. The same group can be specified
   multiple times. If the specified group does not exist, the group is skipped
   over.
@@ -161,4 +173,4 @@ users:
 https://github.com/Kicksecure/privleap
 
 ## AUTHOR
-This man page has been written by Aaron Rainbolt (arraybolt3@ubuntu.com).
+This man page has been written by Aaron Rainbolt (arraybolt3@gmail.com).

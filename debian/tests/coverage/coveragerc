@@ -1,0 +1,16 @@
+## Copyright (C) 2026 - 2026 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
+## See the file COPYING for copying conditions.
+
+## Coverage configuration for the privleap autopkgtest.
+
+[run]
+branch = true
+parallel = true
+sigterm = true
+source =
+    privleap
+    /usr/libexec/privleap
+
+[report]
+precision = 2
+show_missing = true
