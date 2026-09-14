@@ -1,0 +1,21 @@
+## Copyright (C) 2026 - 2026 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
+## See the file COPYING for copying conditions.
+
+## Coverage configuration for the privleap autopkgtest (privleap-test-coverage).
+## privleapd and the shim run in separate processes; parallel mode gives each
+## its own data file and combine merges them. sigterm lets the daemon flush its
+## data when the test stops it with SIGTERM (an uncatchable SIGKILL would lose
+## it). See debian/tests/coverage/sitecustomize.py.
+
+[run]
+parallel = True
+sigterm = True
+source =
+    privleap
+    /usr/libexec/privleap
+omit =
+    */privleap/tests/*
+
+[report]
+precision = 2
+show_missing = True

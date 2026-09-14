@@ -1,4 +1,4 @@
-#!/usr/bin/python3 -su
+#!/usr/bin/python3 -Bsu
 
 ## Copyright (C) 2025 - 2026 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
 ## See the file COPYING for copying conditions.
@@ -1579,6 +1579,10 @@ def leaprun_filter_env_var_test_stdout(
                 stdout_part.startswith(b"AUTOPKGTEST_TESTBED_ARCH="),
                 stdout_part.startswith(b"AUTOPKGTEST_TEST_ARCH="),
                 stdout_part.startswith(b"DEB_BUILD_OPTIONS="),
+                # coverage.py scaffolding the test harness injects.
+                stdout_part.startswith(b"COVERAGE_PROCESS_START="),
+                stdout_part.startswith(b"COVERAGE_FILE="),
+                stdout_part.startswith(b"PYTHONPATH="),
             ]
         ):
             continue

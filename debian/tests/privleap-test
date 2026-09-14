@@ -1,6 +1,42 @@
 #!/bin/bash
 
-## Copyright (C) 2025 - 2025 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
+## Copyright (C) 2025 - 2026 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
 ## See the file COPYING for copying conditions.
 
-python3 test/run-test --no-service-handling
+## Runs the privleap regression suite under coverage.py -- the only supported
+## way to run the suite -- and reports how much of the privleap Python code
+## (the privleap package plus the shim) it reaches. Every privleap process
+## joins the measurement via debian/tests/coverage/sitecustomize.py; see
+## debian/tests/coverage/coveragerc.
+
+set -o errexit
+set -o nounset
+set -o pipefail
+set -o errtrace
+shopt -s inherit_errexit
+shopt -s shift_verbose
+export LC_ALL=C
+
+repo_dir="$(pwd)"
+rcfile="${repo_dir}/debian/tests/coverage/coveragerc"
+
+artifacts_dir="${AUTOPKGTEST_ARTIFACTS:-${repo_dir}/autopkgtest-artifacts}"
+## Root-only: every process that writes coverage data runs as root (the
+## runner, privleapd, the shim, and the root-launched clients). The suite's
+## unprivileged client runs go through `sudo -u`, which scrubs the coverage
+## environment, so they write nothing here -- no world-writable dir needed.
+cov_dir="${artifacts_dir}/privleap-coverage"
+mkdir -p "${cov_dir}"
+
+export COVERAGE_PROCESS_START="${rcfile}"
+export COVERAGE_FILE="${cov_dir}/.coverage"
+export PYTHONPATH="${repo_dir}/debian/tests/coverage${PYTHONPATH:+:${PYTHONPATH}}"
+
+test_rc=0
+./test/run-test --no-service-handling || test_rc="$?"
+
+python3 -m coverage combine --rcfile="${rcfile}" "${cov_dir}"
+python3 -m coverage report --rcfile="${rcfile}" 1>&2
+python3 -m coverage xml --rcfile="${rcfile}" -o "${cov_dir}/coverage.xml"
+
+exit "${test_rc}"
