@@ -18,7 +18,7 @@ create_autopkgtest_tarball() {
   ## initramfs-tools here right now to make the autopkgtest environment happy
   ## but maybe dracut will work instead.)
   sudo mmdebstrap \
-    --include=ca-certificates,passwd,adduser,initramfs-tools \
+    --include=ca-certificates,passwd,adduser,initramfs-tools,sudo \
     --skip=output/dev \
     --variant=debootstrap \
     "${target_distribution}" \
@@ -27,6 +27,9 @@ create_autopkgtest_tarball() {
     --customize-hook='chroot "$1" useradd --home-dir /home/user --create-home user' \
     --customize-hook='chroot "$1" passwd --delete user' \
     --customize-hook='cp /etc/hosts "$1/etc/hosts"' \
+    --customize-hook='printf "%s\n" "Defaults env_keep += \"COVERAGE_PROCESS_START\"" >> "$1"/etc/sudoers.d/privleap-test' \
+    --customize-hook='printf "%s\n" "Defaults env_keep += \"COVERAGE_FILE\"" >> "$1"/etc/sudoers.d/privleap-test' \
+    --customize-hook='printf "%s\n" "Defaults env_keep += \"PYTHONPATH\"" >> "$1"/etc/sudoers.d/privleap-test' \
     --customize-hook=/usr/share/autopkgtest/setup-commands/setup-testbed \
     https://deb.debian.org/debian
 }
@@ -136,7 +139,8 @@ run_autopkgtest() {
   }
   cd ..
   autopkgtest -l "${privleap_project_dir}/privleap-test-log.txt" \
-    --apt-upgrade -B privleap*.deb "${privleap_project_dir}" -- unshare
+    --output-dir="${privleap_project_dir}/test_artifacts" --apt-upgrade \
+    -B privleap*.deb "${privleap_project_dir}" -- unshare
   echo "Test complete. Results are stored in ${privleap_project_dir}/privleap-test-log.txt."
 }
 

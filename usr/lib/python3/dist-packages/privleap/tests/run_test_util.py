@@ -308,9 +308,7 @@ def stop_privleapd_subprocess() -> None:
 
     assert PlTestGlobal.privleapd_proc is not None
     try:
-        # SIGTERM, not SIGKILL: coverage's handler flushes privleapd's data on
-        # SIGTERM, and privleapd installs no handler of its own, so it
-        # terminates the same either way.
+        ## Must use SIGTERM here to trigger the coverage handler.
         PlTestGlobal.privleapd_proc.terminate()
         _ = PlTestGlobal.privleapd_proc.communicate()
     except Exception as e:
