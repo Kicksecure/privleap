@@ -5,7 +5,7 @@ Source: privleap
 Section: admin
 Priority: optional
 Maintainer: Patrick Schleizer <adrelanos@kicksecure.com>
-Build-Depends: debhelper (>= 13), debhelper-compat (= 13), python3
+Build-Depends: debhelper (>= 13), debhelper-compat (= 13), python3, config-package-dev
 Homepage: https://www.kicksecure.com/wiki/Privleap
 Vcs-Browser: https://github.com/Kicksecure/privleap
 Vcs-Git: https://github.com/Kicksecure/privleap.git

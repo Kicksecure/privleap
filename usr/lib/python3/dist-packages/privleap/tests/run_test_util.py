@@ -4,11 +4,6 @@
 ## See the file COPYING for copying conditions.
 
 # pylint: disable=broad-exception-caught,too-few-public-methods,too-many-lines
-# Rationale:
-#   broad-exception-caught: We use broad exception catching for general-purpose
-#     error handlers.
-#   too-few-public-methods: Global variable class uses no methods intentionally.
-#   too-many-lines: Splitting this up is not a priority at the moment.
 
 """
 run_test_util.py - Utility functions for run_test.py.
@@ -35,8 +30,8 @@ class PlTestGlobal:
     """
 
     linebuf: str = ""
-    privleap_conf_base_dir: Path = Path("/etc/privleap")
-    privleap_conf_dir: Path = Path(f"{privleap_conf_base_dir}/conf.d")
+    privleap_conf_dir: Path = Path("/usr/lib/privleap/conf.d")
+    privleap_deploy_local_conf_dir: Path = Path("/etc/privleap/conf.d")
     privleap_system_local_conf_dir: Path = Path(
         "/usr/local/etc/privleap/conf.d"
     )
@@ -46,7 +41,6 @@ class PlTestGlobal:
     privleap_state_comm_dir: Path = Path(privleap_state_dir, "comm")
     base_delay: float = 0.1
     privleapd_running: bool = False
-    no_service_handling = False
     all_asserts_passed = True
     multithreading_test_unexpected_stderr = False
     multithreading_test_monitor_stop = False
@@ -64,20 +58,20 @@ def proc_try_readline(
     assert proc.stdout is not None
     assert proc.stderr is not None
 
-    # If there's a line already in the buffer, find and return it.
+    ## If there's a line already in the buffer, find and return it.
     if "\n" in PlTestGlobal.linebuf:
         linebuf_parts: list[str] = PlTestGlobal.linebuf.split("\n", maxsplit=1)
         PlTestGlobal.linebuf = linebuf_parts[1]
         return linebuf_parts[0] + "\n"
 
-    # Select the correct stream to read from.
+    ## Select the correct stream to read from.
     if read_stderr:
         target_stream: IO[str] = proc.stderr
     else:
         target_stream = proc.stdout
 
-    # Attempt to read from the stream, adding whatever is available from the
-    # stream into a buffer.
+    ## Attempt to read from the stream, adding whatever is available from the
+    ## stream into a buffer.
     current_time: datetime = datetime.now()
     end_time = current_time + timedelta(seconds=timeout)
     while True:
@@ -92,13 +86,13 @@ def proc_try_readline(
             break
         time.sleep(0.0001)
 
-    # Retrieve a line from the buffer and return it.
+    ## Retrieve a line from the buffer and return it.
     linebuf_parts = PlTestGlobal.linebuf.split("\n", maxsplit=1)
     if len(linebuf_parts) == 2:
         PlTestGlobal.linebuf = linebuf_parts[1]
         return linebuf_parts[0] + "\n"
 
-    # If there was no line to retrieve, return None.
+    ## If there was no line to retrieve, return None.
     return None
 
 
@@ -183,30 +177,23 @@ def erase_old_privleap_config() -> None:
     ## This dir should always exist. If we can't remove it, that's an error.
     shutil.rmtree(PlTestGlobal.privleap_conf_dir)
 
-    ## This dir probably won't exist yet though.
+    ## These dirs probably won't exist yet though.
+    try:
+        shutil.rmtree(PlTestGlobal.privleap_deploy_local_conf_dir)
+    except FileNotFoundError:
+        pass
     try:
         shutil.rmtree(PlTestGlobal.privleap_system_local_conf_dir)
     except FileNotFoundError:
         pass
 
     PlTestGlobal.privleap_conf_dir.mkdir(parents=True, exist_ok=False)
+    PlTestGlobal.privleap_deploy_local_conf_dir.mkdir(
+        parents=True, exist_ok=False
+    )
     PlTestGlobal.privleap_system_local_conf_dir.mkdir(
         parents=True, exist_ok=False
     )
-
-
-def stop_privleapd_service() -> None:
-    """
-    Stops the privleapd service. This must be called before testing starts.
-    """
-
-    if PlTestGlobal.no_service_handling:
-        return
-    try:
-        subprocess.run(["systemctl", "stop", "privleapd"], check=True)
-    except Exception as e:
-        logging.critical("Could not stop privleapd service!", exc_info=e)
-        sys.exit(1)
 
 
 def check_privleapd_error_output(expected_error_output: list[str]) -> None:
@@ -252,9 +239,6 @@ def start_privleapd_subprocess(
 
     try:
         # pylint: disable=consider-using-with
-        # Rationale:
-        #   consider-using-with: "with" is not suitable for the architecture of
-        #   this script in this scenario.
         full_args: list[str] = ["/usr/bin/privleapd", "--test"]
         for arg in extra_args:
             full_args.append(arg)
@@ -324,9 +308,7 @@ def stop_privleapd_subprocess() -> None:
 
     assert PlTestGlobal.privleapd_proc is not None
     try:
-        # SIGTERM, not SIGKILL: coverage's handler flushes privleapd's data on
-        # SIGTERM, and privleapd installs no handler of its own, so it
-        # terminates the same either way.
+        ## Must use SIGTERM here to trigger the coverage handler.
         PlTestGlobal.privleapd_proc.terminate()
         _ = PlTestGlobal.privleapd_proc.communicate()
     except Exception as e:
@@ -394,9 +376,7 @@ def assert_command_result(
 def write_privleap_test_config() -> None:
     """
     Writes test privleap config data. Includes one legitimate config file, one
-    empty file, and one file that contains only comments. Also creates the
-    secondary configuration directory so that notices about it not existing
-    don't appear in most instances.
+    empty file, and one file that contains only comments.
     """
 
     with open(
@@ -417,7 +397,6 @@ def write_privleap_test_config() -> None:
         encoding="utf-8",
     ) as config_file:
         config_file.write("\n")
-    Path("/usr/local/etc/privleap/conf.d").mkdir(parents=True, exist_ok=True)
 
 
 def compare_privleapd_stderr(
@@ -445,7 +424,7 @@ def compare_privleapd_stderr(
             read_lines.append(proc_line)
             if proc_line != line:
                 continue
-            # If we get this far, line == proc_line
+            ## If we get this far, line == proc_line
             break
     while True:
         proc_line = proc_try_readline(
@@ -486,6 +465,7 @@ def socket_send_raw_bytes(sock: socket.socket, buf: bytes) -> bool:
     Sends a buffer of bytes through a socket, coping with partial sends
     properly.
     """
+
     buf_sent: int = 0
     while buf_sent < len(buf):
         last_sent: int = sock.send(buf[buf_sent:])
@@ -505,7 +485,7 @@ Command=echo 'test-act-free'
 AuthorizedUsers=privleaptestone
 
 [persistent-users]
-# UID 3 = sys
+## UID 3 = sys
 User=3
 
 [action:test-act-userrestrict]
@@ -556,7 +536,7 @@ Command=echo 'test-act-grouppermit-userpermit'
 AuthorizedUsers=privleaptestone
 AuthorizedGroups=privleaptestone
 
-# Not all groups have a corresponding username, this tests that edge case
+## Not all groups have a corresponding username, this tests that edge case
 [action:test-act-sudopermit]
 Command=echo 'test-act-sudopermit'
 AuthorizedGroups=sudo
@@ -643,13 +623,12 @@ User=news
 User=messagebus
 """
     comment_only_config_file: str = """# this is a comment
-# and so is this
+## and so is this
 """
     invalid_filename_test_config_file: str = """[action:test-act-invalid]
 Command=echo 'test-act-invalid'
 AuthorizedUsers=root
 """
-    # noinspection SpellCheckingInspection
     crash_config_file: str = """[action:test-act-crash]
 Commandecho 'test-act-crash'
 AuthorizedUsers=root
@@ -672,7 +651,7 @@ Command=echo 'test-act-notabsent'
 AuthorizedUsers=root
 
 [action:test-act-absent]
-# Command=echo 'test-act-absent'
+## Command=echo 'test-act-absent'
 """
     invalid_action_config_file: str = """[action:test-@ct-invalidaction]
 Command=echo 'test-@ct-invalidaction'
@@ -720,6 +699,11 @@ Command=echo 'test-act-missing-auth'
 Command=echo 'test-act-nonexistent-restrict'
 AuthorizedUsers=nonexistent
 """
+    deploy_local_config_file: str = """\
+[action:test-act-deploy-local]
+Command=echo 'test-act-deploy-local'
+AuthorizedUsers=privleaptestone
+"""
     system_local_config_file: str = """\
 [action:test-act-system-local]
 Command=echo 'test-act-system-local'
@@ -749,6 +733,9 @@ User=privleaptestthree
     )
     nonexistent_socket_missing: bytes = (
         b"Comm socket does not exist for account 'nonexistent'.\n"
+    )
+    onetwothreefourfive_socket_missing: bytes = (
+        b"Comm socket does not exist for account '12345'.\n"
     )
     apt_socket_created: bytes = b"Comm socket created for account '_apt'.\n"
     apt_socket_destroyed: bytes = b"Comm socket destroyed for account '_apt'.\n"
@@ -787,6 +774,9 @@ User=privleaptestthree
     deleteme_socket_created: bytes = (
         b"Comm socket created for account 'deleteme'.\n"
     )
+    deleteme_socket_invisible: bytes = (
+        b"Comm socket does not exist for account 'deleteme'.\n"
+    )
     deleteme_socket_destroyed: bytes = (
         b"Comm socket destroyed for account 'XXX_DELETEME_UID_XXX'.\n"
     )
@@ -808,7 +798,8 @@ User=privleaptestthree
         b"Comm socket destroyed for account 'privleaptesttwo'.\n"
     )
     privleaptesttwo_socket_not_permitted: bytes = (
-        b"ERROR: Account 'privleaptesttwo' is not permitted to have a comm socket!\n"
+        b"ERROR: Account 'privleaptesttwo' is not permitted to have a comm "
+        + b"socket!\n"
     )
     privleaptestthree_socket_created: bytes = (
         b"Comm socket created for account 'privleaptestthree'.\n"
@@ -817,14 +808,14 @@ User=privleaptestthree
         b"leapctl <--create|--destroy> <user>\n"
         + b"leapctl --reload\n"
         + b"\n"
-        + b"     --create : Specifies that leapctl should request a communication "
-        + b"socket to\n"
+        + b"     --create : Specifies that leapctl should request a "
+        + b"communication socket to\n"
         + b"                be created for the specified user account.\n"
-        + b"    --destroy : Specifies that leapctl should request a communication "
-        + b"socket\n"
+        + b"    --destroy : Specifies that leapctl should request a "
+        + b"communication socket\n"
         + b"                to be destroyed for the specified user account.\n"
-        + b"     --reload : Instructs privleapd to reload configuration without "
-        + b"restarting.\n"
+        + b"     --reload : Instructs privleapd to reload configuration "
+        + b"without restarting.\n"
         + b"         user : The username or UID of the user account to create "
         + b"or destroy a\n"
         + b"                communication socket for.\n"
@@ -879,6 +870,9 @@ User=privleaptestthree
     privleapd_trigger_error_during_check = (
         b"ERROR: privleapd returned a 'TRIGGER_ERROR' message when leaprun "
         + b"was in check mode!\n"
+    )
+    privleapd_trigger_error = (
+        b"ERROR: An error was encountered launching action 'test-act-free'.\n"
     )
     privleapd_multi_trigger = (
         b"ERROR: privleapd returned two 'TRIGGER' messages in the same "
@@ -939,14 +933,6 @@ User=privleaptestthree
     test_act_nonexistent_unauthorized: bytes = (
         b"ERROR: Account 'privleaptestone' (1002) is unauthorized to run "
         + b"action 'test-act-nonexistent'.\n"
-    )
-    test_act_bad_target_user_unauthorized: bytes = (
-        b"ERROR: Account 'privleaptestone' (1002) is unauthorized to run "
-        + b"action 'test-act-bad-target-user'.\n"
-    )
-    test_act_bad_target_group_unauthorized: bytes = (
-        b"ERROR: Account 'privleaptestone' (1002) is unauthorized to run "
-        + b"action 'test-act-bad-target-group'.\n"
     )
     test_act_added1_unauthorized: bytes = (
         b"ERROR: Account 'privleaptestone' (1002) is unauthorized to run "
@@ -1029,14 +1015,15 @@ User=privleaptestthree
     )
     bad_config_file_lines: list[str] = [
         "parse_config_file: ERROR: Error parsing config: "
-        + "'/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax'\n",
+        + "'/usr/lib/privleap/conf.d/crash.conf:2:error:Invalid syntax'\n",
         "main: CRITICAL: Failed initial config load!\n",
     ]
     bad_config_file_check_lines: list[str] = [
-        "/etc/privleap/conf.d/crash.conf:2:error:Invalid syntax\n"
+        "/usr/lib/privleap/conf.d/crash.conf:2:error:Invalid syntax\n"
     ]
     control_disconnect_lines: list[str] = [
-        "handle_control_session: ERROR: Could not get message from control client!\n",
+        "handle_control_session: ERROR: Could not get message from control "
+        + "client!\n",
         "Traceback (most recent call last):\n",
         "ConnectionAbortedError: Connection unexpectedly closed\n",
     ]
@@ -1051,20 +1038,34 @@ User=privleaptestthree
         "Traceback (most recent call last):\n",
         "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
-    destroy_invalid_user_socket_lines: list[str] = [
+    control_create_invalid_uid_socket_lines: list[str] = [
+        "handle_control_create_msg: WARNING: Account '12345' does not exist\n"
+    ]
+    create_invalid_uid_socket_and_bail_lines: list[str] = [
+        "handle_control_create_msg: WARNING: Account '12345' does not "
+        + "exist\n",
+        "send_msg_safe: ERROR: Could not send 'CONTROL_ERROR'\n",
+        "Traceback (most recent call last):\n",
+        "BrokenPipeError: [Errno 32] Broken pipe\n",
+    ]
+    destroy_invalid_uid_socket_lines: list[str] = [
         "destroy_comm_socket: INFO: Could not destroy comm socket for account "
         + "'12345', account has no comm socket open\n",
         "handle_control_destroy_msg: INFO: Handled DESTROY message for account "
         + "'12345', socket did not exist\n",
     ]
-    destroy_nonexistent_user_lines: list[str] = [
+    destroy_invalid_user_socket_lines: list[str] = [
         "destroy_comm_socket: WARNING: Could not destroy comm socket for "
         + "account 'nonexistent', account does not exist and its original UID "
         + "was not given\n",
         "handle_control_destroy_msg: INFO: Handled DESTROY message for account "
         + "'nonexistent', socket did not exist\n",
     ]
-    create_user_socket_lines: list[str] = [
+    create_user_socket_once_lines: list[str] = [
+        "handle_control_create_msg: INFO: Handled CREATE message for account "
+        + "'privleaptestone', socket created\n",
+    ]
+    create_user_socket_twice_lines: list[str] = [
         "handle_control_create_msg: INFO: Handled CREATE message for account "
         + "'privleaptestone', socket created\n",
         "handle_control_create_msg: INFO: Handled CREATE message for account "
@@ -1135,23 +1136,27 @@ User=privleaptestthree
         "BrokenPipeError: [Errno 32] Broken pipe\n",
     ]
     send_invalid_control_message_lines: list[str] = [
-        "handle_control_session: ERROR: Could not get message from control client!\n",
+        "handle_control_session: ERROR: Could not get message from control "
+        + "client!\n",
         "Traceback (most recent call last):\n",
         "ValueError: Unrecognized message type 'BOB'\n",
     ]
     send_corrupted_control_message_lines: list[str] = [
-        "handle_control_session: ERROR: Could not get message from control client!\n",
+        "handle_control_session: ERROR: Could not get message from control "
+        + "client!\n",
         "Traceback (most recent call last):\n",
         "ValueError: recv_buf contains data past the last string\n",
     ]
     bail_comm_lines: list[str] = [
-        "get_client_initial_msg: ERROR: Could not get message from client run by account "
+        "get_client_initial_msg: ERROR: Could not get message from client run "
+        + "by account "
         + "'privleaptestone'!\n",
         "Traceback (most recent call last):\n",
         "ConnectionAbortedError: Connection unexpectedly closed\n",
     ]
     send_invalid_comm_message_lines: list[str] = [
-        "get_client_initial_msg: ERROR: Could not get message from client run by account "
+        "get_client_initial_msg: ERROR: Could not get message from client run "
+        + "by account "
         + "'privleaptestone'!\n",
         "Traceback (most recent call last):\n",
         "ValueError: Unrecognized message type 'BOB'\n",
@@ -1215,7 +1220,6 @@ User=privleaptestthree
         b"\x00\x00\x00\x0fSIGNAL 1 PARAM1",
         b"\x00\x00\x00\x10SIGNAL 1  PARAM1",
     ]
-    # TODO: Any good way to avoid all the repetition?
     invalid_ascii_lines_list: list[list[str]] = [
         [
             "get_client_initial_msg: ERROR: Could not get message from client "
@@ -1345,31 +1349,31 @@ User=privleaptestthree
     ]
     duplicate_actions_config_file_lines: list[str] = [
         "parse_config_file: ERROR: Error parsing config: "
-        + "'/etc/privleap/conf.d/unit-test.conf:58:error:Duplicate action "
+        + "'/usr/lib/privleap/conf.d/unit-test.conf:58:error:Duplicate action "
         + "found: 'test-act-sudopermit''\n",
         "main: CRITICAL: Failed initial config load!\n",
     ]
     wrongorder_config_file_lines: list[str] = [
         "parse_config_file: ERROR: Error parsing config: "
-        + "'/etc/privleap/conf.d/wrongorder.conf:1:error:Config line "
+        + "'/usr/lib/privleap/conf.d/wrongorder.conf:1:error:Config line "
         + "before header'\n",
         "main: CRITICAL: Failed initial config load!\n",
     ]
     duplicate_keys_config_file_lines: list[str] = [
         "parse_config_file: ERROR: Error parsing config: "
-        + "'/etc/privleap/conf.d/dupkeys.conf:3:error:Multiple 'Command' "
+        + "'/usr/lib/privleap/conf.d/dupkeys.conf:3:error:Multiple 'Command' "
         + "keys in action 'test-act-dupkeys''\n",
         "main: CRITICAL: Failed initial config load!\n",
     ]
     absent_command_directive_config_file_lines: list[str] = [
         "parse_config_file: ERROR: Error parsing config: "
-        + "'/etc/privleap/conf.d/absent.conf:5:error:No command configured for "
-        + "action: 'test-act-absent''\n",
+        + "'/usr/lib/privleap/conf.d/absent.conf:5:error:No command configured "
+        + "for action: 'test-act-absent''\n",
         "main: CRITICAL: Failed initial config load!\n",
     ]
     invalid_action_config_file_lines: list[str] = [
         "parse_config_file: ERROR: Error parsing config: "
-        + "'/etc/privleap/conf.d/invalidaction.conf:1:error:Invalid action "
+        + "'/usr/lib/privleap/conf.d/invalidaction.conf:1:error:Invalid action "
         + "name: 'test-@ct-invalidaction''\n",
         "main: CRITICAL: Failed initial config load!\n",
     ]
@@ -1392,6 +1396,16 @@ User=privleaptestthree
         "__init__: WARNING: PrivleapAction: Group 'idontexist2' specified "
         + "by field 'TargetGroup' of action 'test-act-bad-target-group' does "
         + "not exist.\n",
+    ]
+    test_act_bad_target_user_lines: list[str] = [
+        "auth_signal_request: WARNING: Action run request: Could not find "
+        + "action 'test-act-bad-target-user' requested by account "
+        + "'privleaptestone'\n"
+    ]
+    test_act_bad_target_group_lines: list[str] = [
+        "auth_signal_request: WARNING: Action run request: Could not find "
+        + "action 'test-act-bad-target-group' requested by account "
+        + "'privleaptestone'\n"
     ]
     test_act_added1_success_lines: list[str] = [
         "handle_signal_message: INFO: Triggered action 'test-act-added1' "
@@ -1423,20 +1437,20 @@ User=privleaptestthree
     ]
     config_reload_failure_lines: list[str] = [
         "parse_config_file: ERROR: Error parsing config: "
-        + "'/etc/privleap/conf.d/added_actions_bad.conf:10:error:Invalid "
+        + "'/usr/lib/privleap/conf.d/added_actions_bad.conf:10:error:Invalid "
         + "syntax'\n",
         "handle_control_reload_msg: WARNING: Handled RELOAD message, "
         + "configuration was invalid!\n",
     ]
     unrecognized_header_config_file_lines: list[str] = [
         "parse_config_file: ERROR: Error parsing config: "
-        + "'/etc/privleap/conf.d/unrec_header.conf:1:error:Unrecognized header "
-        + "'unrecognized-header''\n",
+        + "'/usr/lib/privleap/conf.d/unrec_header.conf:1:error:Unrecognized "
+        + "header 'unrecognized-header''\n",
         "main: CRITICAL: Failed initial config load!\n",
     ]
     missing_auth_config_file_lines: list[str] = [
         "parse_config_file: ERROR: Error parsing config: "
-        + "'/etc/privleap/conf.d/missing_auth.conf:1:error:No "
+        + "'/usr/lib/privleap/conf.d/missing_auth.conf:1:error:No "
         + "authorized users or groups for action: 'test-act-missing-auth''\n",
         "main: CRITICAL: Failed initial config load!\n",
     ]
@@ -1485,21 +1499,21 @@ User=privleaptestthree
     ]
     insecure_permissions_on_file_lines: list[str] = [
         "parse_config_file: ERROR: Error parsing config: "
-        + "'Config file '/etc/privleap/conf.d/added_actions.conf' has "
+        + "'Config file '/usr/lib/privleap/conf.d/added_actions.conf' has "
         + "insecure permissions; it must be owned by 'root:root' and not be "
         + "world-writable!'\n"
     ]
     insecure_permissions_on_config_dir_lines: list[str] = [
         "parse_config_files: WARNING: Config directory "
-        + "'/etc/privleap/conf.d' exists but has insecure permissions, "
+        + "'/usr/lib/privleap/conf.d' exists but has insecure permissions, "
         + "ignoring all files in this directory.\n",
         "parse_config_files: ERROR: No valid configuration files found! "
-        + "Checked paths: '/etc/privleap/conf.d', "
-        + "'/usr/local/etc/privleap/conf.d'\n",
+        + "Checked paths: '/usr/lib/privleap/conf.d', "
+        + "'/etc/privleap/conf.d', '/usr/local/etc/privleap/conf.d'\n",
     ]
     invalid_config_file_name_lines: list[str] = [
         "parse_config_files: WARNING: Config file "
-        + "'/etc/privleap/conf.d/invalid%config.conf' has an illegal name, "
+        + "'/usr/lib/privleap/conf.d/invalid%config.conf' has an illegal name, "
         + "skipping.\n"
     ]
     missing_local_config_dir_lines: list[str] = [
@@ -1524,13 +1538,27 @@ User=privleaptestthree
         ]
     )
     privleapd_control_msg_mismatch_lines: list[str] = [
-        "handle_control_session: ERROR: Could not get message from control client!\n",
+        "handle_control_session: ERROR: Could not get message from control "
+        + "client!\n",
         "Traceback (most recent call last):\n",
         "ValueError: Invalid message type 'SIGNAL' for socket\n",
     ]
     privleapd_comm_msg_mismatch_lines: list[str] = [
-        "get_client_initial_msg: ERROR: Could not get message from client run by account "
+        "get_client_initial_msg: ERROR: Could not get message from client run "
+        + "by account "
         + "'privleaptestone'!\n",
         "Traceback (most recent call last):\n",
         "ValueError: Invalid message type 'CREATE' for socket\n",
+    ]
+    test_act_system_local_success_lines: list[str] = [
+        "handle_signal_message: INFO: Triggered action "
+        + "'test-act-system-local' for account 'privleaptestone'\n",
+        "send_action_results: INFO: Action 'test-act-system-local' "
+        + "requested by account 'privleaptestone' completed\n",
+    ]
+    test_act_deploy_local_success_lines: list[str] = [
+        "handle_signal_message: INFO: Triggered action "
+        + "'test-act-deploy-local' for account 'privleaptestone'\n",
+        "send_action_results: INFO: Action 'test-act-deploy-local' "
+        + "requested by account 'privleaptestone' completed\n",
     ]

@@ -1,15 +1,12 @@
 #!/usr/bin/python3 -su
 
-# Copyright (C) 2025 - 2026 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
-# See the file COPYING for copying conditions.
+## Copyright (C) 2025 - 2026 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
+## See the file COPYING for copying conditions.
 
+## duplicate-code is triggered by generic_error and unexpected_error_msg.
+## These access incompatible variants of cleanup_and_exit and therefore
+## can't be easily shared.
 # pylint: disable=broad-exception-caught,duplicate-code
-# Rationale:
-#   broad-exception-caught: except blocks are general error handlers.
-#   duplicate-code: This is being triggered because of generic_error and
-#     unexpected_error_msg, which are very similar in leapctl and leaprun but
-#     can't be reasonably broken out of either due to the fact that they access
-#     incompatible variants of the cleanup_and_exit function.
 
 """leaprun.py - privleap client for running actions."""
 
@@ -45,10 +42,6 @@ Buffer = Union[bytes, bytearray, memoryview]
 
 
 # pylint: disable=too-few-public-methods
-# Rationale:
-#   too-few-public-methods: This class just stores global variables, it needs no
-#     public methods. Namespacing global variables in a class makes things
-#     safer.
 class LeaprunGlobal:
     """
     Global variables for leaprun.
@@ -150,7 +143,7 @@ def create_output_msg() -> None:
         ):
             generic_error(f"Signal name {repr(signal_name)} is invalid!")
 
-    # TODO: Consider refactoring to remove skip_signal_name_validate.
+    ## TODO: Consider refactoring to remove skip_signal_name_validate.
     if LeaprunGlobal.check_mode:
         LeaprunGlobal.output_msg = PrivleapCommClientAccessCheckMsg(
             LeaprunGlobal.signal_name_list, skip_signal_name_validate=True
@@ -185,21 +178,21 @@ def start_comm_session() -> None:
     """
 
     try:
-        # Yes, we are explicitly stating the user's UID here. This is not to
-        # identify ourselves to the server, but rather to open the right
-        # socket. privleapd provides a different socket for each user, and sets
-        # each socket's permissions to only allow a user to open the socket
-        # assigned to them. The only socket we can connect to is the one
-        # matching our UID. This authenticates us as a side-effect, but the
-        # authentication is not dependent on us telling the truth, so there
-        # isn't a vulnerability here.
+        ## Yes, we are explicitly stating the user's UID here. This is not to
+        ## identify ourselves to the server, but rather to open the right
+        ## socket. privleapd provides a different socket for each user, and sets
+        ## each socket's permissions to only allow a user to open the socket
+        ## assigned to them. The only socket we can connect to is the one
+        ## matching our UID. This authenticates us as a side-effect, but the
+        ## authentication is not dependent on us telling the truth, so there
+        ## isn't a vulnerability here.
         LeaprunGlobal.comm_session = PrivleapSession(LeaprunGlobal.user_uid)
     except Exception:
         generic_error("Could not connect to privleapd!")
 
     if LeaprunGlobal.test_mode:
-        # Insert a bit of delay before sending messages, to allow the test
-        # suite to win race conditions reliably.
+        ## Insert a bit of delay before sending messages, to allow the test
+        ## suite to win race conditions reliably.
         time.sleep(0.01)
 
 
@@ -238,26 +231,23 @@ def check_terminate_session() -> None:
             LeaprunGlobal.comm_session.send_msg(
                 PrivleapCommClientTerminateMsg()
             )
-            # TODO: Why was 130 chosen as an exit code constant here? Is this
-            # relied upon by anything else? This should be documented.
+            ## TODO: Why was 130 chosen as an exit code constant here? Is this
+            ## relied upon by anything else? This should be documented.
             cleanup_and_exit(130)
         except Exception:
             generic_error("Could not send terminate message to privleapd!")
 
 
+## Splitting this up would reduce readability.
 # pylint: disable=too-many-branches, too-many-statements
-# Rationale:
-#   too-many-branches, too-many-statements: This function is essentially a
-#     finite state machine and would be difficult to split into other
-#     functions while remaining readable.
 def handle_response() -> NoReturn:
     """
     Handles the signal response from the server.
     """
 
-    # This variable changes the behavior of the signal handler so that we
-    # send a 'TERMINATE' message if the user interrupts an action run with
-    # Ctrl+C.
+    ## This variable changes the behavior of the signal handler so that we
+    ## send a 'TERMINATE' message if the user interrupts an action run with
+    ## Ctrl+C.
     LeaprunGlobal.in_response_handler = True
 
     assert LeaprunGlobal.comm_session is not None
@@ -271,7 +261,7 @@ def handle_response() -> NoReturn:
         try:
             check_terminate_session()
 
-            # TODO: Use epoll here.
+            ## TODO: Use epoll here.
             ready_streams: Tuple[list[int], list[int], list[int]] = (
                 select.select(
                     [LeaprunGlobal.comm_session.backend_socket.fileno()],
@@ -312,8 +302,8 @@ def handle_response() -> NoReturn:
                 )
             unauth_signal_list = comm_msg.signal_name_list
             if not LeaprunGlobal.check_mode:
-                # When not running in auth mode, UNAUTHORIZED is the last
-                # message the server will send.
+                ## When not running in auth mode, UNAUTHORIZED is the last
+                ## message the server will send.
                 print_auth_notice(auth_signal_list, unauth_signal_list)
                 cleanup_and_exit(1)
 
@@ -323,8 +313,8 @@ def handle_response() -> NoReturn:
                     "privleapd returned an 'AUTHORIZED' message when leaprun "
                     + "was not in check mode!"
                 )
-            # We don't need to check if processing_trigger is True, because we
-            # reject a 'TRIGGER' message sent when in check mode.
+            ## We don't need to check if processing_trigger is True, because we
+            ## reject a 'TRIGGER' message sent when in check mode.
             if len(auth_signal_list) != 0:
                 generic_error(
                     "privleapd returned two 'AUTHORIZED' messages in the "

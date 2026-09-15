@@ -15,7 +15,7 @@ true "
 #####################################################################
 "
 
-restarted_once='no'
+restarted_once='false'
 red="\033[31m"
 bold="\033[1m"
 nocolor="\033[0m"
@@ -77,7 +77,7 @@ start_privleapd() {
       true "INFO: Upgrade-on-restart inhibited ('${inhibit_restart_file}' exists), not restarting."
       return 0
    fi
-   if [ "${restarted_once}" = 'yes' ]; then
+   if [ "${restarted_once}" = 'true' ]; then
       true "INFO: restarted_once=yes"
       return 0
    fi
@@ -89,9 +89,9 @@ start_privleapd() {
       ## debhelper uses '|| true' for systemctl start action so we should too.
       deb-systemd-invoke restart privleapd.service || true
       make_privleapd_comm_sockets_first_time_maybe
-      restarted_once='yes'
+      restarted_once='true'
    else
-      if [ "${warn_on_bad_config}" = 'y' ]; then
+      if [ "${warn_on_bad_config}" = 'true' ]; then
          1>&2 echo "${config_check_result}"
          1>&2 echo -e "${red}${bold}WARNING: privleap configuration invalid. Not restarting privleapd. Run configuration check using: privleapd --check-config${nocolor}"
       fi
@@ -101,7 +101,7 @@ start_privleapd() {
 reload_privleapd_config_maybe() {
    ## If privleapd restart is inhibited, we should still at least tell it to
    ## reload its configuration.
-   if [ "${restarted_once}" = 'yes' ]; then
+   if [ "${restarted_once}" = 'true' ]; then
       true "INFO: restarted_once=yes"
       return 0
    fi
@@ -117,7 +117,7 @@ case "$1" in
       addgroup --system -- privleap
       deb-systemd-helper enable privleapd.service
       deb-systemd-helper enable leapctl@.service
-      start_privleapd 'n'
+      start_privleapd 'false'
       reload_privleapd_config_maybe
    ;;
 
@@ -125,7 +125,7 @@ case "$1" in
    ;;
 
    triggered)
-      start_privleapd 'y'
+      start_privleapd 'true'
       reload_privleapd_config_maybe
    ;;
 
