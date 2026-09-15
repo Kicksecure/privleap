@@ -1,3 +1,96 @@
+commit 4a0bdb29d94edc2febd048962eacd2cfd4118a89
+Merge: 2dabaa5 9c8194d
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Mon Sep 14 02:36:28 2026 -0400
+
+    Merge remote-tracking branch 'ArrayBolt3/arraybolt3/trixie'
+
+commit 9c8194dca8fbd56334525fe9a76e375f35d9da43
+Author: Aaron Rainbolt <arraybolt3@gmail.com>
+Date:   Sun Sep 13 21:01:29 2026 -0400
+
+    Fix up some aspects of the coverage-enhanced tests, write down details about a remaining issue
+
+commit d5f4c7edc941beb44023de7425300997f58d27dc
+Merge: a0d5dd6 e04c603
+Author: Aaron Rainbolt <arraybolt3@gmail.com>
+Date:   Sun Sep 13 20:09:24 2026 -0400
+
+    Merge branch 'ai' into arraybolt3/trixie
+
+commit a0d5dd685a2d13f5bd68d08f414e1fc32eca36f2
+Author: Aaron Rainbolt <arraybolt3@gmail.com>
+Date:   Sun Sep 13 18:25:58 2026 -0400
+
+    Add support for non-conffile conf.d location, move privleap config there
+
+commit 6791495eaa29ee5969c6b3b00cb4598a92162736
+Author: Aaron Rainbolt <arraybolt3@gmail.com>
+Date:   Thu Sep 10 23:07:51 2026 -0400
+
+    Fix comment style, shorten/remove some of the pylint override rationale comments
+
+commit b56b81938c3b216f2a4f9fc3fef03f611e6e3626
+Author: Aaron Rainbolt <arraybolt3@gmail.com>
+Date:   Thu Sep 10 22:31:49 2026 -0400
+
+    Polish and expand test suite, remove obsolete PyCharm linter suppressions
+
+commit e04c603f2f44bca8f2ba6ab8bd6319b15e27ef73
+Author: claude (dev508 b804ad5a-a84b-41f3-bf7e-e06bd2411a7e) <noreply@anthropic.com>
+Date:   Thu Sep 10 00:25:22 2026 -0400
+
+    Make coverage the only way to run the tests
+
+    - Fold the coverage run into the single privleap-test; drop the opt-in split
+      and the PRIVLEAP_COVERAGE gate. One supported way to run the suite.
+    - Always stop privleapd with SIGTERM so coverage flushes; it installs no
+      handler, so it terminates the same either way.
+    - Coverage dir is root-only: every writer runs as root (sudo -u client runs
+      scrub the coverage env and write nothing).
+
+    Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+
+commit 6702e281db7fd2a1b05bc4ca8a16b596591db913
+Author: claude (dev508 b804ad5a-a84b-41f3-bf7e-e06bd2411a7e) <noreply@anthropic.com>
+Date:   Thu Sep 10 00:02:08 2026 -0400
+
+    Measure code coverage in the autopkgtest suite
+
+    - Opt-in privleap-test-coverage test; the regression test path is unchanged.
+    - Every privleap process joins one measurement via a sitecustomize bootstrap
+      plus COVERAGE_PROCESS_START, so the daemon and shim are counted too.
+    - Under coverage the daemon is stopped with SIGTERM, not SIGKILL, so its data
+      is flushed.
+
+    Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+
+commit fe0dbb8218f4c5cd5900c8f5b839e47c28a50456
+Merge: a86db31 bb56a0f
+Author: claude (dev508 b804ad5a-a84b-41f3-bf7e-e06bd2411a7e) <noreply@anthropic.com>
+Date:   Wed Sep 9 22:22:04 2026 -0400
+
+    Merge branch 'master' into ai
+
+commit bb56a0f2dd74f70858b5a786a73d6ee2ee7a9629
+Author: Aaron Rainbolt <arraybolt3@gmail.com>
+Date:   Wed Sep 9 00:14:00 2026 -0400
+
+    WIP use UIDs rather than usernames as the canonical representation of a user
+
+commit a86db3142fc68ca60b08421d003b730ccaacd727
+Merge: c1c2f36 2dabaa5
+Author: claude <noreply@anthropic.com>
+Date:   Tue Sep 8 13:13:37 2026 -0400
+
+    Merge branch 'master' into ai
+
+commit 2dabaa5e320cf5a0165db398b084c97c2c8bb54c
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sun Sep 6 16:46:27 2026 +0000
+
+    bumped changelog version
+
 commit f48920f1a31918db54a5d222b0339a88e8dee05f
 Merge: c154071 eff6e8c
 Author: Patrick Schleizer <adrelanos@whonix.org>
