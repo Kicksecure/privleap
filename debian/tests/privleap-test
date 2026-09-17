@@ -20,14 +20,28 @@ rcfile="${repo_dir}/debian/tests/coverage/coveragerc"
 ## AUTOPKGTEST_ARTIFACTS might be a relative path.
 artifacts_dir="$(realpath -- "${AUTOPKGTEST_ARTIFACTS:-${repo_dir}/autopkgtest-artifacts}")"
 
+## Create a coverage directory that root reads from or writes into, refusing a
+## pre-planted symlink. mkdir -p treats an existing symlink-to-dir as already
+## present, and the following chmod/cp would then dereference it: a leaf symlink
+## to /etc would become 'chmod 1777 /etc', one to a python path would let a
+## sitecustomize be planted and imported as root. artifacts_dir is realpath'd
+## (contains no symlinks), so only these leaf dirs can be attacker-controlled.
+make_cov_dir() {
+  if [ -L "${1}" ]; then
+    printf 'ERROR: refusing symlinked coverage dir: %s\n' "${1}" 1>&2
+    exit 1
+  fi
+  mkdir --parents -- "${1}"
+  chmod "${2}" -- "${1}"
+}
+
 ## cov_dir holds the raw coverage DATA and must be world-writable, as the
 ## unprivileged clients run by the test suite write their own data files here.
 ## Sticky bit so a client cannot rename or replace another account's (or root's)
 ## data files. It must hold DATA only -- never anything root later imports; see
 ## the bootstrap dir below.
 cov_dir="${artifacts_dir}/privleap-coverage"
-mkdir --parents -- "${cov_dir}"
-chmod 1777 -- "${cov_dir}"
+make_cov_dir "${cov_dir}" 1777
 
 ## The suite runs leaprun as unprivileged accounts (via 'sudo -u'), and their
 ## coverage must be measured too. That needs three things to reach those
@@ -45,8 +59,7 @@ chmod 1777 -- "${cov_dir}"
 ## here via PYTHONPATH, so a world-writable bootstrap would let any local
 ## account replace it and execute code as root. Keep it root-owned, mode 0755.
 cov_bootstrap_dir="${artifacts_dir}/privleap-coverage-bootstrap"
-mkdir --parents -- "${cov_bootstrap_dir}"
-chmod 0755 -- "${cov_bootstrap_dir}"
+make_cov_dir "${cov_bootstrap_dir}" 0755
 cp -- "${repo_dir}/debian/tests/coverage/sitecustomize.py" \
   "${cov_bootstrap_dir}/sitecustomize.py"
 cp -- "${rcfile}" "${cov_bootstrap_dir}/coveragerc"
@@ -92,7 +105,7 @@ test_rc=0
 ## coverage data (files owned by a non-root user). If none did, client coverage
 ## capture has broken again and the report would silently exclude the clients --
 ## fail loudly rather than publish a misleading total.
-client_cov_count="$(find "${cov_dir}" -maxdepth 1 -name '.coverage.*' \
+client_cov_count="$(find "${cov_dir}" -maxdepth 1 -type f -name '.coverage.*' \
   ! -user root -printf '.' | wc -c)"
 if [ "${client_cov_count}" -eq 0 ]; then
   printf '%s\n' \
@@ -104,17 +117,21 @@ fi
 printf 'Captured coverage from %s unprivileged client process(es).\n' \
   "${client_cov_count}" 1>&2
 
-## Root writes the combined database and the xml/html reports; send them to a
-## root-owned dir, never the world-writable cov_dir, or a local account could
-## plant a symlink (e.g. .coverage -> /etc/shadow) that root's combine/xml would
-## follow and overwrite. cov_dir holds only the clients' own data files, which
-## combine reads.
+## Root aggregates the data as root, so it must never open a path an unprivileged
+## account controls. cov_dir is world-writable, and coverage.py's combine opens
+## every '.coverage.*' match read-write following symlinks -- so copy only the
+## REGULAR data files (never a symlink/fifo planted there) into a root-owned dir
+## and combine from that. The combined db and the xml/html reports are written to
+## the same root-owned dir, never back into cov_dir.
 cov_out_dir="${artifacts_dir}/privleap-coverage-report"
-mkdir --parents -- "${cov_out_dir}"
-chmod 0755 -- "${cov_out_dir}"
+make_cov_dir "${cov_out_dir}" 0755
+cov_collect_dir="${cov_out_dir}/data"
+make_cov_dir "${cov_collect_dir}" 0700
+find "${cov_dir}" -maxdepth 1 -type f -name '.coverage.*' \
+  -exec cp -- '{}' "${cov_collect_dir}/" ';'
 combined_file="${cov_out_dir}/.coverage"
 COVERAGE_FILE="${combined_file}" \
-  python3 -m coverage combine --rcfile="${rcfile}" "${cov_dir}"
+  python3 -m coverage combine --rcfile="${rcfile}" "${cov_collect_dir}"
 COVERAGE_FILE="${combined_file}" \
   python3 -m coverage report --rcfile="${rcfile}" 1>&2
 COVERAGE_FILE="${combined_file}" \
