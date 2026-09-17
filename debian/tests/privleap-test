@@ -131,8 +131,14 @@ cov_out_dir="${artifacts_dir}/privleap-coverage-report"
 make_cov_dir "${cov_out_dir}" 0755
 cov_collect_dir="${cov_out_dir}/data"
 make_cov_dir "${cov_collect_dir}" 0700
+## --no-dereference: if a client file is swapped for a symlink after find
+## matched it (TOCTOU), copy the LINK rather than follow it into an arbitrary
+## file (e.g. /dev/zero, which would hang the copy). Any such link lands in the
+## root-owned collect dir; drop links before combine so it only ever opens the
+## regular data files copied here.
 find "${cov_dir}" -maxdepth 1 -type f -name '.coverage.*' \
-  -exec cp -- '{}' "${cov_collect_dir}/" ';'
+  -exec cp --no-dereference -- '{}' "${cov_collect_dir}/" ';'
+find "${cov_collect_dir}" -maxdepth 1 -type l -delete
 combined_file="${cov_out_dir}/.coverage"
 COVERAGE_FILE="${combined_file}" \
   python3 -m coverage combine --rcfile="${rcfile}" "${cov_collect_dir}"
