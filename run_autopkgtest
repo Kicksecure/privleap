@@ -93,6 +93,11 @@ run_autopkgtest() {
   if ! [ -f '/usr/share/keyrings/debian-archive-trixie-stable.gpg' ]; then
     offer_package_install 'debian-archive-keyring'
   fi
+  if ! [ -f '/usr/bin/newuidmap' ] || ! [ -f '/usr/bin/newgidmap' ]; then
+    ## Provided by 'uidmap', not by util-linux; the newuidmap/newgidmap checks
+    ## below stat these unconditionally, so ensure the package is present first.
+    offer_package_install 'uidmap'
+  fi
   if [ "$(basename "${privleap_project_dir}")" != 'privleap' ]; then
     1>&2 echo 'The run_autopkgtest script does not appear to be in the root of the privleap source tree!'
     exit 1

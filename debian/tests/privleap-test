@@ -56,18 +56,25 @@ rcfile="${cov_bootstrap_dir}/coveragerc"
 
 ## (2) The three coverage variables must survive 'sudo -u'. sudo resets the
 ## environment and strips PYTHONPATH by default, so an env_keep rule is
-## required. Provision it here (validated first) so the test is self-contained
-## and does not depend on the rule being baked into the testbed image.
-coverage_sudoers="$(mktemp)"
+## required. Scope it to 'Defaults:root': the suite always invokes the client
+## sudo AS root, so root is the only invoking user that needs the variables
+## preserved. An unscoped 'Defaults env_keep' would apply to every sudo caller,
+## letting any sudo-capable account smuggle PYTHONPATH / COVERAGE_PROCESS_START
+## (code execution as root via sitecustomize or a coverage plugin) or
+## COVERAGE_FILE (arbitrary root file overwrite) into a root sudo command.
+## Validate before installing, and remove on exit so the rule never outlives the
+## run on a persistent or 'null' testbed.
+coverage_sudoers=/etc/sudoers.d/privleap-coverage
+coverage_sudoers_tmp="$(mktemp)"
+trap 'rm -f -- "${coverage_sudoers}" "${coverage_sudoers_tmp}"' EXIT
 printf '%s\n' \
-  'Defaults env_keep += "COVERAGE_PROCESS_START"' \
-  'Defaults env_keep += "COVERAGE_FILE"' \
-  'Defaults env_keep += "PYTHONPATH"' \
-  > "${coverage_sudoers}"
-visudo -cf "${coverage_sudoers}" >/dev/null
+  'Defaults:root env_keep += "COVERAGE_PROCESS_START"' \
+  'Defaults:root env_keep += "COVERAGE_FILE"' \
+  'Defaults:root env_keep += "PYTHONPATH"' \
+  > "${coverage_sudoers_tmp}"
+visudo -cf "${coverage_sudoers_tmp}" >/dev/null
 install -m 0440 -o root -g root -- \
-  "${coverage_sudoers}" /etc/sudoers.d/privleap-coverage
-rm -f -- "${coverage_sudoers}"
+  "${coverage_sudoers_tmp}" "${coverage_sudoers}"
 
 ## (3) cov_dir is world-writable (above), so the clients can write their data.
 
@@ -83,7 +90,7 @@ test_rc=0
 ## capture has broken again and the report would silently exclude the clients --
 ## fail loudly rather than publish a misleading total.
 client_cov_count="$(find "${cov_dir}" -maxdepth 1 -name '.coverage.*' \
-  ! -user root | wc -l)"
+  ! -user root -printf '.' | wc -c)"
 if [ "${client_cov_count}" -eq 0 ]; then
   printf '%s\n' \
     'ERROR: no coverage data from unprivileged clients was captured.' \
@@ -94,9 +101,23 @@ fi
 printf 'Captured coverage from %s unprivileged client process(es).\n' \
   "${client_cov_count}" 1>&2
 
-python3 -m coverage combine --rcfile="${rcfile}" "${cov_dir}"
-python3 -m coverage report --rcfile="${rcfile}" 1>&2
-python3 -m coverage xml --rcfile="${rcfile}" -o "${cov_dir}/coverage.xml"
-python3 -m coverage html --rcfile="${rcfile}" --directory="${cov_dir}/coverage_html"
+## Root writes the combined database and the xml/html reports; send them to a
+## root-owned dir, never the world-writable cov_dir, or a local account could
+## plant a symlink (e.g. .coverage -> /etc/shadow) that root's combine/xml would
+## follow and overwrite. cov_dir holds only the clients' own data files, which
+## combine reads.
+cov_out_dir="${artifacts_dir}/privleap-coverage-report"
+mkdir --parents -- "${cov_out_dir}"
+chmod 0755 -- "${cov_out_dir}"
+combined_file="${cov_out_dir}/.coverage"
+COVERAGE_FILE="${combined_file}" \
+  python3 -m coverage combine --rcfile="${rcfile}" "${cov_dir}"
+COVERAGE_FILE="${combined_file}" \
+  python3 -m coverage report --rcfile="${rcfile}" 1>&2
+COVERAGE_FILE="${combined_file}" \
+  python3 -m coverage xml --rcfile="${rcfile}" -o "${cov_out_dir}/coverage.xml"
+COVERAGE_FILE="${combined_file}" \
+  python3 -m coverage html --rcfile="${rcfile}" \
+  --directory="${cov_out_dir}/coverage_html"
 
 exit "${test_rc}"
