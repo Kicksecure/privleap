@@ -23,53 +23,69 @@ artifacts_dir="$(realpath -- "${AUTOPKGTEST_ARTIFACTS:-${repo_dir}/autopkgtest-a
 ## cov_dir must be world-writable, as unprivileged clients run by the test
 ## suite must have their coverage measured also.
 cov_dir="${artifacts_dir}/privleap-coverage"
-mkdir --mode=777 --parents -- "${cov_dir}"
+mkdir --parents -- "${cov_dir}"
+chmod 0777 -- "${cov_dir}"
 
-## Debugging.
-printf '%s\n' "DEBUGGING: Stat report on '${cov_dir}':"
-iter_str="${cov_dir}"
-while [ -n "${iter_str}" ] && [ "${iter_str}" != '/' ]; do
-  stat "${iter_str}" || true
-  iter_str="$(dirname "${iter_str}")";
-done
-printf '%s\n' "END DEBUGGING: Stat report on '${cov_dir}':"
+## The suite runs leaprun as unprivileged accounts (via 'sudo -u'), and their
+## coverage must be measured too. That needs three things to reach those
+## processes; without all three the client coverage is silently dropped and the
+## reported total is misleadingly low.
+
+## (1) The coverage bootstrap (sitecustomize.py + coveragerc) must be READABLE
+## by the client accounts. autopkgtest's unshare backend copies the source tree
+## as mode 0770 owned by an unprivileged 'unshare' user, so the client accounts
+## cannot read it there. site.py imports sitecustomize inside a silenced
+## try/except, so the failure is invisible and coverage.process_startup() never
+## runs for the clients. Stage the bootstrap in the world-readable coverage dir.
+cov_bootstrap_dir="${cov_dir}/bootstrap"
+mkdir --parents -- "${cov_bootstrap_dir}"
+chmod 0755 -- "${cov_bootstrap_dir}"
+cp -- "${repo_dir}/debian/tests/coverage/sitecustomize.py" \
+  "${cov_bootstrap_dir}/sitecustomize.py"
+cp -- "${rcfile}" "${cov_bootstrap_dir}/coveragerc"
+chmod 644 -- "${cov_bootstrap_dir}/sitecustomize.py" \
+  "${cov_bootstrap_dir}/coveragerc"
+rcfile="${cov_bootstrap_dir}/coveragerc"
+
+## (2) The three coverage variables must survive 'sudo -u'. sudo resets the
+## environment and strips PYTHONPATH by default, so an env_keep rule is
+## required. Provision it here (validated first) so the test is self-contained
+## and does not depend on the rule being baked into the testbed image.
+coverage_sudoers="$(mktemp)"
+printf '%s\n' \
+  'Defaults env_keep += "COVERAGE_PROCESS_START"' \
+  'Defaults env_keep += "COVERAGE_FILE"' \
+  'Defaults env_keep += "PYTHONPATH"' \
+  > "${coverage_sudoers}"
+visudo -cf "${coverage_sudoers}" >/dev/null
+install -m 0440 -o root -g root -- \
+  "${coverage_sudoers}" /etc/sudoers.d/privleap-coverage
+rm -f -- "${coverage_sudoers}"
+
+## (3) cov_dir is world-writable (above), so the clients can write their data.
 
 export COVERAGE_PROCESS_START="${rcfile}"
 export COVERAGE_FILE="${cov_dir}/.coverage"
-export PYTHONPATH="${repo_dir}/debian/tests/coverage${PYTHONPATH:+:${PYTHONPATH}}"
-
-## FIXME: Coverage reports from unprivileged clients are not being captured.
-## These must be captured for the coverage report to be useful. Issues rules
-## out so far:
-##
-## * Environment passthrough settings aren't being written to /etc/sudoers.d?
-##   Verified false - a developer was able to unpack the tarball written by
-##   mmdebstrap during environment setup and see the config file, with the
-##   expected contents.
-## * Malformed configuration? Verified false - a developer was able to chroot
-##   into an unpacked tarball, export whitelisted environment variables as
-##   root, then run `sudo -u user bash` and see those environment variables
-##   present in the shell.
-## * Parent directory permissions forbid unprivileged users from writing into
-##   the coverage data repository? Verified false - the stat report debugging
-##   above shows that every parent directory is at least r-x for unprivileged
-##   users, and that $cov_dir itself is rwx for unprivileged users.
-## * AUTOPKGTEST_ARTIFACTS is a relative path? Impossible, the path is made
-##   into an absolute path above. Verified false - these environment variables
-##   are printed into the test log by the `test-act-rootdata` and
-##   `test-act-userdata` action tests, and are shown as absolute paths there.
-## * Environment variables silently fail to have an effect in a non-root
-##   session? Verified false - a developer was able to run Python scripts
-##   commands in a properly set up unpacked tarball and see coverage report
-##   files generated automatically.
-##
-## Most likely the environment variables are not reaching the unprivileged
-## scripts for some unknown reason. It is also possible that coverage files
-## are being generated but coverage.py is ignoring them due to file ownership
-## or other concerns. Further investigation remains to be done.
+export PYTHONPATH="${cov_bootstrap_dir}${PYTHONPATH:+:${PYTHONPATH}}"
 
 test_rc=0
 ./test/run-test || test_rc="$?"
+
+## Regression guard: the unprivileged clients must have written their own
+## coverage data (files owned by a non-root user). If none did, client coverage
+## capture has broken again and the report would silently exclude the clients --
+## fail loudly rather than publish a misleading total.
+client_cov_count="$(find "${cov_dir}" -maxdepth 1 -name '.coverage.*' \
+  ! -user root | wc -l)"
+if [ "${client_cov_count}" -eq 0 ]; then
+  printf '%s\n' \
+    'ERROR: no coverage data from unprivileged clients was captured.' \
+    'Client coverage (leaprun run via sudo) is being lost; refusing to' \
+    'report a misleading coverage total.' 1>&2
+  exit 1
+fi
+printf 'Captured coverage from %s unprivileged client process(es).\n' \
+  "${client_cov_count}" 1>&2
 
 python3 -m coverage combine --rcfile="${rcfile}" "${cov_dir}"
 python3 -m coverage report --rcfile="${rcfile}" 1>&2

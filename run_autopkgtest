@@ -27,9 +27,6 @@ create_autopkgtest_tarball() {
     --customize-hook='chroot "$1" useradd --home-dir /home/user --create-home user' \
     --customize-hook='chroot "$1" passwd --delete user' \
     --customize-hook='cp /etc/hosts "$1/etc/hosts"' \
-    --customize-hook='printf "%s\n" "Defaults env_keep += \"COVERAGE_PROCESS_START\"" >> "$1"/etc/sudoers.d/privleap-test' \
-    --customize-hook='printf "%s\n" "Defaults env_keep += \"COVERAGE_FILE\"" >> "$1"/etc/sudoers.d/privleap-test' \
-    --customize-hook='printf "%s\n" "Defaults env_keep += \"PYTHONPATH\"" >> "$1"/etc/sudoers.d/privleap-test' \
     --customize-hook=/usr/share/autopkgtest/setup-commands/setup-testbed \
     https://deb.debian.org/debian
 }
@@ -138,6 +135,9 @@ run_autopkgtest() {
     exit 1
   }
   cd ..
+  ## autopkgtest refuses a non-empty --output-dir, so a rerun would abort on the
+  ## previous run's artifacts. Clear it first.
+  rm -rf -- "${privleap_project_dir}/test_artifacts"
   autopkgtest -l "${privleap_project_dir}/privleap-test-log.txt" \
     --output-dir="${privleap_project_dir}/test_artifacts" --apt-upgrade \
     -B privleap*.deb "${privleap_project_dir}" -- unshare
