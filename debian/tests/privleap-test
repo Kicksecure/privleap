@@ -20,18 +20,22 @@ rcfile="${repo_dir}/debian/tests/coverage/coveragerc"
 ## AUTOPKGTEST_ARTIFACTS might be a relative path.
 artifacts_dir="$(realpath -- "${AUTOPKGTEST_ARTIFACTS:-${repo_dir}/autopkgtest-artifacts}")"
 
-## Create a coverage directory that root reads from or writes into, refusing a
-## pre-planted symlink. mkdir -p treats an existing symlink-to-dir as already
-## present, and the following chmod/cp would then dereference it: a leaf symlink
-## to /etc would become 'chmod 1777 /etc', one to a python path would let a
-## sitecustomize be planted and imported as root. artifacts_dir is realpath'd
-## (contains no symlinks), so only these leaf dirs can be attacker-controlled.
+## Create a coverage directory that root reads from or writes into. Use plain
+## mkdir (never -p): it fails on ANY pre-existing entry -- a leftover directory
+## or a symlink an attacker pre-planted -- atomically, with no check-then-create
+## gap. -p instead silently succeeds on an existing symlink-to-dir, and the
+## following chmod would then dereference it (a leaf symlink to /etc would become
+## 'chmod 1777 /etc'; one to a python path would let a sitecustomize be planted
+## and imported as root). The parent (realpath'd artifacts_dir, or a dir made
+## just above) already exists, so -p is not needed. A concurrent attacker who
+## can write inside artifacts_dir could still swap the dir between mkdir and
+## chmod, but under autopkgtest artifacts_dir is root-owned and the testbed is
+## single-tenant, so no such writer exists.
 make_cov_dir() {
-  if [ -L "${1}" ]; then
-    printf 'ERROR: refusing symlinked coverage dir: %s\n' "${1}" 1>&2
+  if ! mkdir -- "${1}" 2>/dev/null; then
+    printf 'ERROR: coverage dir pre-exists or is not creatable: %s\n' "${1}" 1>&2
     exit 1
   fi
-  mkdir --parents -- "${1}"
   chmod "${2}" -- "${1}"
 }
 
