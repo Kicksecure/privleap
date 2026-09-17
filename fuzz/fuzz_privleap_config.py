@@ -27,10 +27,10 @@ import tempfile
 from pathlib import Path
 
 with atheris.instrument_imports():
-    from privleap import privleap as pl
+    from privleap.privleap import PrivleapCommon
 
 ## Focus the fuzzer on the content parser, not the ownership/mode gate.
-pl.PrivleapCommon.check_secure_file_permissions = staticmethod(  # type: ignore[method-assign]
+PrivleapCommon.check_secure_file_permissions = staticmethod(  # type: ignore[method-assign]
     lambda *args, **kwargs: True
 )
 
@@ -42,7 +42,7 @@ def TestOneInput(data: bytes) -> None:  # noqa: N802 (Atheris contract name)
     try:
         with os.fdopen(handle_fd, "w", encoding="utf-8") as handle:
             handle.write(text)
-        result = pl.PrivleapCommon.parse_config_file(Path(path))
+        result = PrivleapCommon.parse_config_file(Path(path))
         ## Declared return type: a ConfigData tuple on success, or an error
         ## string. Anything else -- or an exception -- is a finding.
         if not isinstance(result, (tuple, str)):

@@ -26,7 +26,7 @@ import socket
 import sys
 
 with atheris.instrument_imports():
-    from privleap import privleap as pl
+    from privleap.privleap import PrivleapSession
 
 ## Message types the server legitimately parses on each socket direction.
 COMM_RECV = ("SIGNAL", "ACCESS_CHECK", "TERMINATE")
@@ -46,7 +46,7 @@ def TestOneInput(data: bytes) -> None:  # noqa: N802 (Atheris contract name)
     cli.settimeout(5.0)
     srv.settimeout(5.0)
     try:
-        session = pl.PrivleapSession(
+        session = PrivleapSession(
             srv,
             user_id=None if control else os.getuid(),
             is_control_session=control,
