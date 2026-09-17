@@ -20,11 +20,14 @@ rcfile="${repo_dir}/debian/tests/coverage/coveragerc"
 ## AUTOPKGTEST_ARTIFACTS might be a relative path.
 artifacts_dir="$(realpath -- "${AUTOPKGTEST_ARTIFACTS:-${repo_dir}/autopkgtest-artifacts}")"
 
-## cov_dir must be world-writable, as unprivileged clients run by the test
-## suite must have their coverage measured also.
+## cov_dir holds the raw coverage DATA and must be world-writable, as the
+## unprivileged clients run by the test suite write their own data files here.
+## Sticky bit so a client cannot rename or replace another account's (or root's)
+## data files. It must hold DATA only -- never anything root later imports; see
+## the bootstrap dir below.
 cov_dir="${artifacts_dir}/privleap-coverage"
 mkdir --parents -- "${cov_dir}"
-chmod 0777 -- "${cov_dir}"
+chmod 1777 -- "${cov_dir}"
 
 ## The suite runs leaprun as unprivileged accounts (via 'sudo -u'), and their
 ## coverage must be measured too. That needs three things to reach those
@@ -36,8 +39,12 @@ chmod 0777 -- "${cov_dir}"
 ## as mode 0770 owned by an unprivileged 'unshare' user, so the client accounts
 ## cannot read it there. site.py imports sitecustomize inside a silenced
 ## try/except, so the failure is invisible and coverage.process_startup() never
-## runs for the clients. Stage the bootstrap in the world-readable coverage dir.
-cov_bootstrap_dir="${cov_dir}/bootstrap"
+## runs for the clients. Stage the bootstrap in a world-READABLE dir instead.
+## It must NOT be world-writable and must NOT live under the world-writable
+## cov_dir: root's later 'coverage combine' auto-imports sitecustomize.py from
+## here via PYTHONPATH, so a world-writable bootstrap would let any local
+## account replace it and execute code as root. Keep it root-owned, mode 0755.
+cov_bootstrap_dir="${artifacts_dir}/privleap-coverage-bootstrap"
 mkdir --parents -- "${cov_bootstrap_dir}"
 chmod 0755 -- "${cov_bootstrap_dir}"
 cp -- "${repo_dir}/debian/tests/coverage/sitecustomize.py" \
