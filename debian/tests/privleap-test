@@ -67,6 +67,9 @@ rcfile="${cov_bootstrap_dir}/coveragerc"
 coverage_sudoers=/etc/sudoers.d/privleap-coverage
 coverage_sudoers_tmp="$(mktemp)"
 trap 'rm -f -- "${coverage_sudoers}" "${coverage_sudoers_tmp}"' EXIT
+## An interrupt must still run the EXIT cleanup, or the sudoers rule is left
+## behind on a persistent host; re-raise via a normal exit so EXIT fires.
+trap 'exit 130' INT TERM
 printf '%s\n' \
   'Defaults:root env_keep += "COVERAGE_PROCESS_START"' \
   'Defaults:root env_keep += "COVERAGE_FILE"' \

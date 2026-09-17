@@ -135,6 +135,9 @@ run_autopkgtest() {
     create_autopkgtest_tarball
   fi
 
+  ## Remove any stale package builds so autopkgtest's 'privleap*.deb' glob below
+  ## picks up only this build's output, not a leftover from an earlier version.
+  rm -f -- ../privleap_*.deb ../privleap_*.buildinfo ../privleap_*.changes
   dpkg-buildpackage -i -us -uc -b || {
     1>&2 echo 'Cannot build privleap deb package!'
     exit 1
