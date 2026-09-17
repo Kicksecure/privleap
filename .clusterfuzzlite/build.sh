@@ -40,6 +40,12 @@ export PYTHONPATH="${SRC}/privleap/usr/lib/python3/dist-packages${PYTHONPATH+:${
 ## Wrap each fuzz/fuzz_*.py harness for OSS-Fuzz's Python runtime.
 for harness in fuzz/fuzz_*.py; do
   name="$(basename -- "${harness}" .py)"
-  compile_python_fuzzer "${harness}"
+  ## compile_python_fuzzer overwrites PYTHONPATH (to fuzz-introspector), so
+  ## PyInstaller cannot see the privleap package via the export above. Point it
+  ## at the package dir with --paths, and --collect-submodules so the same-name
+  ## privleap.privleap module is bundled and importable in the frozen harness.
+  compile_python_fuzzer "${harness}" \
+    --paths "${SRC}/privleap/usr/lib/python3/dist-packages" \
+    --collect-submodules privleap
   printf 'compiled %s\n' "${name}"
 done

@@ -26,7 +26,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-with atheris.instrument_imports():
+with atheris.instrument_imports(enable_loader_override=False):
     from privleap.privleap import PrivleapCommon
 
 ## Focus the fuzzer on the content parser, not the ownership/mode gate.

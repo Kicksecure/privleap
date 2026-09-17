@@ -25,7 +25,7 @@ import os
 import socket
 import sys
 
-with atheris.instrument_imports():
+with atheris.instrument_imports(enable_loader_override=False):
     from privleap.privleap import PrivleapSession
 
 ## Message types the server legitimately parses on each socket direction.
