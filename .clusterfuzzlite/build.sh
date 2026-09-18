@@ -17,9 +17,8 @@
 ##
 ## The fuzz HARNESSES + corpus are NOT kept in this package: they live in
 ## org-ai-assisted/dist-ai (the single source for privleap's test/fuzz logic,
-## alongside every other privleap suite). The Fuzz workflow checks dist-ai out
-## into .clusterfuzzlite/dist-ai before the image build, so it lands in the
-## build context; this script compiles the SAME atheris harnesses the in-process
+## alongside every other privleap suite). The Dockerfile clones dist-ai to
+## $SRC/dist-ai; this script compiles the SAME atheris harnesses the in-process
 ## privleap-tests-fuzz-atheris lane runs. privleapd/privleap still come from THIS
 ## checkout (PYTHONPATH), so the fuzzers test the code under review.
 ##
@@ -51,13 +50,13 @@ export PATH="/opt/py312/bin:${PATH}"
 python3 -m pip install --quiet --upgrade pip
 python3 -m pip install --quiet pyinstaller atheris sdnotify
 
-## Harnesses + corpus from the dist-ai checkout the workflow placed here.
-tests_dir="${SRC}/privleap/.clusterfuzzlite/dist-ai/usr/share/privleap-tests"
+## Harnesses + corpus from the dist-ai clone the Dockerfile placed at $SRC/dist-ai.
+tests_dir="${SRC}/dist-ai/usr/share/privleap-tests"
 corpus_root="${tests_dir}/fuzz-corpus"
 if [ ! -d "${tests_dir}" ]; then
   printf '%s\n' \
-    "FATAL: ${tests_dir} missing; the Fuzz workflow must check out dist-ai" \
-    'into .clusterfuzzlite/dist-ai before the image build.' >&2
+    "FATAL: ${tests_dir} missing; the Dockerfile must clone dist-ai to" \
+    "${SRC}/dist-ai before this runs." >&2
   exit 1
 fi
 

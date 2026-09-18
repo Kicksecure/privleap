@@ -67,18 +67,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Checkout dist-ai (fuzz harnesses + corpus)
-        ## The atheris harnesses + corpus live in dist-ai (single source for
-        ## privleap's test/fuzz logic); place them in the CFLite build context
-        ## so .clusterfuzzlite/build.sh compiles them. @master per the org's
-        ## branch-tracking model for our own cross-repo refs.
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-        with:
-          repository: org-ai-assisted/dist-ai
-          ref: master
-          path: .clusterfuzzlite/dist-ai
-          persist-credentials: false
-
       - name: Build fuzzers
         ## https://github.com/google/clusterfuzzlite/tree/v1
         ## > 884713a6c30a92e5e8544c39945cd7cb630abcd1 (HEAD of v1; no release tag)
@@ -148,18 +136,6 @@ jobs:
         ## > de0fac2e4500dabe0009e67214ff5f5447ce83dd
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
-          persist-credentials: false
-
-      - name: Checkout dist-ai (fuzz harnesses + corpus)
-        ## The atheris harnesses + corpus live in dist-ai (single source for
-        ## privleap's test/fuzz logic); place them in the CFLite build context
-        ## so .clusterfuzzlite/build.sh compiles them. @master per the org's
-        ## branch-tracking model for our own cross-repo refs.
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-        with:
-          repository: org-ai-assisted/dist-ai
-          ref: master
-          path: .clusterfuzzlite/dist-ai
           persist-credentials: false
 
       - name: Build fuzzers

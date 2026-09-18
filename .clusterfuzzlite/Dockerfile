@@ -39,6 +39,15 @@ RUN curl -fsSL -o /tmp/py312.tar.gz \
     && rm /tmp/py312.tar.gz \
     && /opt/py312/bin/python3 --version
 
+## The fuzz harnesses + corpus live in org-ai-assisted/dist-ai (the single
+## source for privleap's test/fuzz logic), NOT this package. Clone them at build
+## time: the CFLite build context is this repo's git tree, so a workspace
+## checkout never reaches the COPY below. dist-ai is public; @master per the
+## org's branch-tracking model for our own cross-repo refs. build.sh compiles
+## the SAME atheris harnesses the in-process privleap-tests-fuzz-atheris runs.
+RUN git clone --depth 1 --branch master \
+      https://github.com/org-ai-assisted/dist-ai "$SRC/dist-ai"
+
 COPY . $SRC/privleap
 COPY .clusterfuzzlite/build.sh $SRC/build.sh
 WORKDIR $SRC/privleap
