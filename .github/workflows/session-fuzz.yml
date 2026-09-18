@@ -76,10 +76,25 @@ jobs:
           path: .github/dist-ai
           persist-credentials: false
 
+      - name: Set up Python 3.13 (privleap targets Trixie / 3.13)
+        ## privleapd uses 3.13-only APIs (e.g. Path.is_dir(follow_symlinks=)),
+        ## the runner defaults to 3.12. Trixie ships 3.13.
+        ## https://github.com/actions/setup-python/releases/tag/v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: '3.13'
+
       - name: Set up privleap runtime (deps, group, PAM policy, shim target)
         ## Centralised in dist-ai so the setup is maintained with the suite; the
         ## daemon + shim still run from THIS checkout (passed as the arg).
         run: ./.github/dist-ai/usr/bin/privleap-tests-session-fuzz-setup "${PWD}"
+
+      - name: Point /usr/bin/python3 at 3.13
+        ## The daemon + session_fuzz shebangs are the absolute /usr/bin/python3,
+        ## which setup-python's PATH change does not affect. Repoint it (after
+        ## the apt step above ran under the original python) so privleapd starts
+        ## under 3.13 on this ephemeral VM.
+        run: sudo ln -sf "$(command -v python3)" /usr/bin/python3
 
       - name: Session fuzz
         env:
