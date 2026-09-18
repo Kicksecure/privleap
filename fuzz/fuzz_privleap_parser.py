@@ -46,11 +46,19 @@ def TestOneInput(data: bytes) -> None:  # noqa: N802 (Atheris contract name)
     cli.settimeout(5.0)
     srv.settimeout(5.0)
     try:
-        session = PrivleapSession(
-            srv,
-            user_id=None if control else os.getuid(),
-            is_control_session=control,
-        )
+        try:
+            session = PrivleapSession(
+                srv,
+                user_id=None if control else os.getuid(),
+                is_control_session=control,
+            )
+        except ValueError:
+            ## Session SETUP, not the wire parser: a comm session resolves
+            ## os.getuid() via pwd, and a run container executing the onefile
+            ## under a bare numeric UID with no /etc/passwd entry raises here on
+            ## ~half the inputs. That is an environment condition, not a parser
+            ## finding -- skip the iteration rather than report a false crash.
+            return
         try:
             cli.sendall(raw)
         except OSError:
