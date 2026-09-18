@@ -9,27 +9,26 @@
 ## thread-safety / message-ordering bugs a single-session parser fuzzer cannot
 ## reach.
 ##
-## It re-execs under `sudo unshare --mount` and lays a private tmpfs over /run
-## and /etc/privleap, so it needs a mount namespace + sudo -- which the dist-ai
-## CONTAINER lane (reusable-dist-ai-tests.yml) cannot provide. It therefore runs
-## directly on the ubuntu-latest VM here, after setting up the small privleap
-## runtime the daemon and its PAM shim require (the group, the PAM policy, and a
-## shim path to bind the checkout's shim over). privleapd and the shim still run
-## from the CHECKOUT (PRIVLEAP_REPO), so this tests the code under review.
+## Environment: it re-execs under `sudo unshare --mount` (a private mount
+## namespace + tmpfs over /run and /etc/privleap) AND privleap is a Debian
+## Trixie package -- privleapd uses 3.13-only APIs and the PAM shim imports the
+## `PAM` module Debian's python3-pam provides for the system python. Neither the
+## dist-ai CONTAINER lane (no mount namespace) nor a plain ubuntu VM (Python
+## 3.12; python3-pam built for it) satisfies both. So it runs in a PRIVILEGED
+## debian:trixie container: native Python 3.13, apt deps that match it, and
+## SYS_ADMIN for the mount namespace. privleapd + the shim still run from THIS
+## checkout, so the fuzzer tests the code under review.
+##
+## NOT a PR gate: this needs a privileged container and a faithful privleap
+## runtime, so it runs on a schedule and on demand rather than blocking PRs.
+## The per-PR wire/config/authz fuzzing lives in the Fuzz + dist-ai-fuzz
+## workflows.
 ##
 ## Reference: dist-ai usr/bin/privleap-tests-session-fuzz
 
 name: Session fuzz
 
 on:
-  pull_request:
-    branches: [master]
-    paths:
-      - 'usr/lib/python3/dist-packages/**/*.py'
-      - 'usr/libexec/privleap/**'
-      - 'usr/bin/privleapd'
-      - 'etc/pam.d/**'
-      - '.github/workflows/session-fuzz.yml'
   schedule:
     - cron: '15 4 * * *'
   workflow_dispatch:
@@ -49,17 +48,27 @@ concurrency:
 jobs:
   session-fuzz:
     name: Live-daemon session fuzz
-    ## CI runs only where we enabled it; ANDed with the fork-PR guard.
-    if: >-
-      vars.CI_ENABLED_ORG_AI_ASSISTED == 'true'
-      && (
-        (github.event_name == 'pull_request'
-          && github.event.pull_request.head.repo.full_name == github.repository)
-        || github.event_name != 'pull_request'
-      )
+    ## CI runs only where we enabled it.
+    if: vars.CI_ENABLED_ORG_AI_ASSISTED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    container:
+      image: debian:trixie
+      ## --privileged: the fuzzer needs CAP_SYS_ADMIN to create the mount
+      ## namespace + tmpfs the real daemon runs in. The container is ephemeral.
+      options: --privileged
     steps:
+      - name: Install prerequisites (Trixie, native Python 3.13)
+        ## git + node deps for actions/checkout; the privleap runtime deps
+        ## (python3-pam gives the shim's `PAM` module, python3-sdnotify the
+        ## daemon's), and the suite's own deps -- all matching Trixie's 3.13.
+        run: |
+          apt-get update
+          apt-get install --yes --no-install-recommends \
+            git ca-certificates sudo \
+            python3 python3-pam python3-sdnotify \
+            python3-hypothesis python3-pytest
+
       - name: Checkout privleap
         ## https://github.com/actions/checkout/releases/tag/v6.0.2
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -76,32 +85,10 @@ jobs:
           path: .github/dist-ai
           persist-credentials: false
 
-      - name: Set up Python 3.13 (privleap targets Trixie / 3.13)
-        ## privleapd uses 3.13-only APIs (e.g. Path.is_dir(follow_symlinks=)),
-        ## the runner defaults to 3.12. Trixie ships 3.13.
-        ## https://github.com/actions/setup-python/releases/tag/v5
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
-        with:
-          python-version: '3.13'
-
-      - name: Install privleap runtime deps into 3.13
-        ## setup-python's 3.13 has its own site-packages, isolated from the apt
-        ## python3-sdnotify/pam (which target the system 3.12). privleapd imports
-        ## sdnotify and the shim imports pam, so install both into the 3.13 that
-        ## will actually run the daemon.
-        run: python3 -m pip install --quiet sdnotify python-pam
-
-      - name: Set up privleap runtime (deps, group, PAM policy, shim target)
+      - name: Set up privleap runtime (group, PAM policy, shim target)
         ## Centralised in dist-ai so the setup is maintained with the suite; the
         ## daemon + shim still run from THIS checkout (passed as the arg).
         run: ./.github/dist-ai/usr/bin/privleap-tests-session-fuzz-setup "${PWD}"
-
-      - name: Point /usr/bin/python3 at 3.13
-        ## The daemon + session_fuzz shebangs are the absolute /usr/bin/python3,
-        ## which setup-python's PATH change does not affect. Repoint it (after
-        ## the apt step above ran under the original python) so privleapd starts
-        ## under 3.13 on this ephemeral VM.
-        run: sudo ln -sf "$(command -v python3)" /usr/bin/python3
 
       - name: Session fuzz
         env:
