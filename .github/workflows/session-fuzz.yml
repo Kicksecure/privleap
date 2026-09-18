@@ -9,26 +9,29 @@
 ## thread-safety / message-ordering bugs a single-session parser fuzzer cannot
 ## reach.
 ##
-## Environment: it re-execs under `sudo unshare --mount` (a private mount
-## namespace + tmpfs over /run and /etc/privleap) AND privleap is a Debian
-## Trixie package -- privleapd uses 3.13-only APIs and the PAM shim imports the
-## `PAM` module Debian's python3-pam provides for the system python. Neither the
-## dist-ai CONTAINER lane (no mount namespace) nor a plain ubuntu VM (Python
-## 3.12; python3-pam built for it) satisfies both. So it runs in a PRIVILEGED
-## debian:trixie container: native Python 3.13, apt deps that match it, and
-## SYS_ADMIN for the mount namespace. privleapd + the shim still run from THIS
-## checkout, so the fuzzer tests the code under review.
-##
-## NOT a PR gate: this needs a privileged container and a faithful privleap
-## runtime, so it runs on a schedule and on demand rather than blocking PRs.
-## The per-PR wire/config/authz fuzzing lives in the Fuzz + dist-ai-fuzz
-## workflows.
+## Environment: privleap is a Debian Trixie package -- privleapd uses 3.13-only
+## APIs and the PAM shim does `import PAM` (Debian python3-pam's C module, built
+## for Trixie's python). So it runs in a debian:trixie container (native 3.13 +
+## matching apt deps). It runs the daemon with PRIVLEAP_TEST_DISPOSABLE_ENV=1,
+## which SKIPS the mount namespace + tmpfs -- those exist only to keep a REAL
+## host's /run + /etc/privleap untouched, and this container is throwaway. That
+## is what lets it run in an ORDINARY, NON-privileged container: `unshare
+## --mount` was the only piece needing CAP_SYS_ADMIN. privleapd + the shim still
+## run from THIS checkout, so the fuzzer tests the code under review.
 ##
 ## Reference: dist-ai usr/bin/privleap-tests-session-fuzz
 
 name: Session fuzz
 
 on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'usr/lib/python3/dist-packages/**/*.py'
+      - 'usr/libexec/privleap/**'
+      - 'usr/bin/privleapd'
+      - 'etc/pam.d/**'
+      - '.github/workflows/session-fuzz.yml'
   schedule:
     - cron: '15 4 * * *'
   workflow_dispatch:
@@ -48,24 +51,29 @@ concurrency:
 jobs:
   session-fuzz:
     name: Live-daemon session fuzz
-    ## CI runs only where we enabled it.
-    if: vars.CI_ENABLED_ORG_AI_ASSISTED == 'true'
+    ## CI runs only where we enabled it; ANDed with the fork-PR guard.
+    if: >-
+      vars.CI_ENABLED_ORG_AI_ASSISTED == 'true'
+      && (
+        (github.event_name == 'pull_request'
+          && github.event.pull_request.head.repo.full_name == github.repository)
+        || github.event_name != 'pull_request'
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    ## An ORDINARY (non-privileged) container: disposable mode skips the mount
+    ## namespace, so no CAP_SYS_ADMIN is needed. Trixie for native 3.13 + the
+    ## Debian python3-pam `PAM` module the shim imports.
     container:
       image: debian:trixie
-      ## --privileged: the fuzzer needs CAP_SYS_ADMIN to create the mount
-      ## namespace + tmpfs the real daemon runs in. The container is ephemeral.
-      options: --privileged
     steps:
       - name: Install prerequisites (Trixie, native Python 3.13)
         ## git + node deps for actions/checkout; the privleap runtime deps
         ## (python3-pam gives the shim's `PAM` module, python3-sdnotify the
         ## daemon's), and the suite's own deps -- all matching Trixie's 3.13.
+        ## adduser: the minimal image lacks the `addgroup` the runtime setup uses.
         run: |
           apt-get update
-          ## adduser: the minimal image lacks it, but the runtime setup uses
-          ## `addgroup` to create the privleap system group.
           apt-get install --yes --no-install-recommends \
             git ca-certificates sudo adduser \
             python3 python3-pam python3-sdnotify \
@@ -96,9 +104,8 @@ jobs:
         ## session_fuzz REFUSES to run as root: the daemon must attribute
         ## requests to an unprivileged caller (that is the whole authorization
         ## surface). The container is root, so make a normal user with
-        ## passwordless sudo (for the mount-namespace re-exec) -- exactly the
-        ## VM's runner-user + sudo shape. The workspace stays root-owned but is
-        ## world-readable, so the caller can run the checked-out code.
+        ## passwordless sudo (the daemon still needs root, reached via sudo).
+        ## The workspace stays root-owned but world-readable.
         run: |
           useradd --create-home --shell /bin/bash fuzzcaller
           printf 'fuzzcaller ALL=(ALL) NOPASSWD:ALL\n' \
@@ -109,9 +116,13 @@ jobs:
       - name: Session fuzz (as the unprivileged caller)
         env:
           ITERATIONS: ${{ github.event.inputs.iterations || '4000' }}
+        ## PRIVLEAP_TEST_DISPOSABLE_ENV: skip the mount namespace (this container
+        ## is throwaway), which is what keeps it non-privileged.
         run: |
           sudo -u fuzzcaller \
-            env PRIVLEAP_REPO="${GITHUB_WORKSPACE}" ITERATIONS="${ITERATIONS}" \
+            env PRIVLEAP_REPO="${GITHUB_WORKSPACE}" \
+                PRIVLEAP_TEST_DISPOSABLE_ENV=1 \
+                ITERATIONS="${ITERATIONS}" \
             bash -c 'cd "${PRIVLEAP_REPO}" \
               && ./.github/dist-ai/usr/bin/privleap-tests-session-fuzz \
                    --iterations "${ITERATIONS}"'
