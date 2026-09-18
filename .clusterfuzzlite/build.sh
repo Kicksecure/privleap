@@ -40,7 +40,8 @@ cd -- "${SRC}/privleap"
 ## its own python; reinstall them for 3.12.
 export PATH="/opt/py312/bin:${PATH}"
 python3 -m pip install --quiet --upgrade pip
-python3 -m pip install --quiet pyinstaller atheris
+## sdnotify: privleapd (imported by the authorization harness) imports it.
+python3 -m pip install --quiet pyinstaller atheris sdnotify
 
 ## Make the privleap package importable inside the harnesses. Both harnesses
 ## import only privleap.privleap, which is pure stdlib -- no extra pip deps.
