@@ -1,0 +1,102 @@
+## Copyright (C) 2026 - 2026 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
+## See the file COPYING for copying conditions.
+
+## AI-Assisted
+
+## Stateful, concurrent, live-daemon session fuzzer
+## (dist-ai privleap-tests-session-fuzz): drives many concurrent
+## PrivleapSession conversations against a REAL privleapd to shake out
+## thread-safety / message-ordering bugs a single-session parser fuzzer cannot
+## reach.
+##
+## It re-execs under `sudo unshare --mount` and lays a private tmpfs over /run
+## and /etc/privleap, so it needs a mount namespace + sudo -- which the dist-ai
+## CONTAINER lane (reusable-dist-ai-tests.yml) cannot provide. It therefore runs
+## directly on the ubuntu-latest VM here, after setting up the small privleap
+## runtime the daemon and its PAM shim require (the group, the PAM policy, and a
+## shim path to bind the checkout's shim over). privleapd and the shim still run
+## from the CHECKOUT (PRIVLEAP_REPO), so this tests the code under review.
+##
+## Reference: dist-ai usr/bin/privleap-tests-session-fuzz
+
+name: Session fuzz
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'usr/lib/python3/dist-packages/**/*.py'
+      - 'usr/libexec/privleap/**'
+      - 'usr/bin/privleapd'
+      - 'etc/pam.d/**'
+      - '.github/workflows/session-fuzz.yml'
+  schedule:
+    - cron: '15 4 * * *'
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: 'Number of fuzz sessions'
+        required: false
+        default: '4000'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  session-fuzz:
+    name: Live-daemon session fuzz
+    ## CI runs only where we enabled it; ANDed with the fork-PR guard.
+    if: >-
+      vars.CI_ENABLED_ORG_AI_ASSISTED == 'true'
+      && (
+        (github.event_name == 'pull_request'
+          && github.event.pull_request.head.repo.full_name == github.repository)
+        || github.event_name != 'pull_request'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout privleap
+        ## https://github.com/actions/checkout/releases/tag/v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Checkout dist-ai (test suites + runner)
+        ## The suite and its runner live in dist-ai; @master is the org's single
+        ## source of truth.
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          repository: org-ai-assisted/dist-ai
+          ref: master
+          path: .github/dist-ai
+          persist-credentials: false
+
+      - name: Install runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            python3-pam python3-sdnotify
+
+      - name: Set up privleap runtime (group, PAM policy, shim bind target)
+        ## privleapd and the shim run from the checkout, but a few artifacts
+        ## live at fixed system paths the daemon hardcodes: the privleap group,
+        ## the PAM policy the shim authenticates against, and an installed shim
+        ## path for bind_repo_shim to mount the checkout's shim over.
+        run: |
+          sudo addgroup --system privleap || true
+          sudo install -D --mode=0644 etc/pam.d/privleapd /etc/pam.d/privleapd
+          sudo install -D --mode=0755 \
+            usr/libexec/privleap/shim.py /usr/libexec/privleap/shim.py
+
+      - name: Session fuzz
+        env:
+          ITERATIONS: ${{ github.event.inputs.iterations || '4000' }}
+        run: |
+          PRIVLEAP_REPO="${PWD}" \
+            ./.github/dist-ai/usr/bin/privleap-tests-session-fuzz \
+              --iterations "${ITERATIONS}"
