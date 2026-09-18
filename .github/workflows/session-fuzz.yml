@@ -76,22 +76,10 @@ jobs:
           path: .github/dist-ai
           persist-credentials: false
 
-      - name: Install runtime dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends \
-            python3-pam python3-sdnotify
-
-      - name: Set up privleap runtime (group, PAM policy, shim bind target)
-        ## privleapd and the shim run from the checkout, but a few artifacts
-        ## live at fixed system paths the daemon hardcodes: the privleap group,
-        ## the PAM policy the shim authenticates against, and an installed shim
-        ## path for bind_repo_shim to mount the checkout's shim over.
-        run: |
-          sudo addgroup --system privleap || true
-          sudo install -D --mode=0644 etc/pam.d/privleapd /etc/pam.d/privleapd
-          sudo install -D --mode=0755 \
-            usr/libexec/privleap/shim.py /usr/libexec/privleap/shim.py
+      - name: Set up privleap runtime (deps, group, PAM policy, shim target)
+        ## Centralised in dist-ai so the setup is maintained with the suite; the
+        ## daemon + shim still run from THIS checkout (passed as the arg).
+        run: ./.github/dist-ai/usr/bin/privleap-tests-session-fuzz-setup "${PWD}"
 
       - name: Session fuzz
         env:
