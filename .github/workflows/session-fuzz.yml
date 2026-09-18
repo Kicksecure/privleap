@@ -92,10 +92,26 @@ jobs:
         ## daemon + shim still run from THIS checkout (passed as the arg).
         run: ./.github/dist-ai/usr/bin/privleap-tests-session-fuzz-setup "${PWD}"
 
-      - name: Session fuzz
+      - name: Create the unprivileged fuzz caller
+        ## session_fuzz REFUSES to run as root: the daemon must attribute
+        ## requests to an unprivileged caller (that is the whole authorization
+        ## surface). The container is root, so make a normal user with
+        ## passwordless sudo (for the mount-namespace re-exec) -- exactly the
+        ## VM's runner-user + sudo shape. The workspace stays root-owned but is
+        ## world-readable, so the caller can run the checked-out code.
+        run: |
+          useradd --create-home --shell /bin/bash fuzzcaller
+          printf 'fuzzcaller ALL=(ALL) NOPASSWD:ALL\n' \
+            > /etc/sudoers.d/fuzzcaller
+          chmod 0440 /etc/sudoers.d/fuzzcaller
+          chmod -R a+rX "${GITHUB_WORKSPACE}"
+
+      - name: Session fuzz (as the unprivileged caller)
         env:
           ITERATIONS: ${{ github.event.inputs.iterations || '4000' }}
         run: |
-          PRIVLEAP_REPO="${PWD}" \
-            ./.github/dist-ai/usr/bin/privleap-tests-session-fuzz \
-              --iterations "${ITERATIONS}"
+          sudo -u fuzzcaller \
+            env PRIVLEAP_REPO="${GITHUB_WORKSPACE}" ITERATIONS="${ITERATIONS}" \
+            bash -c 'cd "${PRIVLEAP_REPO}" \
+              && ./.github/dist-ai/usr/bin/privleap-tests-session-fuzz \
+                   --iterations "${ITERATIONS}"'
