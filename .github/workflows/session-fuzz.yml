@@ -84,6 +84,13 @@ jobs:
         with:
           python-version: '3.13'
 
+      - name: Install privleap runtime deps into 3.13
+        ## setup-python's 3.13 has its own site-packages, isolated from the apt
+        ## python3-sdnotify/pam (which target the system 3.12). privleapd imports
+        ## sdnotify and the shim imports pam, so install both into the 3.13 that
+        ## will actually run the daemon.
+        run: python3 -m pip install --quiet sdnotify python-pam
+
       - name: Set up privleap runtime (deps, group, PAM policy, shim target)
         ## Centralised in dist-ai so the setup is maintained with the suite; the
         ## daemon + shim still run from THIS checkout (passed as the arg).
