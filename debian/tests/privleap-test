@@ -20,56 +20,65 @@ rcfile="${repo_dir}/debian/tests/coverage/coveragerc"
 ## AUTOPKGTEST_ARTIFACTS might be a relative path.
 artifacts_dir="$(realpath -- "${AUTOPKGTEST_ARTIFACTS:-${repo_dir}/autopkgtest-artifacts}")"
 
-## cov_dir must be world-writable, as unprivileged clients run by the test
-## suite must have their coverage measured also.
-cov_dir="${artifacts_dir}/privleap-coverage"
-mkdir --mode=777 --parents -- "${cov_dir}"
+## Create a coverage directory that root reads from or writes into.
+make_cov_dir() {
+  if ! mkdir -- "${1}" 2>/dev/null; then
+    printf 'ERROR: coverage dir pre-exists or is not creatable: %s\n' "${1}" 1>&2
+    exit 1
+  fi
+  chmod "${2}" -- "${1}"
+}
 
-## Debugging.
-printf '%s\n' "DEBUGGING: Stat report on '${cov_dir}':"
-iter_str="${cov_dir}"
-while [ -n "${iter_str}" ] && [ "${iter_str}" != '/' ]; do
-  stat "${iter_str}" || true
-  iter_str="$(dirname "${iter_str}")";
-done
-printf '%s\n' "END DEBUGGING: Stat report on '${cov_dir}':"
+## cov_dir holds raw coverage data and must be world-writable for the sake of
+## unprivileged clients. Sticky bit prevents undesired deletion.
+cov_dir="${artifacts_dir}/privleap-coverage"
+make_cov_dir "${cov_dir}" 1777
+
+## sitecustomize.py and coveragerc must be readable by unprivileged clients.
+cov_bootstrap_dir="${artifacts_dir}/privleap-coverage-bootstrap"
+make_cov_dir "${cov_bootstrap_dir}" 0755
+cp -- "${repo_dir}/debian/tests/coverage/sitecustomize.py" \
+  "${cov_bootstrap_dir}/"
+cp -- "${rcfile}" "${cov_bootstrap_dir}/"
+chmod 644 -- "${cov_bootstrap_dir}/sitecustomize.py" \
+  "${cov_bootstrap_dir}/coveragerc"
+rcfile="${cov_bootstrap_dir}/coveragerc"
+
+## All coverage-activating environment variables must survive 'sudo -u'.
+coverage_sudoers=/etc/sudoers.d/privleap-coverage
+coverage_sudoers_tmp="$(mktemp)"
+trap 'rm -f -- "${coverage_sudoers}" "${coverage_sudoers_tmp}"' EXIT
+trap 'exit 130' INT TERM ## triggers cleanup without preventing exit
+printf '%s\n' \
+  'Defaults:root env_keep += "COVERAGE_PROCESS_START"' \
+  'Defaults:root env_keep += "COVERAGE_FILE"' \
+  'Defaults:root env_keep += "PYTHONPATH"' \
+  > "${coverage_sudoers_tmp}"
+visudo -cf "${coverage_sudoers_tmp}" >/dev/null
+install -m 0440 -o root -g root -- \
+  "${coverage_sudoers_tmp}" "${coverage_sudoers}"
 
 export COVERAGE_PROCESS_START="${rcfile}"
 export COVERAGE_FILE="${cov_dir}/.coverage"
-export PYTHONPATH="${repo_dir}/debian/tests/coverage${PYTHONPATH:+:${PYTHONPATH}}"
-
-## FIXME: Coverage reports from unprivileged clients are not being captured.
-## These must be captured for the coverage report to be useful. Issues rules
-## out so far:
-##
-## * Environment passthrough settings aren't being written to /etc/sudoers.d?
-##   Verified false - a developer was able to unpack the tarball written by
-##   mmdebstrap during environment setup and see the config file, with the
-##   expected contents.
-## * Malformed configuration? Verified false - a developer was able to chroot
-##   into an unpacked tarball, export whitelisted environment variables as
-##   root, then run `sudo -u user bash` and see those environment variables
-##   present in the shell.
-## * Parent directory permissions forbid unprivileged users from writing into
-##   the coverage data repository? Verified false - the stat report debugging
-##   above shows that every parent directory is at least r-x for unprivileged
-##   users, and that $cov_dir itself is rwx for unprivileged users.
-## * AUTOPKGTEST_ARTIFACTS is a relative path? Impossible, the path is made
-##   into an absolute path above. Verified false - these environment variables
-##   are printed into the test log by the `test-act-rootdata` and
-##   `test-act-userdata` action tests, and are shown as absolute paths there.
-## * Environment variables silently fail to have an effect in a non-root
-##   session? Verified false - a developer was able to run Python scripts
-##   commands in a properly set up unpacked tarball and see coverage report
-##   files generated automatically.
-##
-## Most likely the environment variables are not reaching the unprivileged
-## scripts for some unknown reason. It is also possible that coverage files
-## are being generated but coverage.py is ignoring them due to file ownership
-## or other concerns. Further investigation remains to be done.
+export PYTHONPATH="${cov_bootstrap_dir}${PYTHONPATH:+:${PYTHONPATH}}"
 
 test_rc=0
 ./test/run-test || test_rc="$?"
+
+## Make sure some non-root-owned coverage files exist.
+client_cov_count="$(find "${cov_dir}" -maxdepth 1 -type f -name '.coverage.*' \
+  -not -user root -printf '.' | wc -c)"
+if [ "${client_cov_count}" -eq 0 ]; then
+  printf '%s\n' 'ERROR: no coverage data from unprivileged clients was captured, coverage data is incomplete.' >&2
+  exit 1
+fi
+printf '%s\n' "Captured coverage from ${client_cov_count} unprivileged client process(es)." >&2
+
+## Lock down and cleanup cov_dir before doing file combination.
+chmod 0700 -- "${cov_dir}"
+find "${cov_dir}" -maxdepth 1 -type f '(' -not -name '.coverage.*' \
+  -and -not -name '.coverage' ')' -delete
+find "${cov_dir}" -maxdepth 1 -type l -delete
 
 python3 -m coverage combine --rcfile="${rcfile}" "${cov_dir}"
 python3 -m coverage report --rcfile="${rcfile}" 1>&2

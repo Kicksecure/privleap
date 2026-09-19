@@ -1,0 +1,42 @@
+## Copyright (C) 2026 - 2026 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
+## See the file COPYING for copying conditions.
+
+## AI-Assisted
+
+## privleap-specific: always run the dist-ai FUZZ suite on CI, in addition to
+## the fast --core run in the standard "dist-ai tests" workflow. Runs the
+## randomized wire-protocol parser fuzzer (privleap-tests-fuzz), the stateful
+## concurrent live-daemon session fuzzer (privleap-tests-session-fuzz), and the
+## coverage-guided Atheris variant (privleap-tests-fuzz-atheris, which skips
+## unless atheris is installed).
+##
+## This is an INTENTIONAL per-repo workflow, NOT a managed consumer template
+## (pkg_update_consumer_workflows must not overwrite it). It reuses the same
+## reusable-dist-ai-tests.yml, passing the --fuzz category so it inherits the
+## caller checkout, the dm-consumer.yml apt-packages setup, and the per-suite
+## timeout/log handling.
+##
+## Reusable docs:
+## https://github.com/org-ai-assisted/developer-meta-files/blob/master/.github/workflows/reusable-dist-ai-tests.yml
+
+name: dist-ai fuzz
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dist-ai-fuzz:
+    uses: org-ai-assisted/developer-meta-files/.github/workflows/reusable-dist-ai-tests.yml@master
+    with:
+      categories: '--fuzz'
