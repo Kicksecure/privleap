@@ -19,7 +19,11 @@
 ## --mount` was the only piece needing CAP_SYS_ADMIN. privleapd + the shim still
 ## run from THIS checkout, so the fuzzer tests the code under review.
 ##
-## Reference: dist-ai usr/bin/privleap-tests-session-fuzz
+## All runtime deps + provisioning (runtime setup, the unprivileged caller, the
+## fuzz run) live in the dist-ai CI orchestrator so this wrapper stays thin and
+## the recipe is maintained with the suite.
+##
+## Reference: dist-ai usr/bin/privleap-tests-session-fuzz-ci
 
 name: Session fuzz
 
@@ -67,17 +71,13 @@ jobs:
     container:
       image: debian:trixie
     steps:
-      - name: Install prerequisites (Trixie, native Python 3.13)
-        ## git + node deps for actions/checkout; the privleap runtime deps
-        ## (python3-pam gives the shim's `PAM` module, python3-sdnotify the
-        ## daemon's), and the suite's own deps -- all matching Trixie's 3.13.
-        ## adduser: the minimal image lacks the `addgroup` the runtime setup uses.
+      - name: Install checkout prerequisites
+        ## Minimal bootstrap so actions/checkout can run in the bare Trixie
+        ## image; every runtime dep + all provisioning is owned by the dist-ai
+        ## CI orchestrator below, kept with the suite rather than duplicated here.
         run: |
           apt-get update
-          apt-get install --yes --no-install-recommends \
-            git ca-certificates sudo adduser \
-            python3 python3-pam python3-sdnotify \
-            python3-hypothesis python3-pytest
+          apt-get install --yes --no-install-recommends git ca-certificates
 
       - name: Checkout privleap
         ## https://github.com/actions/checkout/releases/tag/v6.0.2
@@ -85,9 +85,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Checkout dist-ai (test suites + runner)
-        ## The suite and its runner live in dist-ai; @master is the org's single
-        ## source of truth.
+      - name: Checkout dist-ai (test suites + CI orchestrator)
+        ## The suite, its runner, and the session-fuzz CI orchestrator live in
+        ## dist-ai; @master is the org's single source of truth.
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           repository: org-ai-assisted/dist-ai
@@ -95,34 +95,13 @@ jobs:
           path: .github/dist-ai
           persist-credentials: false
 
-      - name: Set up privleap runtime (group, PAM policy, shim target)
-        ## Centralised in dist-ai so the setup is maintained with the suite; the
-        ## daemon + shim still run from THIS checkout (passed as the arg).
-        run: ./.github/dist-ai/usr/bin/privleap-tests-session-fuzz-setup "${PWD}"
-
-      - name: Create the unprivileged fuzz caller
-        ## session_fuzz REFUSES to run as root: the daemon must attribute
-        ## requests to an unprivileged caller (that is the whole authorization
-        ## surface). The container is root, so make a normal user with
-        ## passwordless sudo (the daemon still needs root, reached via sudo).
-        ## The workspace stays root-owned but world-readable.
-        run: |
-          useradd --create-home --shell /bin/bash fuzzcaller
-          printf 'fuzzcaller ALL=(ALL) NOPASSWD:ALL\n' \
-            > /etc/sudoers.d/fuzzcaller
-          chmod 0440 /etc/sudoers.d/fuzzcaller
-          chmod -R a+rX "${GITHUB_WORKSPACE}"
-
-      - name: Session fuzz (as the unprivileged caller)
+      - name: Provision and run session fuzz
+        ## The dist-ai orchestrator installs runtime deps, sets up the privleap
+        ## runtime (group / PAM / shim), creates the unprivileged caller
+        ## (session_fuzz refuses root), and runs the fuzzer as it in disposable
+        ## mode. privleapd + the shim run from THIS checkout (passed as ${PWD}).
         env:
           ITERATIONS: ${{ github.event.inputs.iterations || '4000' }}
-        ## PRIVLEAP_TEST_DISPOSABLE_ENV: skip the mount namespace (this container
-        ## is throwaway), which is what keeps it non-privileged.
         run: |
-          sudo -u fuzzcaller \
-            env PRIVLEAP_REPO="${GITHUB_WORKSPACE}" \
-                PRIVLEAP_TEST_DISPOSABLE_ENV=1 \
-                ITERATIONS="${ITERATIONS}" \
-            bash -c 'cd "${PRIVLEAP_REPO}" \
-              && ./.github/dist-ai/usr/bin/privleap-tests-session-fuzz \
-                   --iterations "${ITERATIONS}"'
+          ./.github/dist-ai/usr/bin/privleap-tests-session-fuzz-ci \
+            "${PWD}" --iterations "${ITERATIONS}"
