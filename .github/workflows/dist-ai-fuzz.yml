@@ -60,7 +60,12 @@ jobs:
         || github.event_name != 'pull_request'
       )
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    ## timeout_fuzz is PER fuzz suite; dist-ai-tests-all runs them in sequence,
+    ## so the job cap must exceed (number of privleap fuzz suites) x timeout_fuzz
+    ## plus checkout/provisioning. In practice only the session fuzzer approaches
+    ## its cap (the parser fuzzers finish fast); 45 min leaves headroom for the
+    ## 1200s default and a raised dispatch value alike.
+    timeout-minutes: 45
     ## An ORDINARY (non-privileged) container: the session fuzzer runs in
     ## disposable mode (no mount namespace), so no CAP_SYS_ADMIN is needed.
     ## Trixie for native 3.13 + the Debian python3-pam `PAM` module the shim imports.
