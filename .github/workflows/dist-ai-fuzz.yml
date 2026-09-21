@@ -3,30 +3,43 @@
 
 ## AI-Assisted
 
-## privleap-specific: always run the dist-ai FUZZ suite on CI, in addition to
-## the fast --core run in the standard "dist-ai tests" workflow. Runs the
-## randomized wire-protocol parser fuzzer (privleap-tests-fuzz), the stateful
-## concurrent live-daemon session fuzzer (privleap-tests-session-fuzz), and the
-## coverage-guided Atheris variant (privleap-tests-fuzz-atheris, which skips
-## unless atheris is installed).
+## Runs the WHOLE privleap dist-ai fuzz category in ONE lane: the in-process
+## wire/config/authz parser fuzzers AND the stateful live-daemon session fuzzer.
+## The live-daemon fuzzer refuses to run as root and needs the privleap runtime
+## (group / PAM / shim) installed, so this cannot use the generic
+## reusable-dist-ai-tests lane (which the other consumers use); instead it calls
+## the dist-ai CI orchestrator, which provisions the runtime, drops to an
+## unprivileged caller, and runs dist-ai-tests-all --fuzz as it. That is why this
+## repo has no separate session-fuzz workflow and does not skip session-fuzz.
 ##
-## This is an INTENTIONAL per-repo workflow, NOT a managed consumer template
-## (pkg_update_consumer_workflows must not overwrite it). It reuses the same
-## reusable-dist-ai-tests.yml, passing the --fuzz category so it inherits the
-## caller checkout, the dm-consumer.yml apt-packages setup, and the per-suite
-## timeout/log handling.
+## Cadence is deliberately lean -- path-filtered PRs + a daily cron, NOT every
+## push: the session fuzzer is a ~20-minute job and deep fuzzing runs locally,
+## so CI is a smoke check, not a per-push gate.
 ##
-## Reusable docs:
-## https://github.com/org-ai-assisted/developer-meta-files/blob/master/.github/workflows/reusable-dist-ai-tests.yml
+## INTENTIONAL per-repo workflow, NOT a managed consumer template
+## (pkg_update_consumer_workflows must not overwrite it).
+##
+## Reference: dist-ai usr/bin/privleap-tests-fuzz-ci
 
 name: dist-ai fuzz
 
 on:
   pull_request:
     branches: [master]
-  push:
-    branches: [master]
+    paths:
+      - 'usr/lib/python3/dist-packages/**/*.py'
+      - 'usr/libexec/privleap/**'
+      - 'usr/bin/privleapd'
+      - 'etc/pam.d/**'
+      - '.github/workflows/dist-ai-fuzz.yml'
+  schedule:
+    - cron: '15 4 * * *'
   workflow_dispatch:
+    inputs:
+      timeout_fuzz:
+        description: 'Per-fuzzer wall-clock budget in seconds'
+        required: false
+        default: '1200'
 
 permissions:
   contents: read
@@ -36,7 +49,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  dist-ai-fuzz:
-    uses: org-ai-assisted/developer-meta-files/.github/workflows/reusable-dist-ai-tests.yml@master
-    with:
-      categories: '--fuzz'
+  fuzz:
+    name: dist-ai fuzz (in-process + live-daemon)
+    ## CI runs only where we enabled it; ANDed with the fork-PR guard.
+    if: >-
+      vars.CI_ENABLED_ORG_AI_ASSISTED == 'true'
+      && (
+        (github.event_name == 'pull_request'
+          && github.event.pull_request.head.repo.full_name == github.repository)
+        || github.event_name != 'pull_request'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    ## An ORDINARY (non-privileged) container: the session fuzzer runs in
+    ## disposable mode (no mount namespace), so no CAP_SYS_ADMIN is needed.
+    ## Trixie for native 3.13 + the Debian python3-pam `PAM` module the shim imports.
+    container:
+      image: debian:trixie
+    steps:
+      - name: Install checkout prerequisites
+        ## Minimal bootstrap so actions/checkout can run in the bare Trixie
+        ## image; every runtime dep + all provisioning is owned by the dist-ai
+        ## CI orchestrator below, kept with the suite rather than duplicated here.
+        run: |
+          apt-get update
+          apt-get install --yes --no-install-recommends git ca-certificates
+
+      - name: Checkout privleap
+        ## https://github.com/actions/checkout/releases/tag/v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Checkout dist-ai (test suites + CI orchestrator)
+        ## The suites, their runners, and the fuzz CI orchestrator live in
+        ## dist-ai; @master is the org's single source of truth.
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          repository: org-ai-assisted/dist-ai
+          ref: master
+          path: .github/dist-ai
+          persist-credentials: false
+
+      - name: Provision and run all privleap fuzz
+        ## The dist-ai orchestrator installs runtime deps, sets up the privleap
+        ## runtime (group / PAM / shim), creates the unprivileged caller, and runs
+        ## dist-ai-tests-all --fuzz (in-process parser fuzz + live-daemon session
+        ## fuzz) as it. privleapd + the shim run from THIS checkout (passed as ${PWD}).
+        env:
+          TIMEOUT_FUZZ: ${{ github.event.inputs.timeout_fuzz || '1200' }}
+        run: |
+          ./.github/dist-ai/usr/bin/privleap-tests-fuzz-ci \
+            "${PWD}" --timeout-fuzz "${TIMEOUT_FUZZ}"

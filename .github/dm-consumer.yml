@@ -12,8 +12,7 @@ dist-ai-tests:
   ## (privleap-tests-verify) hard-FAILs without Z3 (it must not silently
   ## disable itself).
   apt-packages: "python3 python3-pytest python3-hypothesis python3-sdnotify python3-pam python3-z3"
-  ## Runs in its own workflow (session-fuzz.yml).
-  skip: [privleap-tests-session-fuzz]
-  ## privleap-tests-fuzz-atheris needs the atheris pip package (not packaged
-  ## for Debian); coverage-guided fuzzing runs continuously via ClusterFuzzLite.
-  allow-skip: [privleap-tests-fuzz-atheris]
+  ## No fuzz skip/allow-skip here: the whole --fuzz category (including the
+  ## live-daemon session fuzzer and the atheris allow-skip) runs in the repo's
+  ## own dist-ai-fuzz.yml via privleap-tests-fuzz-ci, not the generic --core lane
+  ## this section configures. --core never runs the fuzz suites.
