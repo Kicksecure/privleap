@@ -1,0 +1,38 @@
+---
+## propagation: manual
+## Copyright (C) 2026 - 2026 ENCRYPTED SUPPORT LLC <adrelanos@whonix.org>
+## See the file COPYING for copying conditions.
+
+## AI-Assisted
+
+## Hand-maintained. Dockerfile lives at .clusterfuzzlite/Dockerfile.
+## See developer-meta-files/agents/github-actions-consumer-templates.md
+## "Per-repo manual dependabot.yml".
+
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 1
+    commit-message:
+      prefix: "ci(deps)"
+      include: scope
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "docker"
+    directory: ".clusterfuzzlite"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 1
+    commit-message:
+      prefix: "ci(deps)"
+      include: scope
+    groups:
+      docker:
+        patterns:
+          - "*"
