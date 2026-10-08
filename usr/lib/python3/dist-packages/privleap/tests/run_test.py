@@ -255,6 +255,35 @@ def leapctl_delete_deleteme_user(bogus: str) -> bool:
     return True
 
 
+def leapctl_create_upper_user(bogus: str) -> bool:
+    """
+    Creates a user account with uppercase letters in its name, for testing
+    that such accounts can get a comm socket.
+    """
+
+    if bogus != "":
+        return False
+    try:
+        subprocess.run(["useradd", "-m", "PrivleapTestUpper"], check=True)
+    except Exception:
+        return False
+    return True
+
+
+def leapctl_delete_upper_user(bogus: str) -> bool:
+    """
+    Deletes the user account created by leapctl_create_upper_user().
+    """
+
+    if bogus != "":
+        return False
+    try:
+        subprocess.run(["deluser", "PrivleapTestUpper"], check=True)
+    except Exception:
+        return False
+    return True
+
+
 def leapctl_server_error_test(bogus: str) -> bool:
     """
     Tests leapctl against a fake server that always errors out regardless of
@@ -582,6 +611,50 @@ def run_leapctl_tests() -> None:
         ["leapctl", "--destroy", str(deleteme_uid)],
         exit_code=0,
         stdout_data=deleteme_destroy_stdout,
+    )
+    ## ---
+    leapctl_assert_function(
+        leapctl_create_upper_user,
+        "",
+        "Create user with uppercase letters in its name",
+    )
+    leapctl_assert_command(
+        ["leapctl", "--reload"],
+        exit_code=0,
+        stdout_data=b"privleapd configuration reload successful.\n",
+    )
+    upper_uid_str: str = str(pwd.getpwnam("PrivleapTestUpper").pw_uid)
+    leapctl_assert_command(
+        ["leapctl", "--create", "PrivleapTestUpper"],
+        exit_code=0,
+        stdout_data=PlTestData.upper_socket_created,
+    )
+    leapctl_assert_function(
+        test_if_path_exists,
+        str(
+            Path(
+                PlTestGlobal.privleap_state_dir,
+                "comm",
+                upper_uid_str,
+            )
+        ),
+        "Ensure uppercase user socket exists",
+    )
+    ## leapctl@.service passes the UID, so test that path too.
+    leapctl_assert_command(
+        ["leapctl", "--create", upper_uid_str],
+        exit_code=0,
+        stdout_data=PlTestData.upper_socket_exists,
+    )
+    leapctl_assert_command(
+        ["leapctl", "--destroy", "PrivleapTestUpper"],
+        exit_code=0,
+        stdout_data=PlTestData.upper_socket_destroyed,
+    )
+    leapctl_assert_function(
+        leapctl_delete_upper_user,
+        "",
+        "Delete user with uppercase letters in its name",
     )
     ## ---
     leapctl_assert_command(

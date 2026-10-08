@@ -1239,7 +1239,9 @@ class PrivleapCommon:
     ## quickly to avoid this attack.
     socket_timeout: float = 0.1
     config_file_regex: re.Pattern[str] = re.compile(r"[-A-Za-z0-9_]+\.conf\Z")
-    user_name_regex: re.Pattern[str] = re.compile(r"[a-z_][-a-z0-9_]*\$?\Z")
+    user_name_regex: re.Pattern[str] = re.compile(
+        r"[A-Za-z_][-A-Za-z0-9_]*\$?\Z"
+    )
     uid_regex: re.Pattern[str] = re.compile(r"[0-9]+\Z")
     signal_name_regex: re.Pattern[str] = re.compile(r"[-A-Za-z0-9_.]+\Z")
     msg_arg_blob_data: dict[str, tuple[int, int, bool]] = {

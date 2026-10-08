@@ -627,6 +627,10 @@ User=news
 
 [persistent-users]
 User=messagebus
+
+## Account names may contain uppercase letters
+[allowed-users]
+User=PrivleapTestUpper
 """
     comment_only_config_file: str = """# this is a comment
 ## and so is this
@@ -785,6 +789,15 @@ User=privleaptestthree
     )
     deleteme_socket_destroyed: bytes = (
         b"Comm socket destroyed for account 'XXX_DELETEME_UID_XXX'.\n"
+    )
+    upper_socket_created: bytes = (
+        b"Comm socket created for account 'PrivleapTestUpper'.\n"
+    )
+    upper_socket_exists: bytes = (
+        b"Comm socket already exists for account 'PrivleapTestUpper'.\n"
+    )
+    upper_socket_destroyed: bytes = (
+        b"Comm socket destroyed for account 'PrivleapTestUpper'.\n"
     )
     man_socket_not_permitted: bytes = (
         b"ERROR: Account 'man' is not permitted to have a comm socket!\n"

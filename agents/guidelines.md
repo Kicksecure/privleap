@@ -43,6 +43,14 @@ The following bugs have been identified and fixed. Do not re-report them.
   and catch `FileNotFoundError`.
 - Config file name validation used the full path (`str(config_file)`) against
   the filename regex. Fixed: validates `config_file.name` only.
+- `user_name_regex` rejected uppercase letters, although Debian's `adduser`
+  accepts them by default (see `NAME_REGEX` / `SYS_NAME_REGEX` in
+  `adduser.conf(5)`). Accounts such as `Example_User` could not get a comm
+  socket and `leapctl@.service` restarted forever. Fixed: regex is now
+  `r"[A-Za-z_][-A-Za-z0-9_]*\$?\Z"`, which matches `SYS_NAME_REGEX`. All
+  account and group names reaching this regex come from root (leapctl, the
+  root-only control socket, root-owned config files), so this does not widen
+  what unprivileged users can send.
 
 ## Things that look like bugs but are not
 
